@@ -1,5 +1,6 @@
 import os
 import io
+import re
 import logging
 import uuid
 import sqlite3
@@ -45,6 +46,10 @@ FUEL_PREFIX    = {"95": "95",    "92": "92",     "diesel": "DZ"}
 STATION_PREFIX = {"TES": "TES",  "Atan": "ATN",  "VTK": "VTK"}
 
 DISTRICTS = ["Гагаринский район", "Ленинский/Нахимовский", "Балаклава/Северная"]
+
+# Допустимые буквы на российских номерах (кириллица + латинские аналоги)
+_PL = "АВЕКМНОРСТУХавекмнорстухABEKMHOPCTYXabekmhopctyx"
+PLATE_RE = re.compile(rf"^[{_PL}]\d{{3}}[{_PL}]{{2}}\d{{2,3}}$")
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -634,8 +639,18 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     # ── 3. Госномер автомобиля (пользователь) ────────────────────
     if context.user_data.get("waiting_plate"):
+        if not PLATE_RE.match(text.strip()):
+            await update.message.reply_text(
+                "⚠️ *Ошибка:* Введённый номер не соответствует стандартному формату РФ!\n\n"
+                "Пожалуйста, введите корректный номер в формате:\n"
+                "`А123АА92` — одна буква, три цифры, две буквы, код региона.\n\n"
+                "Допускается ввод как кириллицей, так и латиницей.",
+                parse_mode="Markdown"
+            )
+            return  # waiting_plate остаётся в user_data — ждём повторного ввода
+
         flow  = context.user_data.pop("waiting_plate")
-        plate = text.upper()
+        plate = text.strip().upper()
 
         if flow == "free":
             if plate_cooldown_active(plate, "free", FREE_COOLDOWN_DAYS):
