@@ -390,12 +390,22 @@ async def menu_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     # ── Платный ваучер ────────────────────────────────────────────
     elif data == "paid_quota":
-        context.user_data["waiting_plate"] = "paid"
         await query.edit_message_text(
-            "⚡ *Дополнительный объём (Платная доза)*\n\n"
+            "⚡ *Внимание! Важная информация о дополнительных объёмах:*\n\n"
+            "1. Вы приобретаете *электронный ВАУЧЕР (право на покупку)*, а не само физическое "
+            "топливо. Оплата топлива по тарифу АЗС производится непосредственно на кассе "
+            "заправки «ТЭС» после гашения QR-кода контролёром.\n\n"
+            "2. Количество доступных коммерческих ваучеров в системе *строго ограничено "
+            "суточными лимитами поставок* в Севастополь.\n\n"
+            "3. Действует жёсткое антикризисное ограничение: *не более 1 дополнительного "
+            "ваучера (20 литров) в неделю на один госномер автомобиля*.\n\n"
             "Введите *госномер автомобиля* для проверки недельного лимита:",
-            parse_mode="Markdown"
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("❌ Отмена", callback_data="main_menu")
+            ]])
         )
+        context.user_data["waiting_plate"] = "paid"
 
     # ── Выбор вида топлива (платный) ──────────────────────────────
     elif data == "paid_fuel_select":
@@ -428,7 +438,7 @@ async def menu_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await query.edit_message_text(
             text, parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("💳 Оплатить через СБП", web_app=WebAppInfo(url=sim_url))],
+                [InlineKeyboardButton("💳 Оплатить сервисный сбор за ваучер (СБП)", web_app=WebAppInfo(url=sim_url))],
                 [InlineKeyboardButton("🤖 Тестовая оплата (Симуляция)", callback_data=f"paid_sim_{fuel_type}")],
                 [InlineKeyboardButton("❌ Отменить", callback_data="main_menu")],
             ])
@@ -458,14 +468,17 @@ async def menu_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         )
         caption = (
             f"⚡ *Коммерческий ваучер на 20 литров*\n\n"
-            f"🏷 Серийный номер: `{payload}`\n"
+            f"🏷 Выдан дополнительный коммерческий ваучер №`{payload}` на объём до *20 литров*.\n"
             f"⛽ АЗС: {product['label']}\n"
             f"🚗 Госномер: `{plate}`\n\n"
+            "⚠️ *Важно:* Сам бензин оплачивается отдельно на кассе АЗС «ТЭС» после гашения "
+            "QR-кода контролёром. Данный ваучер подтверждает только *право на покупку* топлива.\n\n"
             "📋 *Инструкция:*\n"
             "1. Код действует до момента гашения сотрудником АЗС.\n"
-            "2. Предъявите код контролёру на АЗС ТЭС.\n"
-            "3. Контролёр сверит код с госномером вашего авто.\n"
-            "4. Следующий платный ваучер — не ранее чем через 7 дней."
+            "2. Предъявите код контролёру Правительства Севастополя на АЗС ТЭС.\n"
+            "3. Контролёр сверит код с госномером вашего авто и погасит его.\n"
+            "4. После гашения оплатите топливо на кассе по тарифу АЗС.\n"
+            "5. Следующий платный ваучер — не ранее чем через *7 дней*."
         )
         await query.message.reply_photo(photo=make_qr(payload), caption=caption, parse_mode="Markdown")
 
