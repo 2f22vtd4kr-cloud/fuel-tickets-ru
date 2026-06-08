@@ -146,9 +146,9 @@ router.post("/cryptobot", async (req: Request, res: Response) => {
     const now = new Date().toISOString().slice(0, 10);
     db.prepare(
       `UPDATE vouchers
-       SET status='issued', license_plate=?, issued_at=?, voucher_type='paid'
+       SET status='issued', license_plate=?, issued_at=?, voucher_type='paid', chat_id=?
        WHERE id=?`,
-    ).run(plate, now, voucher.id);
+    ).run(plate, now, chat_id, voucher.id);
 
     db.prepare("DELETE FROM pending_payments WHERE order_id=?").run(orderId);
 

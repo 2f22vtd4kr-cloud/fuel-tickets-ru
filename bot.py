@@ -87,6 +87,7 @@ def init_db() -> None:
         ("voucher_type",  "TEXT NOT NULL DEFAULT 'free'"),
         ("license_plate", "TEXT"),
         ("redeemed_at",   "TEXT"),
+        ("chat_id",       "INTEGER"),
     ]:
         try:
             cur.execute(f"ALTER TABLE vouchers ADD COLUMN {col} {definition}")
@@ -101,9 +102,15 @@ def init_db() -> None:
             chat_id    INTEGER NOT NULL,
             plate      TEXT NOT NULL,
             fuel_type  TEXT NOT NULL,
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            pay_url    TEXT
         )
     """)
+    # Миграция pending_payments (старая схема без pay_url)
+    try:
+        cur.execute("ALTER TABLE pending_payments ADD COLUMN pay_url TEXT")
+    except sqlite3.OperationalError:
+        pass
     existing = cur.execute("SELECT COUNT(*) FROM vouchers").fetchone()[0]
     if existing == 0:
         rows = []
@@ -129,15 +136,16 @@ def _today_str() -> str:
 
 
 def save_pending_payment(
-    order_id: str, invoice_id: int, chat_id: int, plate: str, fuel_type: str
+    order_id: str, invoice_id: int, chat_id: int,
+    plate: str, fuel_type: str, pay_url: str = ""
 ) -> None:
     con = _conn()
     con.execute(
         """INSERT OR IGNORE INTO pending_payments
-           (order_id, invoice_id, chat_id, plate, fuel_type, created_at)
-           VALUES (?, ?, ?, ?, ?, ?)""",
+           (order_id, invoice_id, chat_id, plate, fuel_type, created_at, pay_url)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
         (order_id, invoice_id, chat_id, plate, fuel_type,
-         datetime.now(timezone.utc).isoformat()),
+         datetime.now(timezone.utc).isoformat(), pay_url),
     )
     con.commit()
     con.close()
@@ -145,6 +153,49 @@ def save_pending_payment(
 
 def _n_days_ago_iso(n: int) -> str:
     return (datetime.now(timezone.utc) - timedelta(days=n)).isoformat()
+
+
+def get_user_orders(chat_id: int) -> dict:
+    """Возвращает pending-платежи и выданные ваучеры пользователя по chat_id."""
+    con = _conn()
+    pending_rows = con.execute(
+        """SELECT order_id, plate, fuel_type, created_at, pay_url
+           FROM pending_payments WHERE chat_id = ?
+           ORDER BY created_at DESC""",
+        (chat_id,),
+    ).fetchall()
+    issued_rows = con.execute(
+        """SELECT qr_code_payload, fuel_type, station_brand, license_plate,
+                  issued_at, voucher_type
+           FROM vouchers
+           WHERE chat_id = ? AND status = 'issued'
+           ORDER BY issued_at DESC LIMIT 20""",
+        (chat_id,),
+    ).fetchall()
+    con.close()
+    return {
+        "pending": [
+            {
+                "order_id":   r[0],
+                "plate":      r[1],
+                "fuel_type":  r[2],
+                "created_at": r[3],
+                "pay_url":    r[4] or "",
+            }
+            for r in pending_rows
+        ],
+        "issued": [
+            {
+                "payload":    r[0],
+                "fuel_type":  r[1],
+                "station":    r[2],
+                "plate":      r[3],
+                "issued_at":  r[4],
+                "vtype":      r[5],
+            }
+            for r in issued_rows
+        ],
+    }
 
 
 def pop_expired_pending() -> list[dict]:
@@ -218,7 +269,7 @@ def plate_cooldown_active(plate: str, vtype: str, days: int) -> bool:
 
 # ─ Выдача ваучеров ──────────────────────────────────────────────────
 
-def issue_free_voucher(plate: str) -> str | None:
+def issue_free_voucher(plate: str, chat_id: int = 0) -> str | None:
     """Берёт любой доступный ваучер и маркирует как бесплатный."""
     con = _conn()
     cur = con.cursor()
@@ -230,8 +281,8 @@ def issue_free_voucher(plate: str) -> str | None:
         return None
     vid, payload = row
     cur.execute(
-        "UPDATE vouchers SET status='issued', voucher_type='free', license_plate=?, issued_at=? WHERE id=?",
-        (plate.upper(), datetime.now(timezone.utc).isoformat(), vid)
+        "UPDATE vouchers SET status='issued', voucher_type='free', license_plate=?, issued_at=?, chat_id=? WHERE id=?",
+        (plate.upper(), datetime.now(timezone.utc).isoformat(), chat_id, vid)
     )
     con.commit()
     con.close()
@@ -473,6 +524,62 @@ def _stats_markup() -> InlineKeyboardMarkup:
     ])
 
 
+async def myorders_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat_id = update.effective_user.id
+    orders = get_user_orders(chat_id)
+
+    if not orders["pending"] and not orders["issued"]:
+        await update.message.reply_text(
+            "📭 У вас пока нет оформленных заказов или ваучеров.",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")
+            ]]),
+        )
+        return
+
+    lines: list[str] = ["📋 *Ваши заказы и ваучеры:*\n"]
+    buttons: list[list[InlineKeyboardButton]] = []
+    idx = 0
+
+    for p in orders["pending"]:
+        idx += 1
+        fuel = FUEL_LABELS.get(p["fuel_type"], p["fuel_type"])
+        lines.append(
+            f"*{idx}. ⏳ Ожидает оплаты*\n"
+            f"   🚗 Госномер: `{p['plate']}`\n"
+            f"   ⛽ {fuel}, 20 л\n"
+            f"   ⏱ Действует 30 мин с момента создания\n"
+        )
+        if p["pay_url"]:
+            buttons.append([InlineKeyboardButton(
+                f"💳 Оплатить (заказ {idx})", url=p["pay_url"]
+            )])
+
+    for v in orders["issued"]:
+        idx += 1
+        fuel = FUEL_LABELS.get(v["fuel_type"], v["fuel_type"])
+        vtype_label = "🆓 Бесплатный" if v["vtype"] == "free" else "💰 Платный"
+        date_str = (v["issued_at"] or "")[:10] or "—"
+        lines.append(
+            f"*{idx}. ✅ Ваучер выдан ({vtype_label})*\n"
+            f"   🚗 Госномер: `{v['plate']}`\n"
+            f"   ⛽ {fuel}, 20 л\n"
+            f"   📅 Выдан: {date_str}\n"
+        )
+        buttons.append([InlineKeyboardButton(
+            f"📷 Показать QR (заказ {idx})",
+            callback_data=f"show_qr_{v['payload']}",
+        )])
+
+    buttons.append([InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")])
+
+    await update.message.reply_text(
+        "\n".join(lines),
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(buttons),
+    )
+
+
 async def stats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not context.user_data.get("admin_authenticated"):
         await update.message.reply_text(
@@ -662,7 +769,7 @@ async def menu_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         pay_url    = invoice["pay_url"]
         invoice_id = invoice["invoice_id"]
 
-        save_pending_payment(order_id, invoice_id, query.from_user.id, plate, fuel_type)
+        save_pending_payment(order_id, invoice_id, query.from_user.id, plate, fuel_type, pay_url)
 
         text = (
             f"🛒 *Счёт на оплату сформирован*\n\n"
@@ -740,6 +847,21 @@ async def menu_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("◀️ Назад в меню контролёра", callback_data="admin_menu")
             ]])
+        )
+
+    elif data.startswith("show_qr_"):
+        qr_payload = data[len("show_qr_"):]
+        qr_img = make_qr(qr_payload)
+        await query.answer()
+        await query.message.reply_photo(
+            photo=qr_img,
+            caption=(
+                f"📷 *QR-код ваучера*\n\n"
+                f"🏷 Серийный номер: `{qr_payload}`\n\n"
+                "Предъявите QR-код контролёру Правительства Севастополя на АЗС.\n"
+                "Контролёр сверит код с госномером вашего авто и погасит его."
+            ),
+            parse_mode="Markdown",
         )
 
     elif data == "stats_refresh":
@@ -887,7 +1009,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 return
 
             await update.message.reply_text("⏳ Генерирую ваш персональный QR-код...")
-            payload = issue_free_voucher(plate)
+            payload = issue_free_voucher(plate, update.effective_user.id)
             if not payload:
                 await update.message.reply_text(
                     "⚠️ Свободных ваучеров не осталось. Обратитесь завтра после 22:00.",
@@ -957,7 +1079,8 @@ async def post_init(application: Application) -> None:
         BotCommand("rules", "Актуальные правила и сводки Губернатора"),
         BotCommand("map",   "Карта остатков топлива АЗС"),
         BotCommand("admin", "Вход для контролёров АЗС"),
-        BotCommand("stats", "Статистика системы (только для контролёров)"),
+        BotCommand("stats",    "Статистика системы (только для контролёров)"),
+        BotCommand("myorders", "Мои заказы и ваучеры"),
     ])
     logger.info("Командное меню Telegram зарегистрировано.")
     asyncio.create_task(_invoice_cleanup_loop(application.bot))
@@ -976,7 +1099,8 @@ def main() -> None:
     app.add_handler(CommandHandler("rules", rules_cmd))
     app.add_handler(CommandHandler("map",   map_cmd))
     app.add_handler(CommandHandler("admin", admin_cmd))
-    app.add_handler(CommandHandler("stats", stats_cmd))
+    app.add_handler(CommandHandler("stats",    stats_cmd))
+    app.add_handler(CommandHandler("myorders", myorders_cmd))
     app.add_handler(CallbackQueryHandler(menu_navigation))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
