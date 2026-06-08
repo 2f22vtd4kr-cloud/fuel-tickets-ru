@@ -1,5 +1,6 @@
 import os
 import io
+import csv
 import re
 import logging
 import uuid
@@ -11,7 +12,8 @@ from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup,
-    KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, BotCommand
+    KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, BotCommand,
+    InputFile,
 )
 from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler,
@@ -234,6 +236,41 @@ def cancel_pending_payments(chat_id: int) -> list[dict]:
         con.commit()
     con.close()
     return [{"order_id": r[0], "invoice_id": r[1], "plate": r[2]} for r in rows]
+
+
+def get_all_vouchers_export() -> list[dict]:
+    """Собирает все ваучеры и активные ожидающие платежи для CSV-выгрузки."""
+    con = _conn()
+    vouchers = con.execute(
+        "SELECT serial, chat_id, license_plate, voucher_type, issued_at, status FROM vouchers ORDER BY issued_at DESC"
+    ).fetchall()
+    pending = con.execute(
+        "SELECT order_id, chat_id, plate, fuel_type, created_at FROM pending_payments ORDER BY created_at DESC"
+    ).fetchall()
+    con.close()
+
+    rows = []
+    for v in vouchers:
+        vtype = "Бесплатный" if v[3] == "free" else "Платный 20л"
+        rows.append({
+            "id":         v[0],
+            "chat_id":    v[1] or "",
+            "plate":      v[2],
+            "type":       vtype,
+            "created_at": v[4],
+            "status":     v[5],
+        })
+    for p in pending:
+        ftype = "Платный 20л"
+        rows.append({
+            "id":         p[0],
+            "chat_id":    p[1] or "",
+            "plate":      p[2],
+            "type":       ftype,
+            "created_at": p[4],
+            "status":     "pending",
+        })
+    return rows
 
 
 def cancel_single_pending(order_id: str, chat_id: int) -> dict | None:
@@ -489,9 +526,10 @@ def main_menu_markup() -> InlineKeyboardMarkup:
 
 def admin_menu_markup() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔍 Проверить статус ваучера", callback_data="admin_check")],
-        [InlineKeyboardButton("🚫 Погасить ваучер",          callback_data="admin_redeem")],
-        [InlineKeyboardButton("🚪 Выйти из режима контролёра", callback_data="admin_exit")],
+        [InlineKeyboardButton("🔍 Проверить статус ваучера",    callback_data="admin_check")],
+        [InlineKeyboardButton("🚫 Погасить ваучер",             callback_data="admin_redeem")],
+        [InlineKeyboardButton("📤 Экспорт в CSV",               callback_data="admin_export")],
+        [InlineKeyboardButton("🚪 Выйти из режима контролёра",  callback_data="admin_exit")],
     ])
 
 
@@ -969,6 +1007,44 @@ async def menu_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await query.answer("📊 Данные обновлены!", show_alert=False)
         await query.edit_message_text(
             _build_stats_text(), parse_mode="Markdown", reply_markup=_stats_markup()
+        )
+
+    elif data == "admin_export":
+        await query.answer("⏳ Формирую выгрузку…")
+        rows = get_all_vouchers_export()
+        buf = io.StringIO()
+        writer = csv.writer(buf, delimiter=";", quoting=csv.QUOTE_MINIMAL)
+        writer.writerow([
+            "ID заказа",
+            "Telegram ID",
+            "Госномер",
+            "Тип / объём",
+            "Дата и время",
+            "Статус",
+        ])
+        for r in rows:
+            writer.writerow([
+                r["id"],
+                r["chat_id"],
+                r["plate"],
+                r["type"],
+                r["created_at"],
+                r["status"],
+            ])
+        raw = buf.getvalue().encode("utf-8-sig")   # BOM для корректного открытия в Excel
+        today = datetime.now().strftime("%Y-%m-%d")
+        filename = f"vouchers_report_{today}.csv"
+        await query.message.reply_document(
+            document=InputFile(io.BytesIO(raw), filename=filename),
+            caption=(
+                f"📊 Выгрузка всей базы данных выданных ваучеров успешно сформирована.\n"
+                f"📁 Файл: `{filename}`\n"
+                f"📋 Строк: {len(rows)}"
+            ),
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("◀️ Назад в меню контролёра", callback_data="admin_menu")
+            ]]),
         )
 
     elif data == "admin_exit":
