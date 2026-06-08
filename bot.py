@@ -5,6 +5,7 @@ import logging
 import uuid
 import sqlite3
 import qrcode
+import asyncio
 import aiohttp
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
@@ -135,7 +136,8 @@ def save_pending_payment(
         """INSERT OR IGNORE INTO pending_payments
            (order_id, invoice_id, chat_id, plate, fuel_type, created_at)
            VALUES (?, ?, ?, ?, ?, ?)""",
-        (order_id, invoice_id, chat_id, plate, fuel_type, _today_str()),
+        (order_id, invoice_id, chat_id, plate, fuel_type,
+         datetime.now(timezone.utc).isoformat()),
     )
     con.commit()
     con.close()
@@ -143,6 +145,48 @@ def save_pending_payment(
 
 def _n_days_ago_iso(n: int) -> str:
     return (datetime.now(timezone.utc) - timedelta(days=n)).isoformat()
+
+
+def pop_expired_pending() -> list[dict]:
+    """Возвращает и удаляет из БД просроченные (>30 мин) pending_payments."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
+    con = _conn()
+    rows = con.execute(
+        "SELECT order_id, chat_id FROM pending_payments WHERE created_at < ?",
+        (cutoff,),
+    ).fetchall()
+    if rows:
+        placeholders = ",".join("?" * len(rows))
+        order_ids = [r[0] for r in rows]
+        con.execute(
+            f"DELETE FROM pending_payments WHERE order_id IN ({placeholders})",
+            order_ids,
+        )
+        con.commit()
+    con.close()
+    return [{"order_id": r[0], "chat_id": r[1]} for r in rows]
+
+
+async def _invoice_cleanup_loop(bot) -> None:
+    """Фоновый цикл: каждые 2 минуты чистит просроченные инвойсы."""
+    while True:
+        await asyncio.sleep(120)
+        try:
+            expired = pop_expired_pending()
+            for rec in expired:
+                try:
+                    await bot.send_message(
+                        chat_id=rec["chat_id"],
+                        text=(
+                            "⚠️ Срок действия вашего счёта на дополнительный объём (20 л) истёк.\n\n"
+                            "Если покупка всё ещё актуальна — оформите заказ заново через меню."
+                        ),
+                    )
+                    logger.info(f"Expired invoice notice sent to chat_id={rec['chat_id']}")
+                except Exception as e:
+                    logger.warning(f"Failed to notify chat_id={rec['chat_id']}: {e}")
+        except Exception as e:
+            logger.error(f"Invoice cleanup loop error: {e}")
 
 
 # ─ Суточный лимит бесплатных кодов ─────────────────────────────────
@@ -589,6 +633,7 @@ async def menu_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                         "amount": str(PAID_AMOUNT_USDT),
                         "payload": order_id,
                         "description": "Оплата дополнительного ваучера на 20 литров топлива",
+                        "expires_in": 1800,
                     },
                 )
                 api_result = await resp.json()
@@ -906,7 +951,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 # ═══════════════════════════════════════════════════════════════════
 
 async def post_init(application: Application) -> None:
-    """Регистрирует командное меню (синяя кнопка «Меню» в Telegram)."""
+    """Регистрирует командное меню и запускает фоновые задачи."""
     await application.bot.set_my_commands([
         BotCommand("start", "Главное меню и выбор квот"),
         BotCommand("rules", "Актуальные правила и сводки Губернатора"),
@@ -915,6 +960,8 @@ async def post_init(application: Application) -> None:
         BotCommand("stats", "Статистика системы (только для контролёров)"),
     ])
     logger.info("Командное меню Telegram зарегистрировано.")
+    asyncio.create_task(_invoice_cleanup_loop(application.bot))
+    logger.info("Фоновая задача очистки просроченных инвойсов запущена.")
 
 
 def main() -> None:
