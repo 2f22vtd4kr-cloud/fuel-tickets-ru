@@ -27,6 +27,8 @@ class User(Base):
     referral_code_used = Column(String, nullable=True)
     premium_tier = Column(String, nullable=True)
     premium_expires_at = Column(DateTime(timezone=True), nullable=True)
+    checkin_streak = Column(Integer, default=0)
+    last_checkin_date = Column(DateTime(timezone=True), nullable=True)
 
     purchases = relationship("PurchaseHistory", back_populates="user", lazy="dynamic")
     limits = relationship("DailyLimitTracker", back_populates="user", lazy="dynamic")
@@ -156,8 +158,25 @@ class VpnSession(Base):
     transaction_id = Column(String, nullable=True)
     config_key = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
+    warned_expiry = Column(Boolean, default=False)
     activated_at = Column(DateTime(timezone=True), default=_now)
     expires_at = Column(DateTime(timezone=True), nullable=False)
+
+
+class UserAchievement(Base):
+    """Records each achievement a user has unlocked — one row per user+code."""
+    __tablename__ = "user_achievements"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
+    code = Column(String, nullable=False)
+    unlocked_at = Column(DateTime(timezone=True), default=_now)
+
+    user = relationship("User")
+    __table_args__ = (
+        UniqueConstraint("user_id", "code", name="uq_user_achievement"),
+        Index("ix_achievement_user", "user_id"),
+    )
 
 
 class UserCheckin(Base):

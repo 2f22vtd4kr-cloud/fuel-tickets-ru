@@ -27,6 +27,7 @@ export interface User {
   daily_games_played: number;
   flip_attempts_today: number;
   premium_tier: string | null;
+  checkin_streak?: number;
 }
 
 export interface FuelPrice {
@@ -42,7 +43,7 @@ export interface NewsItem {
   region: string;
   headline: string;
   body: string | null;
-  severity: "info" | "warning" | "critical";
+  severity: "info" | "warning" | "critical" | "success";
   fuel_type: string | null;
   price_delta_pct: number | null;
   source: string | null;
@@ -241,6 +242,7 @@ export interface CheckinResult {
   already_done: boolean;
   message: string;
   next_checkin_at?: string;
+  checkin_streak?: number;
 }
 
 // ── Leaderboard ──────────────────────────────────────────────────
@@ -257,6 +259,7 @@ export interface Leaderboard {
   entries: LeaderboardEntry[];
   user_rank?: number;
   user_xp?: number;
+  total_users?: number;
 }
 
 // ── Dynamic prices ────────────────────────────────────────────────

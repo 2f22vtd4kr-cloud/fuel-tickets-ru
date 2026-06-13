@@ -3,7 +3,9 @@ import { motion } from "framer-motion";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
-import { fetchAnalytics, fetchTrend } from "@/api/client";
+import { fetchAnalytics, fetchTrend, fetchNews, fetchSystemStats } from "@/api/client";
+import type { SystemStats } from "@/api/client";
+import type { NewsItem } from "@/types";
 import { useFavoritesStore } from "@/stores/useFavoritesStore";
 import type { Analytics, RegionalSupply, TrendPoint, TabId } from "@/types";
 
@@ -165,14 +167,22 @@ function AvailabilityBar({ region, data }: { region: string; data: RegionalSuppl
 // ── Main component ─────────────────────────────────────────────────────────
 export function AnalyticsTab({ onNavigate }: Props) {
   const [data, setData] = useState<Analytics | null>(null);
+  const [sysStats, setSysStats] = useState<SystemStats | null>(null);
   const [trendData, setTrendData] = useState<TrendPoint[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [selectedRegion, setSelectedRegion] = useState<string>("");
   const [trendDays, setTrendDays] = useState<number>(7);
   const { addFavorite, removeFavorite, isFavorite } = useFavoritesStore();
 
   const loadAnalytics = useCallback(async () => {
-    try { setData(await fetchAnalytics()); } catch {}
+    try {
+      const [analytics, stats] = await Promise.all([fetchAnalytics(), fetchSystemStats()]);
+      setData(analytics);
+      setSysStats(stats);
+      setLastRefreshed(new Date());
+    } catch {}
   }, []);
 
   const loadTrend = useCallback(async () => {
@@ -216,14 +226,95 @@ export function AnalyticsTab({ onNavigate }: Props) {
       `}</style>
 
       {/* Header */}
-      <div style={{ padding: "1rem 1rem 0.5rem" }}>
-        <h2 style={{ margin: "0 0 0.1rem", color: "#e2e8f0", fontSize: "1.1rem", fontWeight: 700 }}>
-          📊 Центр мониторинга
-        </h2>
-        <p style={{ margin: 0, color: "#6b7280", fontSize: "0.72rem" }}>
-          Матрица снабжения · в реальном времени
-        </p>
+      <div style={{ padding: "1rem 1rem 0.5rem", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <h2 style={{ margin: "0 0 0.1rem", color: "#e2e8f0", fontSize: "1.1rem", fontWeight: 700 }}>
+            📊 Центр мониторинга
+          </h2>
+          <p style={{ margin: 0, color: "#6b7280", fontSize: "0.72rem" }}>
+            {lastRefreshed
+              ? `Обновлено: ${lastRefreshed.toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" })}`
+              : "Матрица снабжения · в реальном времени"}
+          </p>
+        </div>
+        <button
+          onClick={async () => {
+            setRefreshing(true);
+            await Promise.all([loadAnalytics(), loadTrend()]).catch(() => {});
+            setRefreshing(false);
+          }}
+          disabled={refreshing}
+          style={{
+            background: refreshing ? "#14141c" : "rgba(168,85,247,0.15)",
+            border: "1px solid #a855f733",
+            borderRadius: "8px",
+            color: refreshing ? "#4b5563" : "#a855f7",
+            fontSize: "0.72rem",
+            padding: "0.3rem 0.6rem",
+            cursor: refreshing ? "default" : "pointer",
+            transition: "all 0.2s",
+            flexShrink: 0,
+            marginLeft: "0.5rem",
+          }}
+        >
+          {refreshing ? "↻ …" : "↻ Обновить"}
+        </button>
       </div>
+
+      {/* Global stats summary row */}
+      {data && (() => {
+        const sc = data.station_counts;
+        const criticalRegions = Object.values(regions).filter(r => r.avg_pct < 25).length;
+        return (
+          <div style={{ padding: "0 1rem 0.75rem", display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "0.4rem" }}>
+            {[
+              { label: "Всего АЗС", value: sc.total, color: "#a855f7" },
+              { label: "🟢 Норма", value: sc.green, color: "#22c55e" },
+              { label: "🟡 Мало", value: sc.yellow, color: "#eab308" },
+              { label: "🔴 Крит", value: sc.red + criticalRegions, color: sc.red > 0 ? "#ef4444" : "#22c55e" },
+            ].map(({ label, value, color }) => (
+              <div key={label} style={{
+                background: "#14141c", border: "1px solid #22222f", borderRadius: "10px",
+                padding: "0.45rem 0.5rem", textAlign: "center",
+              }}>
+                <p style={{ margin: 0, fontFamily: "'JetBrains Mono',monospace", fontSize: "1.1rem", fontWeight: 700, color, lineHeight: 1 }}>
+                  {value}
+                </p>
+                <p style={{ margin: "0.2rem 0 0", color: "#4b5563", fontSize: "0.55rem", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  {label}
+                </p>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
+      {/* Live system stats row */}
+      {sysStats && (
+        <div style={{ padding: "0 1rem 0.5rem" }}>
+          <div style={{
+            background: "#0b0b0f", border: "1px solid #1a1a24", borderRadius: "12px",
+            padding: "0.55rem 0.9rem", display: "flex", gap: "0.5rem",
+            flexWrap: "wrap", justifyContent: "space-between", alignItems: "center",
+          }}>
+            {[
+              { label: "Пользователи", value: sysStats.total_users, icon: "👥" },
+              { label: "Отчётов", value: sysStats.total_reports, icon: "📋" },
+              { label: "Новостей", value: sysStats.total_news, icon: "📡" },
+              { label: "Средн. %", value: `${sysStats.avg_availability_pct}%`, icon: "⛽" },
+            ].map(({ label, value, icon }) => (
+              <div key={label} style={{ textAlign: "center", minWidth: "52px" }}>
+                <p style={{ margin: 0, color: "#a855f7", fontSize: "0.82rem", fontWeight: 700, fontFamily: "'JetBrains Mono',monospace" }}>
+                  {icon} {value}
+                </p>
+                <p style={{ margin: 0, color: "#374151", fontSize: "0.55rem", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  {label}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Region cycling monitor */}
       {Object.keys(regions).length > 0 && (
@@ -358,6 +449,188 @@ export function AnalyticsTab({ onNavigate }: Props) {
         {filtered.map(([region, d]) => (
           <AvailabilityBar key={region} region={region} data={d} />
         ))}
+      </div>
+
+      <NewsFeed />
+    </div>
+  );
+}
+
+// ─── News Feed ───────────────────────────────────────────────────
+
+const SEVERITY_COLOR: Record<string, string> = {
+  critical: "#ef4444",
+  warning:  "#f59e0b",
+  info:     "#3b82f6",
+  success:  "#22c55e",
+};
+
+const SEVERITY_LABEL: Record<string, string> = {
+  critical: "КРИТИЧНО",
+  warning:  "ВНИМАНИЕ",
+  info:     "ИНФО",
+  success:  "НОРМА",
+};
+
+function NewsFeed() {
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [lastNewsRefresh, setLastNewsRefresh] = useState<Date | null>(null);
+  const [newsLimit, setNewsLimit] = useState(15);
+
+  const loadNews = useCallback(async (force = false, limit = newsLimit) => {
+    if (!force && news.length > 0 && !open) { setOpen(true); return; }
+    if (!force && news.length > 0 && open) { setOpen(false); return; }
+    setLoading(true);
+    try {
+      const data = await fetchNews(undefined, limit);
+      setNews(data);
+      setLastNewsRefresh(new Date());
+      if (!open) setOpen(true);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  }, [news.length, open, newsLimit]);
+
+  // Auto-refresh news every 5 minutes when feed is open
+  useEffect(() => {
+    if (!open) return;
+    const id = setInterval(() => {
+      fetchNews(undefined, 25).then((d) => { setNews(d); setLastNewsRefresh(new Date()); }).catch(() => {});
+    }, 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [open]);
+
+  const load = () => loadNews();
+
+  return (
+    <div style={{ padding: "0 1rem 1.5rem" }}>
+      <div style={{
+        background: "#14141c",
+        border: "1px solid #22222f",
+        borderRadius: "16px",
+        overflow: "hidden",
+      }}>
+        <button
+          onClick={load}
+          style={{
+            width: "100%", display: "flex", alignItems: "center",
+            justifyContent: "space-between",
+            padding: "0.9rem 1rem",
+            background: "none", border: "none", cursor: "pointer",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <span style={{ fontSize: "1rem" }}>📡</span>
+            <div>
+              <span style={{ color: "#e2e8f0", fontWeight: 700, fontSize: "0.95rem" }}>
+                Матричная лента событий
+              </span>
+              {lastNewsRefresh && (
+                <p style={{ margin: 0, color: "#4b5563", fontSize: "0.58rem" }}>
+                  Обновлено {lastNewsRefresh.toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" })} · {news.length} сигналов
+                </p>
+              )}
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            {open && (
+              <button
+                onClick={(e) => { e.stopPropagation(); loadNews(true); }}
+                style={{ background: "none", border: "none", color: "#a855f7", fontSize: "0.7rem", cursor: "pointer", padding: "0.15rem 0.35rem" }}
+              >
+                ↻
+              </button>
+            )}
+            <span style={{ color: "#6b7280", fontSize: "0.8rem" }}>
+              {loading ? "…" : open ? "▲" : "▼"}
+            </span>
+          </div>
+        </button>
+
+        {open && news.length === 0 && !loading && (
+          <p style={{ color: "#4b5563", fontSize: "0.75rem", textAlign: "center", padding: "1rem" }}>
+            Событий пока нет
+          </p>
+        )}
+
+        {open && news.slice(0, newsLimit).map((item) => {
+          const color = SEVERITY_COLOR[item.severity] ?? "#6b7280";
+          const label = SEVERITY_LABEL[item.severity] ?? item.severity.toUpperCase();
+          const time = item.created_at
+            ? new Date(item.created_at).toLocaleString("ru-RU", {
+                day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+              })
+            : null;
+          return (
+            <div key={item.id} style={{
+              padding: "0.65rem 1rem",
+              borderTop: "1px solid #1a1a24",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.2rem" }}>
+                <span style={{
+                  background: `${color}22`,
+                  color,
+                  border: `1px solid ${color}44`,
+                  borderRadius: "4px",
+                  padding: "0.1rem 0.35rem",
+                  fontSize: "0.58rem",
+                  fontWeight: 700,
+                  letterSpacing: "0.05em",
+                  fontFamily: "monospace",
+                }}>
+                  {label}
+                </span>
+                <span style={{ color: "#4b5563", fontSize: "0.62rem" }}>{item.region}</span>
+                {item.fuel_type && (
+                  <span style={{ color: "#6b7280", fontSize: "0.62rem" }}>· {item.fuel_type}</span>
+                )}
+                {item.price_delta_pct !== null && item.price_delta_pct !== undefined && (
+                  <span style={{
+                    color: item.price_delta_pct > 0 ? "#ef4444" : "#22c55e",
+                    fontSize: "0.62rem", fontWeight: 700,
+                  }}>
+                    {item.price_delta_pct > 0 ? "+" : ""}{item.price_delta_pct.toFixed(1)}%
+                  </span>
+                )}
+                {time && <span style={{ color: "#374151", fontSize: "0.6rem", marginLeft: "auto" }}>{time}</span>}
+              </div>
+              <p style={{ margin: 0, color: "#d1d5db", fontSize: "0.78rem", fontWeight: 600, lineHeight: 1.3 }}>
+                {item.headline}
+              </p>
+              {item.body && (
+                <p style={{ margin: "0.2rem 0 0", color: "#6b7280", fontSize: "0.7rem", lineHeight: 1.4 }}>
+                  {item.body}
+                </p>
+              )}
+            </div>
+          );
+        })}
+
+        {open && news.length >= newsLimit && (
+          <button
+            onClick={() => {
+              const newLimit = newsLimit + 15;
+              setNewsLimit(newLimit);
+              fetchNews(undefined, newLimit).then((d) => { setNews(d); setLastNewsRefresh(new Date()); }).catch(() => {});
+            }}
+            style={{
+              width: "100%",
+              background: "none",
+              border: "none",
+              borderTop: "1px solid #1a1a24",
+              color: "#a855f7",
+              fontSize: "0.75rem",
+              padding: "0.65rem",
+              cursor: "pointer",
+            }}
+          >
+            Загрузить ещё…
+          </button>
+        )}
       </div>
     </div>
   );

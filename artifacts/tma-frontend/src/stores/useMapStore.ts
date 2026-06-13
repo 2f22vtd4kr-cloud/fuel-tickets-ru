@@ -7,15 +7,18 @@ interface MapViewport {
   zoom: number;
 }
 
+type FilterKey = "filterStatus" | "filterRegion" | "filterFuel" | "filterNetwork";
+
 interface MapStore {
   viewport: MapViewport;
   selectedStationId: number | null;
   filterStatus: "all" | "green" | "yellow" | "red";
   filterRegion: string | null;
   filterFuel: string | null;
+  filterNetwork: string | null;
   setViewport: (vp: MapViewport) => void;
   selectStation: (id: number | null) => void;
-  setFilter: (key: "filterStatus" | "filterRegion" | "filterFuel", value: string | null) => void;
+  setFilter: (key: FilterKey, value: string | null) => void;
 }
 
 export const useMapStore = create<MapStore>()(
@@ -26,6 +29,7 @@ export const useMapStore = create<MapStore>()(
       filterStatus: "all",
       filterRegion: null,
       filterFuel: null,
+      filterNetwork: null,
 
       setViewport: (viewport) => set({ viewport }),
       selectStation: (id) => set({ selectedStationId: id }),

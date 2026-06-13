@@ -120,7 +120,7 @@ interface MapTabProps {
 
 export function MapTab({ visible, initialStationId, navVisible = true, onNavToggle }: MapTabProps) {
   const { stations, fetch, loading } = useStationStore();
-  const { viewport, filterStatus, filterFuel, setFilter, selectedStationId, selectStation } =
+  const { viewport, filterStatus, filterFuel, filterRegion, filterNetwork, setFilter, selectedStationId, selectStation } =
     useMapStore();
   const [showFilters, setShowFilters] = useState(false);
 
@@ -141,8 +141,13 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
     if (filterFuel) {
       if (!s.fuel_statuses.some((f) => f.fuel_type === filterFuel)) return false;
     }
+    if (filterRegion && s.region !== filterRegion) return false;
+    if (filterNetwork && s.network !== filterNetwork) return false;
     return true;
   });
+
+  const uniqueRegions = Array.from(new Set(stations.map((s) => s.region))).sort();
+  const uniqueNetworks = Array.from(new Set(stations.map((s) => s.network))).sort();
 
   const selectedStation = selectedStationId
     ? stations.find((s) => s.id === selectedStationId)
@@ -190,7 +195,7 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
           }}
         >
           🔍 Фильтры{" "}
-          {(filterStatus !== "all" || filterFuel) && (
+          {(filterStatus !== "all" || filterFuel || filterNetwork || filterRegion) && (
             <span
               style={{
                 background: "#a855f7",
@@ -275,7 +280,7 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
             <p style={{ color: "#6b7280", fontSize: "0.72rem", margin: "0 0 0.5rem" }}>
               ТОПЛИВО
             </p>
-            <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
               <button
                 onClick={() => setFilter("filterFuel", null)}
                 style={{
@@ -308,6 +313,78 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
                 </button>
               ))}
             </div>
+
+            <p style={{ color: "#6b7280", fontSize: "0.72rem", margin: "0 0 0.5rem" }}>
+              РЕГИОН
+            </p>
+            <select
+              value={filterRegion ?? ""}
+              onChange={(e) => setFilter("filterRegion", e.target.value || null)}
+              style={{
+                width: "100%",
+                background: "#0b0b0f",
+                border: "1px solid #22222f",
+                borderRadius: "8px",
+                color: filterRegion ? "#e2e8f0" : "#6b7280",
+                padding: "0.35rem 0.6rem",
+                fontSize: "0.75rem",
+                outline: "none",
+                cursor: "pointer",
+              }}
+            >
+              <option value="">Все регионы</option>
+              {uniqueRegions.map((r) => (
+                <option key={r} value={r}>{r.length > 38 ? r.slice(0, 38) + "…" : r}</option>
+              ))}
+            </select>
+
+            <p style={{ color: "#6b7280", fontSize: "0.72rem", margin: "0.75rem 0 0.5rem" }}>
+              СЕТЬ АЗС
+            </p>
+            <select
+              value={filterNetwork ?? ""}
+              onChange={(e) => setFilter("filterNetwork", e.target.value || null)}
+              style={{
+                width: "100%",
+                background: "#0b0b0f",
+                border: "1px solid #22222f",
+                borderRadius: "8px",
+                color: filterNetwork ? "#e2e8f0" : "#6b7280",
+                padding: "0.35rem 0.6rem",
+                fontSize: "0.75rem",
+                outline: "none",
+                cursor: "pointer",
+              }}
+            >
+              <option value="">Все сети</option>
+              {uniqueNetworks.map((n) => (
+                <option key={n} value={n}>{n.length > 38 ? n.slice(0, 38) + "…" : n}</option>
+              ))}
+            </select>
+
+            {(filterStatus !== "all" || filterFuel || filterRegion || filterNetwork) && (
+              <button
+                onClick={() => {
+                  setFilter("filterStatus", "all");
+                  setFilter("filterFuel", null);
+                  setFilter("filterRegion", null);
+                  setFilter("filterNetwork", null);
+                }}
+                style={{
+                  marginTop: "0.6rem",
+                  width: "100%",
+                  background: "none",
+                  border: "1px solid #22222f",
+                  borderRadius: "8px",
+                  color: "#6b7280",
+                  padding: "0.3rem",
+                  fontSize: "0.72rem",
+                  cursor: "pointer",
+                }}
+              >
+                ✕ Сбросить фильтры
+              </button>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

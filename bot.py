@@ -14,10 +14,12 @@ from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup,
     KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, BotCommand,
     InputFile, WebAppInfo, LabeledPrice,
+    InlineQueryResultArticle, InputTextMessageContent,
 )
 from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler,
-    ContextTypes, MessageHandler, PreCheckoutQueryHandler, filters
+    ContextTypes, MessageHandler, PreCheckoutQueryHandler, filters,
+    InlineQueryHandler,
 )
 
 load_dotenv()
@@ -703,10 +705,28 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 f"Логин: {uname}\n"
                 f"ID: `{user.id}`",
             ))
+
+    # Fetch live system stats for the welcome message
+    _sys_stats_line = ""
+    try:
+        async with aiohttp.ClientSession() as _sess:
+            async with _sess.get("http://localhost:8000/api/stats", timeout=aiohttp.ClientTimeout(total=3)) as _r:
+                if _r.status == 200:
+                    _sd = await _r.json()
+                    _sb = _sd.get("station_breakdown", {})
+                    _sys_stats_line = (
+                        f"\n📡 Состояние матрицы: "
+                        f"🟢{_sb.get('green',0)} · 🟡{_sb.get('yellow',0)} · 🔴{_sb.get('red',0)}"
+                        f" из {_sd.get('total_stations','?')} АЗС\n"
+                    )
+    except Exception:
+        pass
+
     await update.message.reply_text(
         "🏛 *Система государственного учёта и распределения ГСМ*\n"
         "_Департамент цифрового развития города Севастополя_\n\n"
         "─────────────────────────────────\n"
+        f"{_sys_stats_line}"
         "Уважаемые граждане!\n\n"
         "Настоящий цифровой комплекс является официальным расчётно-учётным каналом, "
         "развёрнутым в целях обеспечения бесперебойного распределения целевых объёмов ГСМ "
@@ -894,6 +914,146 @@ async def stats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     await update.message.reply_text(
         _build_stats_text(), parse_mode="Markdown", reply_markup=_stats_markup()
+    )
+
+
+async def news_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show latest crisis/market news from the Matrix feed."""
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{TMA_URL}/api/news?limit=8",
+                timeout=aiohttp.ClientTimeout(total=6),
+            ) as resp:
+                items = await resp.json() if resp.status == 200 else []
+    except Exception:
+        await update.message.reply_text("⚠️ Не удалось загрузить новости. Попробуйте позже.")
+        return
+
+    if not items:
+        await update.message.reply_text("📡 Лента событий пуста. Скоро появятся обновления.")
+        return
+
+    SEVERITY = {"critical": "🔴", "warning": "🟡", "info": "🔵", "success": "🟢"}
+    lines = ["📡 *Матричная лента событий*\n"]
+    for item in items[:8]:
+        emoji = SEVERITY.get(item.get("severity", "info"), "⚪")
+        headline = item.get("headline", "—")
+        region = item.get("region", "")
+        fuel = item.get("fuel_type", "")
+        delta = item.get("price_delta_pct")
+        delta_str = f" ({'+' if delta and delta > 0 else ''}{delta:.1f}%)" if delta else ""
+        fuel_str = f" · {fuel}{delta_str}" if fuel else ""
+        lines.append(f"{emoji} *{region}*{fuel_str}\n_{headline}_\n")
+
+    await update.message.reply_text(
+        "\n".join(lines),
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[
+            tma_btn("📊 Открыть аналитику", "analytics"),
+        ]]),
+    )
+
+
+async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Inline mode: @botname <query> → returns matching gas stations."""
+    query = update.inline_query.query.strip()
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            url = f"{TMA_URL}/api/stations"
+            if query:
+                url += f"?search={query}"
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                stations = await resp.json() if resp.status == 200 else []
+    except Exception:
+        stations = []
+
+    STATUS_EMOJI = {"green": "🟢", "yellow": "🟡", "red": "🔴"}
+    results = []
+    for st in stations[:20]:
+        name = st.get("name", "АЗС")
+        region = st.get("region", "")
+        address = st.get("address", "")
+        status = st.get("overall_status", "unknown")
+        emoji = STATUS_EMOJI.get(status, "⚪")
+        avail = st.get("availability_pct", 0)
+        fuels = st.get("available_fuels", [])
+        fuel_str = " · ".join(fuels[:3]) if fuels else "данные отсутствуют"
+
+        description = f"{emoji} {avail:.0f}% доступно · {fuel_str}"
+        body = (
+            f"{emoji} *{name}*\n"
+            f"📍 {region} — {address}\n"
+            f"Топливо: {fuel_str}\n"
+            f"Доступность: {avail:.0f}%"
+        )
+        results.append(
+            InlineQueryResultArticle(
+                id=str(st.get("id", len(results))),
+                title=f"{emoji} {name}",
+                description=f"{region} · {description}",
+                input_message_content=InputTextMessageContent(
+                    message_text=body,
+                    parse_mode="Markdown",
+                ),
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("⛽ Открыть Матрицу", web_app=WebAppInfo(url=TMA_URL)),
+                ]]),
+            )
+        )
+
+    if not results:
+        results.append(
+            InlineQueryResultArticle(
+                id="not_found",
+                title="Станции не найдены",
+                description=f"По запросу «{query}» ничего не найдено",
+                input_message_content=InputTextMessageContent(
+                    message_text=f"Станции по запросу «{query}» не найдены. Откройте Матрицу для поиска."
+                ),
+            )
+        )
+
+    await update.inline_query.answer(results, cache_time=30)
+
+
+async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Comprehensive command reference."""
+    text = (
+        "📖 *Справка — Матрица Снабжения*\n\n"
+        "🗺 *Карта и АЗС*\n"
+        "/tma — открыть мини-приложение\n"
+        "/map — карта остатков топлива\n"
+        "/status — обзор снабжения по регионам\n"
+        "/find <запрос> — поиск АЗС по названию\n"
+        "/nearest — ближайшие АЗС (геолокация)\n\n"
+        "🔔 *Уведомления*\n"
+        "/subscriptions — мои подписки на АЗС\n"
+        "/digest — дайджест по подписанным АЗС\n\n"
+        "🎯 *Профиль и игры*\n"
+        "/checkin — ежедневный бонус XP\n"
+        "/mystats — мой XP, уровень, рейтинг\n"
+        "/leaderboard — топ-10 агентов по XP\n"
+        "/refer — реферальный код (+200 XP за друга)\n\n"
+        "⛽ *Ваучеры и покупки*\n"
+        "/myorders — мои заказы и ваучеры\n"
+        "/buystars — ваучер за Telegram Stars\n"
+        "/cancel — отменить активный счёт\n\n"
+        "🔒 *VPN*\n"
+        "/vpn — VPN-доступ за Stars или крипту\n\n"
+        "📡 *Новости и рынок*\n"
+        "/news — лента кризисных событий\n"
+        "/price — текущие котировки топлива\n\n"
+        "📋 *Информация*\n"
+        "/rules — правила и сводки\n"
+    )
+    await update.message.reply_text(
+        text,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("⛽ Открыть Матрицу", web_app=WebAppInfo(url=TMA_URL)),
+        ]]),
     )
 
 
@@ -1755,6 +1915,13 @@ async def post_init(application: Application) -> None:
         BotCommand("broadcast",     "[Admin] Рассылка сообщения всем пользователям"),
         BotCommand("status",        "Обзор снабжения по регионам прямо сейчас"),
         BotCommand("digest",        "Мой дайджест — статус подписанных АЗС"),
+        BotCommand("leaderboard",   "Топ-10 агентов по XP — таблица лидеров"),
+        BotCommand("find",          "Найти АЗС по названию: /find Лукойл"),
+        BotCommand("nearest",       "Ближайшие АЗС — отправьте геолокацию"),
+        BotCommand("checkin",       "Ежедневный бонус XP — получить прямо здесь"),
+        BotCommand("news",          "Лента кризисных событий — последние новости рынка"),
+        BotCommand("help",          "Полная справка по командам бота"),
+        BotCommand("price",         "Текущие котировки ГСМ по регионам"),
     ])
     logger.info("Командное меню Telegram зарегистрировано.")
     asyncio.create_task(_invoice_cleanup_loop(application.bot))
@@ -1949,19 +2116,27 @@ async def mystats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     xp = user.get("xp", 0)
     level = user.get("level", "—")
+    nc = user.get("neurocredits", 0)
+    streak = user.get("checkin_streak", 0)
     rank = lb.get("user_rank", "—")
+    total_lb = lb.get("total_users", "—")
     ref_code = ref.get("code", "—")
     ref_uses = ref.get("uses", 0)
+
+    streak_line = f"🔥 Серия чекинов: *{streak}* дн.\n" if streak else ""
+    nc_line = f"🧿 НейроКредиты: *{nc:,}* NC\n".replace(",", " ")
 
     text = (
         f"📊 *Ваша статистика*\n\n"
         f"👤 Пользователь: {tg_user.first_name}\n"
         f"⚡ XP: *{xp:,}*\n"
         f"🎖 Уровень: {level}\n"
-        f"🏆 Место в рейтинге: #{rank}\n\n"
+        f"🏆 Рейтинг: #{rank} из {total_lb}\n\n"
+        f"{nc_line}"
+        f"{streak_line}\n"
         f"🔗 Реферальный код: `{ref_code}`\n"
         f"📨 Приглашено: {ref_uses} чел.\n\n"
-        f"_Открыть полный профиль в Матрице Снабжения:_"
+        f"_Откройте полный профиль в Матрице Снабжения:_"
     ).replace(",", " ")
     await update.message.reply_text(
         text,
@@ -2054,8 +2229,252 @@ async def price_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
+def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """Great-circle distance in km between two lat/lng points."""
+    import math
+    R = 6371.0
+    d_lat = math.radians(lat2 - lat1)
+    d_lng = math.radians(lng2 - lng1)
+    a = math.sin(d_lat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(d_lng / 2) ** 2
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+async def checkin_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Daily XP checkin directly from Telegram — no need to open the TMA."""
+    tg_user = update.effective_user
+    if not tg_user:
+        return
+    user_id = tg_user.id
+    backend = "http://localhost:8000"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{backend}/api/checkin/{user_id}",
+                timeout=aiohttp.ClientTimeout(total=8),
+            ) as resp:
+                data = await resp.json() if resp.status == 200 else {}
+    except Exception:
+        await update.message.reply_text("⚠️ Не удалось выполнить чекин. Попробуйте позже.")
+        return
+
+    if data.get("already_done"):
+        next_at = data.get("next_checkin_at", "")
+        await update.message.reply_text(
+            f"✅ Ежедневный бонус уже получен сегодня.\n\n"
+            f"Возвращайтесь завтра за новым бонусом!\n"
+            f"Текущий XP: *{data.get('total_xp', 0):,}* · Уровень: {data.get('level', '—')}".replace(",", "\u202f"),
+            parse_mode="Markdown",
+        )
+    else:
+        xp_awarded = data.get("xp_awarded", 0)
+        total_xp = data.get("total_xp", 0)
+        level = data.get("level", "—")
+        streak = data.get("checkin_streak", 0)
+        streak_line = ""
+        if streak >= 7:
+            streak_line = f"\n🔥 Серия *{streak}* дней — максимальный бонус!"
+        elif streak >= 3:
+            streak_line = f"\n🔥 Серия *{streak}* дней подряд! Ещё {7 - streak} до максимума."
+        elif streak >= 2:
+            streak_line = f"\n🔥 Серия *{streak}* дня — продолжайте!"
+        dots = "🟡" * min(streak, 7) + "⬛" * max(0, 7 - streak)
+        await update.message.reply_text(
+            f"🎯 *Ежедневный бонус получен!*\n\n"
+            f"+{xp_awarded} XP начислено\n"
+            f"Всего XP: *{total_xp:,}*\n"
+            f"Уровень: *{level}*"
+            f"{streak_line}\n"
+            f"{dots}\n\n"
+            f"_Приходите завтра за новым бонусом_".replace(",", "\u202f"),
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[
+                tma_btn("🎮 Сыграть и заработать больше XP", "reserve"),
+            ]]),
+        )
+
+
+async def nearest_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Ask for user location to find the nearest green stations."""
+    await update.message.reply_text(
+        "📍 Отправьте вашу геолокацию — найдём ближайшие АЗС с топливом.",
+        reply_markup=ReplyKeyboardMarkup(
+            [[KeyboardButton("📍 Отправить геолокацию", request_location=True)]],
+            one_time_keyboard=True,
+            resize_keyboard=True,
+        ),
+    )
+
+
+async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle a shared location message: return 3 nearest green/yellow stations."""
+    loc = update.message.location
+    if not loc:
+        return
+
+    user_lat, user_lng = loc.latitude, loc.longitude
+    backend = "http://localhost:8000"
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{backend}/api/stations",
+                params={"status": "green", "limit": 200},
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as resp:
+                stations = await resp.json() if resp.status == 200 else []
+    except Exception:
+        stations = []
+
+    if not stations:
+        await update.message.reply_text(
+            "😔 Не удалось получить список АЗС. Попробуйте позже.",
+            reply_markup=ReplyKeyboardRemove(),
+        )
+        return
+
+    # Sort by distance
+    for s in stations:
+        s["_dist"] = _haversine_km(user_lat, user_lng, s.get("lat", 0), s.get("lng", 0))
+    stations.sort(key=lambda x: x["_dist"])
+    nearest = stations[:3]
+
+    lines = ["📍 *Ближайшие АЗС с топливом:*\n"]
+    buttons: list[list[InlineKeyboardButton]] = []
+    for s in nearest:
+        sid = s.get("id")
+        name = s.get("name", f"АЗС #{sid}")
+        dist = s.get("_dist", 0)
+        fuels = s.get("fuel_statuses", [])
+        fuel_parts = []
+        for fs in fuels[:3]:
+            emoji = {"green": "🟢", "yellow": "🟡", "red": "🔴"}.get(fs.get("status", ""), "⚪")
+            pct = fs.get("availability_pct", 0)
+            fuel_parts.append(f"{emoji}{fs.get('fuel_type', '?')}({pct}%)")
+        fuel_str = " ".join(fuel_parts) or "нет данных"
+        lines.append(f"⛽ *{name}*\n  📏 {dist:.1f} км · {fuel_str}")
+        if sid:
+            buttons.append([tma_btn(f"📍 {name[:32]}", "map", sid)])
+
+    buttons.append([InlineKeyboardButton("🗺 Открыть карту", web_app=WebAppInfo(url=TMA_URL))])
+    await update.message.reply_text(
+        "\n".join(lines),
+        parse_mode="Markdown",
+        reply_markup=ReplyKeyboardRemove(),
+    )
+    await update.message.reply_text(
+        "Открыть на карте:",
+        reply_markup=InlineKeyboardMarkup(buttons),
+    )
+
+
+async def find_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Search stations by name or address: /find <query>"""
+    query = " ".join(context.args).strip() if context.args else ""
+    if not query:
+        await update.message.reply_text(
+            "Укажите название или адрес АЗС:\n`/find Лукойл` или `/find Балаклавское`",
+            parse_mode="Markdown",
+        )
+        return
+
+    backend = "http://localhost:8000"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{backend}/api/stations",
+                params={"search": query, "limit": 5},
+                timeout=aiohttp.ClientTimeout(total=8),
+            ) as resp:
+                stations = await resp.json() if resp.status == 200 else []
+    except Exception:
+        stations = []
+
+    if not stations:
+        await update.message.reply_text(
+            f"😔 По запросу «{query}» ничего не найдено.\n\nПопробуйте другое название или откройте карту.",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🗺 Открыть карту", web_app=WebAppInfo(url=TMA_URL))
+            ]]),
+        )
+        return
+
+    lines = [f"🔍 *Результаты поиска: «{query}»*\n"]
+    buttons: list[list[InlineKeyboardButton]] = []
+    for s in stations[:5]:
+        sid = s.get("id")
+        name = s.get("name", f"АЗС #{sid}")
+        region = s.get("region", "")
+        addr = s.get("address", "")
+        queue = s.get("queue_cars", 0)
+        fuels = s.get("fuel_statuses", [])
+        fuel_parts = []
+        for fs in fuels[:3]:
+            emoji = {"green": "🟢", "yellow": "🟡", "red": "🔴"}.get(fs.get("status", ""), "⚪")
+            fuel_parts.append(f"{emoji}{fs.get('fuel_type', '?')}")
+        fuel_str = " ".join(fuel_parts) or "нет данных"
+        lines.append(
+            f"⛽ *{name}*\n"
+            f"  📍 {region}{' · ' + addr if addr else ''}\n"
+            f"  {fuel_str} · 🚗 очередь: {queue}"
+        )
+        if sid:
+            buttons.append([tma_btn(f"📍 {name[:32]}", "map", sid)])
+
+    buttons.append([InlineKeyboardButton("🗺 Открыть карту", web_app=WebAppInfo(url=TMA_URL))])
+    await update.message.reply_text(
+        "\n".join(lines),
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(buttons),
+    )
+
+
+async def leaderboard_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show top 10 XP leaderboard from the TMA backend."""
+    tg_user = update.effective_user
+    user_id = tg_user.id if tg_user else 0
+    backend = "http://localhost:8000"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{backend}/api/leaderboard?user_id={user_id}",
+                timeout=aiohttp.ClientTimeout(total=8),
+            ) as resp:
+                data = await resp.json() if resp.status == 200 else {}
+    except Exception:
+        await update.message.reply_text("⚠️ Не удалось получить таблицу лидеров.")
+        return
+
+    entries = data.get("entries", [])[:10]
+    user_rank = data.get("user_rank")
+    user_xp = data.get("user_xp", 0)
+
+    medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+    lines = ["🏆 *Таблица лидеров — Матрица Снабжения*\n"]
+    for e in entries:
+        rank = e.get("rank", 0)
+        icon = medals.get(rank, f"{rank}.")
+        name = e.get("username") or f"Агент #{e.get('user_id', '?')}"
+        xp = e.get("xp", 0)
+        level = e.get("level", "—")
+        marker = " ← вы" if e.get("user_id") == user_id else ""
+        lines.append(f"{icon} *{name}* — {xp:,} XP · {level}{marker}".replace(",", "\u202f"))
+
+    if user_rank and not any(e.get("user_id") == user_id for e in entries):
+        lines.append(f"\n…\n#{user_rank} *Вы* — {user_xp:,} XP".replace(",", "\u202f"))
+
+    lines.append("\n_Зарабатывайте XP в мини-приложении — игры, карта, покупки_")
+    await update.message.reply_text(
+        "\n".join(lines),
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[
+            tma_btn("🎮 Открыть Резерв (игры)", "reserve"),
+            tma_btn("🗄 Мой профиль", "vault"),
+        ]]),
+    )
+
+
 async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Show a regional fuel availability overview fetched from the TMA backend."""
+    """Show a regional fuel availability overview + system stats from the TMA backend."""
     backend = "http://localhost:8000"
     try:
         async with aiohttp.ClientSession() as session:
@@ -2063,9 +2482,12 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 f"{backend}/api/analytics",
                 timeout=aiohttp.ClientTimeout(total=8),
             ) as resp:
-                if resp.status != 200:
-                    raise ValueError(f"HTTP {resp.status}")
-                data = await resp.json()
+                data = await resp.json() if resp.status == 200 else {}
+            async with session.get(
+                f"{backend}/api/stats",
+                timeout=aiohttp.ClientTimeout(total=8),
+            ) as resp:
+                sys_stats = await resp.json() if resp.status == 200 else {}
     except Exception as exc:
         await update.message.reply_text(
             f"⚠️ Не удалось получить данные: {exc}\n\nОткройте Матрицу для актуальной карты.",
@@ -2075,24 +2497,27 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         )
         return
 
-    regions = data.get("regions", [])
-    if not regions:
-        await update.message.reply_text("Данные временно недоступны.")
-        return
+    # System header from /api/stats
+    total_st = sys_stats.get("total_stations", "—")
+    avg_pct  = sys_stats.get("avg_availability_pct", "—")
+    sb       = sys_stats.get("station_breakdown", {})
+    g, y, r  = sb.get("green", 0), sb.get("yellow", 0), sb.get("red", 0)
 
-    lines = ["🗺 *Обзор снабжения по регионам*\n"]
-    for r in regions[:10]:
-        name = r.get("name", "—")
-        green = r.get("green_pct", 0)
-        yellow = r.get("yellow_pct", 0)
-        red = r.get("red_pct", 0)
-        if green >= 60:
-            icon = "🟢"
-        elif green + yellow >= 40:
-            icon = "🟡"
-        else:
-            icon = "🔴"
-        lines.append(f"{icon} *{name}*: {green:.0f}% норм · {yellow:.0f}% мало · {red:.0f}% нет")
+    lines = [
+        "⛽ *Матрица Снабжения — Сводка*\n",
+        f"АЗС в системе: *{total_st}* · средн. наличие: *{avg_pct}%*",
+        f"🟢 {g} · 🟡 {y} · 🔴 {r}\n",
+    ]
+
+    # Regional breakdown from /api/analytics
+    regional = data.get("regional_supply", {})
+    if regional:
+        sorted_regions = sorted(regional.items(), key=lambda x: x[1].get("avg_pct", 0), reverse=True)
+        lines.append("📍 *Регионы (топ‑10):*")
+        for name, info in sorted_regions[:10]:
+            pct = info.get("avg_pct", 0)
+            icon = "🟢" if pct >= 60 else "🟡" if pct >= 25 else "🔴"
+            lines.append(f"{icon} {name}: {pct:.0f}%")
 
     lines.append("\n_Обновлено только что_")
     await update.message.reply_text(
@@ -2146,7 +2571,7 @@ async def digest_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         except Exception:
             station = {}
 
-        fuel_statuses = station.get("fuel_status", [])
+        fuel_statuses = station.get("fuel_statuses", [])
         if sub_fuel:
             fuel_statuses = [f for f in fuel_statuses if f.get("fuel_type") == sub_fuel]
 
@@ -2280,6 +2705,14 @@ def main() -> None:
     app.add_handler(CommandHandler("broadcast",     broadcast_cmd))
     app.add_handler(CommandHandler("status",        status_cmd))
     app.add_handler(CommandHandler("digest",        digest_cmd))
+    app.add_handler(CommandHandler("leaderboard",   leaderboard_cmd))
+    app.add_handler(CommandHandler("find",          find_cmd))
+    app.add_handler(CommandHandler("nearest",       nearest_cmd))
+    app.add_handler(CommandHandler("checkin",       checkin_cmd))
+    app.add_handler(CommandHandler("news",          news_cmd))
+    app.add_handler(CommandHandler("help",          help_cmd))
+    app.add_handler(InlineQueryHandler(inline_query_handler))
+    app.add_handler(MessageHandler(filters.LOCATION, handle_location))
     app.add_handler(CallbackQueryHandler(vpn_callback,     pattern=r"^vpn_"))
     app.add_handler(CallbackQueryHandler(copy_ref_callback, pattern=r"^copy_ref_"))
     app.add_handler(CallbackQueryHandler(buystars_callback, pattern=r"^buystars_"))

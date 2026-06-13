@@ -125,9 +125,21 @@ export function StationCard({ station, onClose }: Props) {
           <p style={{ color: "#6b7280", fontSize: "0.78rem", margin: 0 }}>
             {station.address}
           </p>
-          <p style={{ color: "#4b5563", fontSize: "0.72rem", margin: "0.15rem 0 0" }}>
-            {station.region}
-          </p>
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginTop: "0.15rem", flexWrap: "wrap" }}>
+            <p style={{ color: "#4b5563", fontSize: "0.72rem", margin: 0 }}>
+              {station.region}
+            </p>
+            <span style={{
+              background: "#a855f711",
+              border: "1px solid #a855f733",
+              borderRadius: "4px",
+              color: "#a855f7",
+              fontSize: "0.62rem",
+              padding: "0.05rem 0.35rem",
+            }}>
+              🚗 {station.queue_cars} в очереди
+            </span>
+          </div>
         </div>
         {/* Bell subscription button */}
         <button
@@ -198,7 +210,7 @@ export function StationCard({ station, onClose }: Props) {
       </div>
 
       {/* Report buttons */}
-      <div style={{ padding: "0.75rem 1rem 0.75rem", display: "flex", gap: "0.5rem" }}>
+      <div style={{ padding: "0.75rem 1rem 0.5rem", display: "flex", gap: "0.5rem" }}>
         <button
           onClick={() => handleReport("available")}
           style={{
@@ -220,6 +232,27 @@ export function StationCard({ station, onClose }: Props) {
           }}
         >
           ✕ Нет
+        </button>
+        <button
+          onClick={() => {
+            const fuels = station.fuel_statuses
+              .map(f => `${f.fuel_type}: ${f.availability_pct}%`)
+              .join(", ");
+            const text = encodeURIComponent(
+              `⛽ ${station.name}\n📍 ${station.region} — ${station.address}\n${fuels}\n\nМатрица Снабжения`
+            );
+            const url = `https://t.me/share/url?url=${encodeURIComponent("https://t.me/")}&text=${text}`;
+            window.open(url, "_blank");
+          }}
+          style={{
+            padding: "0.5rem 0.7rem",
+            background: "#1e40af22", border: "1px solid #3b82f644",
+            borderRadius: "10px", color: "#3b82f6",
+            fontSize: "0.85rem", cursor: "pointer",
+          }}
+          title="Поделиться в Telegram"
+        >
+          ✈️
         </button>
       </div>
 

@@ -522,12 +522,14 @@ function DailyCheckin() {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [nextAt, setNextAt] = useState<string | null>(null);
+  const [streak, setStreak] = useState(0);
 
   const handleCheckin = async () => {
     if (!user || loading || done) return;
     setLoading(true);
     try {
       const res = await dailyCheckin(user.id);
+      if (res.checkin_streak !== undefined) setStreak(res.checkin_streak);
       if (res.already_done) {
         setDone(true);
         if (res.next_checkin_at) setNextAt(res.next_checkin_at);
@@ -535,7 +537,9 @@ function DailyCheckin() {
       } else {
         setDone(true);
         if (res.next_checkin_at) setNextAt(res.next_checkin_at);
-        toast(`✅ +${res.xp_awarded} XP — ежедневный бонус получен!`, "success");
+        const streakMsg = res.checkin_streak && res.checkin_streak >= 3
+          ? ` 🔥 Серия ${res.checkin_streak}!` : "";
+        toast(`✅ +${res.xp_awarded} XP — ежедневный бонус получен!${streakMsg}`, "success");
         await refresh();
       }
     } catch (e: unknown) {
@@ -548,6 +552,8 @@ function DailyCheckin() {
   const nextTime = nextAt
     ? new Date(nextAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
     : null;
+
+  const streakDots = Array.from({ length: 7 }, (_, i) => i < streak);
 
   return (
     <div style={{ padding: "0 1rem 1rem" }}>
@@ -568,11 +574,28 @@ function DailyCheckin() {
           <p style={{ margin: 0, color: "#e2e8f0", fontWeight: 700, fontSize: "0.9rem" }}>
             Ежедневный бонус
           </p>
-          <p style={{ margin: "0.1rem 0 0", color: "#6b7280", fontSize: "0.72rem" }}>
+          <p style={{ margin: "0.1rem 0 0.4rem", color: "#6b7280", fontSize: "0.72rem" }}>
             {done
               ? `Получен. Следующий${nextTime ? ` в ${nextTime}` : " завтра"}`
               : "+50 XP каждые 24 часа — просто загляните сюда"}
           </p>
+          {/* Streak dots */}
+          <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+            {streakDots.map((filled, i) => (
+              <div key={i} style={{
+                width: "10px", height: "10px", borderRadius: "50%",
+                background: filled ? "#f59e0b" : "#22222f",
+                border: `1px solid ${filled ? "#f59e0b88" : "#33333f"}`,
+                boxShadow: filled ? "0 0 5px #f59e0b66" : "none",
+                transition: "all 0.3s",
+              }} />
+            ))}
+            {streak > 0 && (
+              <span style={{ color: "#f59e0b", fontSize: "0.65rem", marginLeft: "4px", fontWeight: 700 }}>
+                {streak >= 7 ? "🔥 MAX" : `${streak}/7`}
+              </span>
+            )}
+          </div>
         </div>
         <button
           onClick={handleCheckin}
@@ -694,7 +717,7 @@ function LeaderboardSection() {
                 );
               })}
               <p style={{ textAlign: "center", color: "#4b5563", fontSize: "0.65rem", padding: "0.5rem" }}>
-                Топ-10 по XP · обновляется в реальном времени
+                Топ-10 по XP · всего участников: {board.total_users || "…"} · обновляется в реальном времени
               </p>
             </motion.div>
           )}
@@ -822,19 +845,43 @@ export function ReserveTab() {
           Игровые механики · XP · Ежедневные бонусы
         </p>
         {user && (
-          <div style={{
-            marginTop: "0.5rem",
-            display: "inline-flex", alignItems: "center", gap: "0.4rem",
-            background: "#a855f722", border: "1px solid #a855f744",
-            borderRadius: "8px", padding: "0.2rem 0.5rem",
-          }}>
-            <span style={{ color: "#a855f7", fontSize: "0.75rem", fontWeight: 700 }}>
-              {user.xp.toLocaleString("ru")} XP
-            </span>
-            <span style={{ color: "#6b7280", fontSize: "0.72rem" }}>·</span>
-            <span style={{ color: TIER_COLORS[user.level] ?? "#6b7280", fontSize: "0.72rem" }}>
-              {user.level}
-            </span>
+          <div style={{ marginTop: "0.5rem", display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: "0.4rem",
+              background: "#a855f722", border: "1px solid #a855f744",
+              borderRadius: "8px", padding: "0.2rem 0.5rem",
+            }}>
+              <span style={{ color: "#a855f7", fontSize: "0.75rem", fontWeight: 700 }}>
+                {user.xp.toLocaleString("ru")} XP
+              </span>
+              <span style={{ color: "#6b7280", fontSize: "0.72rem" }}>·</span>
+              <span style={{ color: TIER_COLORS[user.level] ?? "#6b7280", fontSize: "0.72rem" }}>
+                {user.level}
+              </span>
+            </div>
+            {(user.checkin_streak ?? 0) > 0 && (
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: "0.3rem",
+                background: "#f9731622", border: "1px solid #f9731644",
+                borderRadius: "8px", padding: "0.2rem 0.5rem",
+              }}>
+                <span style={{ fontSize: "0.75rem" }}>🔥</span>
+                <span style={{ color: "#f97316", fontSize: "0.75rem", fontWeight: 700 }}>
+                  {user.checkin_streak} дн.
+                </span>
+              </div>
+            )}
+            {user.neurocredits > 0 && (
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: "0.3rem",
+                background: "#db277722", border: "1px solid #db277744",
+                borderRadius: "8px", padding: "0.2rem 0.5rem",
+              }}>
+                <span style={{ color: "#db2777", fontSize: "0.75rem", fontWeight: 700, fontFamily: "'JetBrains Mono',monospace" }}>
+                  ⬡ {user.neurocredits} NC
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>

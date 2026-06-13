@@ -191,3 +191,42 @@ export const useReferralCode = (userId: number, code: string) =>
     method: "POST",
     body: JSON.stringify({ user_id: userId, code }),
   });
+
+// System stats
+export interface SystemStats {
+  total_stations: number;
+  total_users: number;
+  total_purchases: number;
+  active_purchases: number;
+  total_news: number;
+  total_reports: number;
+  avg_availability_pct: number;
+  station_breakdown: { green: number; yellow: number; red: number };
+  generated_at: string;
+}
+export const fetchSystemStats = () => req<SystemStats>("/stats");
+
+// Top stations
+export interface TopStation {
+  id: number;
+  name: string;
+  region: string;
+  network: string;
+  queue_cars: number;
+  avg_availability_pct: number;
+}
+export const fetchTopStations = (limit = 5, fuelType?: string) =>
+  req<TopStation[]>(`/top-stations?limit=${limit}${fuelType ? `&fuel_type=${fuelType}` : ""}`);
+
+// Achievements
+export interface Achievement {
+  code: string;
+  icon: string;
+  label: string;
+  desc: string;
+  xp_bonus: number;
+  unlocked: boolean;
+  unlocked_at: string | null;
+}
+export const fetchAchievements = (userId: number) =>
+  req<{ achievements: Achievement[] }>(`/achievements/${userId}`);

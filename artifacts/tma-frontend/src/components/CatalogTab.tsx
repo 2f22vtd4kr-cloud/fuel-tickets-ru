@@ -291,6 +291,7 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
   const [limits, setLimits] = useState<LimitsMap | null>(null);
   const [blockReason, setBlockReason] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortMode, setSortMode] = useState<"name" | "availability" | "queue">("availability");
   const [payMethod, setPayMethod] = useState<PayMethod>("stars");
 
   useEffect(() => {
@@ -307,11 +308,24 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
       .catch(() => {});
   }, [user, selectedStation]);
 
-  const filteredStations = stations.filter((s) =>
-    s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.region.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.network.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredStations = stations
+    .filter((s) =>
+      s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.region.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.network.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (sortMode === "name") return a.name.localeCompare(b.name, "ru");
+      if (sortMode === "queue") return a.queue_cars - b.queue_cars;
+      // availability: sort by avg availability % descending
+      const avgA = a.fuel_statuses.length
+        ? a.fuel_statuses.reduce((s, f) => s + f.availability_pct, 0) / a.fuel_statuses.length
+        : 0;
+      const avgB = b.fuel_statuses.length
+        ? b.fuel_statuses.reduce((s, f) => s + f.availability_pct, 0) / b.fuel_statuses.length
+        : 0;
+      return avgB - avgA;
+    });
 
   const handleBuy = async (fuelType: string, volume: number, method: PayMethod) => {
     if (!user || !selectedStation) return;
@@ -370,7 +384,7 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
         </p>
       </div>
 
-      <div style={{ padding: "0.5rem 1rem" }}>
+      <div style={{ padding: "0.5rem 1rem 0.35rem" }}>
         <input
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -384,11 +398,75 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
           }}
         />
       </div>
+      <div style={{ padding: "0 1rem 0.5rem", display: "flex", gap: "0.35rem", alignItems: "center" }}>
+        <span style={{ color: "#4b5563", fontSize: "0.65rem", marginRight: "0.1rem" }}>Сорт:</span>
+        {(["availability", "name", "queue"] as const).map((mode) => (
+          <button
+            key={mode}
+            onClick={() => setSortMode(mode)}
+            style={{
+              background: sortMode === mode ? "rgba(168,85,247,0.2)" : "none",
+              border: `1px solid ${sortMode === mode ? "#a855f7" : "#22222f"}`,
+              borderRadius: "6px",
+              color: sortMode === mode ? "#a855f7" : "#6b7280",
+              fontSize: "0.67rem",
+              padding: "0.2rem 0.45rem",
+              cursor: "pointer",
+            }}
+          >
+            {mode === "availability" ? "Наличие" : mode === "name" ? "Назв." : "Очередь"}
+          </button>
+        ))}
+        <span style={{ marginLeft: "auto", color: "#4b5563", fontSize: "0.65rem" }}>
+          {filteredStations.length} АЗС
+        </span>
+      </div>
+
+      {!selectedStation && !searchQuery && sortMode === "availability" && (
+        <div style={{ padding: "0 1rem 0.75rem" }}>
+          <p style={{ margin: "0 0 0.4rem", color: "#4b5563", fontSize: "0.64rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            ⭐ Лучшая доступность прямо сейчас
+          </p>
+          <div style={{ display: "flex", gap: "0.4rem", overflowX: "auto", paddingBottom: "0.25rem" }}>
+            {[...stations]
+              .sort((a, b) => {
+                const avgA = a.fuel_statuses.length ? a.fuel_statuses.reduce((s, f) => s + f.availability_pct, 0) / a.fuel_statuses.length : 0;
+                const avgB = b.fuel_statuses.length ? b.fuel_statuses.reduce((s, f) => s + f.availability_pct, 0) / b.fuel_statuses.length : 0;
+                return avgB - avgA;
+              })
+              .slice(0, 5)
+              .map((s) => {
+                const avg = s.fuel_statuses.length ? Math.round(s.fuel_statuses.reduce((acc, f) => acc + f.availability_pct, 0) / s.fuel_statuses.length) : 0;
+                const color = avg >= 60 ? "#22c55e" : avg >= 25 ? "#eab308" : "#ef4444";
+                return (
+                  <div
+                    key={s.id}
+                    onClick={() => setSelectedStation(s)}
+                    style={{
+                      flexShrink: 0, minWidth: "130px", maxWidth: "140px",
+                      background: "#14141c", border: `1px solid ${color}33`,
+                      borderRadius: "10px", padding: "0.55rem 0.65rem",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <p style={{ margin: "0 0 0.15rem", color, fontFamily: "'JetBrains Mono',monospace", fontSize: "1.1rem", fontWeight: 700 }}>{avg}%</p>
+                    <p style={{ margin: 0, color: "#e2e8f0", fontSize: "0.68rem", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</p>
+                    <p style={{ margin: 0, color: "#4b5563", fontSize: "0.6rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.network}</p>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      )}
 
       {!selectedStation ? (
         <div style={{ padding: "0 1rem" }}>
           {filteredStations.slice(0, 50).map((s) => {
             const hasFuel = s.fuel_statuses.some((f) => f.availability_pct > 0);
+            const avgAvail = s.fuel_statuses.length
+              ? Math.round(s.fuel_statuses.reduce((acc, f) => acc + f.availability_pct, 0) / s.fuel_statuses.length)
+              : 0;
+            const availColor = avgAvail >= 60 ? "#22c55e" : avgAvail >= 25 ? "#eab308" : "#ef4444";
             return (
               <motion.div
                 key={s.id}
@@ -406,8 +484,8 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
                   alignItems: "center",
                 }}
               >
-                <div>
-                  <p style={{ margin: "0 0 0.15rem", color: "#e2e8f0", fontSize: "0.88rem", fontWeight: 600 }}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <p style={{ margin: "0 0 0.15rem", color: "#e2e8f0", fontSize: "0.88rem", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {s.name}
                   </p>
                   <p style={{ margin: "0 0 0.1rem", color: "#6b7280", fontSize: "0.72rem" }}>
@@ -415,19 +493,15 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
                   </p>
                   <p style={{ margin: 0, color: "#4b5563", fontSize: "0.7rem" }}>{s.address}</p>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <span style={{
-                    color: hasFuel ? "#22c55e" : "#ef4444",
-                    fontSize: "0.7rem",
-                    background: hasFuel ? "#22c55e11" : "#ef444411",
-                    border: `1px solid ${hasFuel ? "#22c55e44" : "#ef444444"}`,
-                    borderRadius: "6px",
-                    padding: "0.2rem 0.4rem",
-                    display: "block",
-                    marginBottom: "0.3rem",
+                <div style={{ textAlign: "right", flexShrink: 0, marginLeft: "0.5rem" }}>
+                  <p style={{
+                    margin: "0 0 0.2rem",
+                    fontFamily: "'JetBrains Mono',monospace",
+                    fontSize: "0.9rem", fontWeight: 700,
+                    color: hasFuel ? availColor : "#ef4444",
                   }}>
-                    {hasFuel ? "Есть" : "Нет"}
-                  </span>
+                    {hasFuel ? `${avgAvail}%` : "—"}
+                  </p>
                   <span style={{ color: "#6b7280", fontSize: "0.68rem" }}>
                     🚗 {s.queue_cars}
                   </span>

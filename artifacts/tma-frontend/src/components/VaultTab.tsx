@@ -3,8 +3,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useVaultStore } from "@/stores/useVaultStore";
 import { useUserStore } from "@/stores/useUserStore";
 import { useFavoritesStore } from "@/stores/useFavoritesStore";
-import { fetchReferral } from "@/api/client";
-import type { Purchase, ReferralInfo } from "@/types";
+import { fetchReferral, fetchAchievements, fetchUserSubscriptions, unsubscribeFromStation, fetchCreditsBalance } from "@/api/client";
+import type { Achievement } from "@/api/client";
+import type { Purchase, ReferralInfo, Subscription, CreditTx } from "@/types";
 import { FUEL_LABELS, XP_TIER_THRESHOLDS } from "@/types";
 import QRCode from "qrcode";
 
@@ -175,6 +176,12 @@ export function VaultTab({ initialPurchaseId }: VaultTabProps) {
   const { purchases, loading, fetch } = useVaultStore();
   const [highlightedId, setHighlightedId] = useState<number | undefined>(initialPurchaseId);
   const [referral, setReferral] = useState<ReferralInfo | null>(null);
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [showAllAch, setShowAllAch] = useState(false);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [showAllSubs, setShowAllSubs] = useState(false);
+  const [creditHistory, setCreditHistory] = useState<CreditTx[]>([]);
+  const [showCreditHistory, setShowCreditHistory] = useState(false);
 
   // Auto-clear highlight ring after 3 seconds
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -190,6 +197,9 @@ export function VaultTab({ initialPurchaseId }: VaultTabProps) {
     if (user) {
       fetch(user.id);
       fetchReferral(user.id).then(setReferral).catch(() => {});
+      fetchAchievements(user.id).then((d) => setAchievements(d.achievements)).catch(() => {});
+      fetchUserSubscriptions(user.id).then((d) => setSubscriptions(d.subscriptions)).catch(() => {});
+      fetchCreditsBalance(user.id).then((d) => setCreditHistory(d.history)).catch(() => {});
     }
   }, [user, fetch]);
 
@@ -239,8 +249,13 @@ export function VaultTab({ initialPurchaseId }: VaultTabProps) {
               {user.xp.toLocaleString("ru")} XP
             </p>
             <p style={{ margin: 0, color: "#4b5563", fontSize: "0.68rem" }}>
-              {active.length} активных ваучеров
+              {active.length > 0 ? `${active.length} ваучер${active.length > 1 ? "а" : ""}` : "нет ваучеров"}
             </p>
+            {user.neurocredits > 0 && (
+              <p style={{ margin: 0, color: "#db2777", fontSize: "0.65rem", fontFamily: "'JetBrains Mono',monospace" }}>
+                ⬡ {user.neurocredits} NC
+              </p>
+            )}
           </div>
         </div>
 
@@ -326,6 +341,72 @@ export function VaultTab({ initialPurchaseId }: VaultTabProps) {
         </div>
       )}
 
+      {/* Subscriptions */}
+      {subscriptions.length > 0 && (
+        <div style={{ padding: "0 1rem 0.75rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+            <p style={{ margin: 0, color: "#9ca3af", fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              🔔 Подписки на АЗС — {subscriptions.length}
+            </p>
+            {subscriptions.length > 3 && (
+              <button
+                onClick={() => setShowAllSubs(!showAllSubs)}
+                style={{ background: "none", border: "none", color: "#a855f7", fontSize: "0.7rem", cursor: "pointer", padding: 0 }}
+              >
+                {showAllSubs ? "Скрыть" : "Все"}
+              </button>
+            )}
+          </div>
+          {(showAllSubs ? subscriptions : subscriptions.slice(0, 3)).map((sub) => (
+            <motion.div
+              key={sub.id}
+              layout
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{
+                background: "#14141c",
+                border: "1px solid #22222f",
+                borderRadius: "10px",
+                padding: "0.55rem 0.75rem",
+                marginBottom: "0.4rem",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <p style={{ margin: 0, color: "#e2e8f0", fontSize: "0.78rem", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {sub.station_name}
+                </p>
+                <p style={{ margin: 0, color: "#6b7280", fontSize: "0.65rem" }}>
+                  {sub.station_region}{sub.fuel_type ? ` · ${sub.fuel_type}` : ""}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  unsubscribeFromStation(sub.id, sub.user_id)
+                    .then(() => setSubscriptions((prev) => prev.filter((s) => s.id !== sub.id)))
+                    .catch(() => {});
+                }}
+                style={{
+                  background: "none",
+                  border: "1px solid #ef444420",
+                  borderRadius: "6px",
+                  color: "#ef4444",
+                  fontSize: "0.65rem",
+                  padding: "0.25rem 0.45rem",
+                  cursor: "pointer",
+                  flexShrink: 0,
+                  marginLeft: "0.5rem",
+                }}
+              >
+                ✕
+              </button>
+            </motion.div>
+          ))}
+        </div>
+      )}
+
       {/* Favorite regions */}
       {favoriteRegions.length > 0 && (
         <div style={{ padding: "0 1rem 0.75rem" }}>
@@ -375,7 +456,112 @@ export function VaultTab({ initialPurchaseId }: VaultTabProps) {
         </div>
       )}
 
-      {!loading && purchases.length === 0 && favoriteRegions.length === 0 && (
+      {/* Achievements section */}
+      {achievements.length > 0 && (
+        <div style={{ padding: "0 1rem 0.75rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+            <p style={{ margin: 0, color: "#9ca3af", fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              🏆 Достижения — {achievements.filter(a => a.unlocked).length}/{achievements.length}
+            </p>
+            <button
+              onClick={() => setShowAllAch(!showAllAch)}
+              style={{ background: "none", border: "none", color: "#a855f7", fontSize: "0.7rem", cursor: "pointer", padding: 0 }}
+            >
+              {showAllAch ? "Скрыть" : "Все"}
+            </button>
+          </div>
+
+          {/* Progress bar for achievements */}
+          <div style={{ height: "3px", background: "#0b0b0f", borderRadius: "2px", marginBottom: "0.65rem", overflow: "hidden" }}>
+            <div style={{
+              height: "100%",
+              width: `${(achievements.filter(a => a.unlocked).length / achievements.length) * 100}%`,
+              background: "linear-gradient(90deg,#a855f7,#db2777)",
+              transition: "width 0.6s",
+            }} />
+          </div>
+
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+            gap: "0.4rem",
+          }}>
+            {(showAllAch ? achievements : achievements.filter(a => a.unlocked).slice(0, 6)).map((ach) => (
+              <motion.div
+                key={ach.code}
+                initial={{ opacity: 0, scale: 0.92 }}
+                animate={{ opacity: 1, scale: 1 }}
+                style={{
+                  background: ach.unlocked ? "#14141c" : "#0b0b0f",
+                  border: `1px solid ${ach.unlocked ? "#a855f730" : "#22222f"}`,
+                  borderRadius: "10px",
+                  padding: "0.55rem 0.7rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  opacity: ach.unlocked ? 1 : 0.4,
+                }}
+              >
+                <span style={{ fontSize: "1.2rem", flexShrink: 0 }}>{ach.icon}</span>
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ margin: 0, color: ach.unlocked ? "#e2e8f0" : "#6b7280", fontSize: "0.72rem", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {ach.label}
+                  </p>
+                  <p style={{ margin: 0, color: "#4b5563", fontSize: "0.62rem" }}>
+                    +{ach.xp_bonus} XP
+                  </p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          {!showAllAch && achievements.filter(a => a.unlocked).length === 0 && (
+            <p style={{ color: "#4b5563", fontSize: "0.75rem", textAlign: "center", padding: "0.5rem 0" }}>
+              Выполняйте действия в приложении, чтобы разблокировать достижения.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* NC Credit History */}
+      {creditHistory.length > 0 && (
+        <div style={{ padding: "0 1rem 0.75rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.45rem" }}>
+            <p style={{ margin: 0, color: "#9ca3af", fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              ⬡ История НейроКредитов
+            </p>
+            <button
+              onClick={() => setShowCreditHistory(!showCreditHistory)}
+              style={{ background: "none", border: "none", color: "#db2777", fontSize: "0.7rem", cursor: "pointer", padding: 0 }}
+            >
+              {showCreditHistory ? "Скрыть" : "Показать"}
+            </button>
+          </div>
+          {showCreditHistory && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+              {creditHistory.slice(0, 10).map((tx, i) => {
+                const t = tx.created_at ? new Date(tx.created_at).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+                return (
+                  <div key={i} style={{
+                    background: "#0b0b0f", border: "1px solid #1a1a24", borderRadius: "8px",
+                    padding: "0.35rem 0.65rem", display: "flex", justifyContent: "space-between", alignItems: "center",
+                  }}>
+                    <div>
+                      <p style={{ margin: 0, color: "#d1d5db", fontSize: "0.73rem" }}>{tx.reason}</p>
+                      {t && <p style={{ margin: 0, color: "#374151", fontSize: "0.6rem" }}>{t}</p>}
+                    </div>
+                    <p style={{ margin: 0, fontFamily: "'JetBrains Mono',monospace", fontSize: "0.82rem", fontWeight: 700, color: tx.delta >= 0 ? "#db2777" : "#ef4444", flexShrink: 0 }}>
+                      {tx.delta >= 0 ? "+" : ""}{tx.delta} NC
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {!loading && purchases.length === 0 && favoriteRegions.length === 0 && subscriptions.length === 0 && achievements.filter(a => a.unlocked).length === 0 && (
         <div style={{ textAlign: "center", padding: "3rem 2rem", color: "#4b5563" }}>
           <div style={{ fontSize: "3rem", marginBottom: "0.75rem" }}>🗄️</div>
           <p style={{ fontSize: "0.85rem" }}>Ваш сейф пуст. Оформите первый ваучер в каталоге.</p>

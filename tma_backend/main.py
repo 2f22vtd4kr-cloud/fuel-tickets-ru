@@ -28,7 +28,7 @@ from tma_backend.models import (
     RegionFavorite,
     AnalyticsSnapshot, DailyLimitTracker, FuelStatus, GasStation,
     PurchaseHistory, ReferralCode, StationReport, Subscription, User,
-    UserCheckin, VpnSession,
+    UserAchievement, UserCheckin, VpnSession,
     FuelPriceEvent, NewsEvent, CreditTransaction, PremiumSubscription, RssCacheEntry,
 )
 from tma_backend.cards import draw_cards, RARITY_COLORS
@@ -68,9 +68,71 @@ async def _broadcast_prices(data: dict) -> None:
 scheduler = AsyncIOScheduler(timezone="UTC")
 
 
+def _seed_news_events(db: Session) -> None:
+    """Populate the news_events table with initial crisis events if it is empty."""
+    if db.query(NewsEvent).count() > 0:
+        return  # already seeded
+
+    from datetime import timedelta
+    import random as _rng
+
+    INITIAL_NEWS = [
+        {"region": "АР Крым и г. Севастополь", "headline": "Дефицит АИ-95 в Симферополе: очереди от 40 машин", "body": "Несколько крупных АЗС в центре Симферополя вывесили таблички «Нет бензина АИ-95». Очереди достигают 40 автомобилей.", "severity": "critical", "fuel_type": "АИ-95", "price_delta_pct": 8.2},
+        {"region": "Донецкая область", "headline": "Поставки топлива задержаны из-за ремонта трассы М04", "body": "Плановый ремонт трассы М04 задержал колонны бензовозов на 12–18 часов. Дефицит ожидается до 3 суток.", "severity": "warning", "fuel_type": None, "price_delta_pct": None},
+        {"region": "Запорожская область", "headline": "АЗС «Восток-Ресурс» в Мелитополе возобновили отпуск дизеля", "body": "После 4-дневного перерыва топливные запасы пополнены. Дизельное топливо доступно в пределах нормы.", "severity": "success", "fuel_type": "ДТ", "price_delta_pct": -3.1},
+        {"region": "Херсонская область", "headline": "Критический уровень запасов АИ-92 в Геническе", "body": "По данным регионального мониторинга, запасы АИ-92 на 3 из 5 городских АЗС ниже 10%. Ожидается поставка в течение 48 часов.", "severity": "critical", "fuel_type": "АИ-92", "price_delta_pct": 12.5},
+        {"region": "Луганская область", "headline": "Введено ограничение: не более 30 л на одно ТС", "body": "В связи с напряжённостью топливного баланса временно введена норма выдачи — не более 30 литров одного вида топлива на автомобиль.", "severity": "warning", "fuel_type": None, "price_delta_pct": None},
+        {"region": "Белгородская область", "headline": "Роснефть сообщила о нормализации поставок", "body": "Региональный оператор Роснефть подтвердил восстановление цепочки поставок. АЗС сети ожидают пополнения в течение суток.", "severity": "info", "fuel_type": None, "price_delta_pct": -1.5},
+        {"region": "Курская область", "headline": "Скачок цен на дизель: +9.3% за неделю", "body": "Средняя розничная цена дизельного топлива в регионе выросла на 9.3% за 7 дней. Эксперты связывают это с перебоями в нефтепереработке.", "severity": "warning", "fuel_type": "ДТ", "price_delta_pct": 9.3},
+        {"region": "Брянская область", "headline": "Топливо в норме — мониторинг не выявил отклонений", "body": "Плановая проверка АЗС региона не выявила нарушений. Доступность топлива всех видов — 90–100%.", "severity": "success", "fuel_type": None, "price_delta_pct": 0.2},
+        {"region": "АР Крым и г. Севастополь", "headline": "Газпромнефть подтвердила внеплановую поставку 200 тонн АИ-92", "body": "Внеплановая партия в 200 тонн АИ-92 ожидается в Симферополе к концу дня. Запасы стабилизируются.", "severity": "info", "fuel_type": "АИ-92", "price_delta_pct": -4.8},
+        {"region": "Ростовская область", "headline": "Лукойл: плановое техобслуживание нефтебазы, поставки ограничены", "body": "В ходе планового ТО нефтебазы в Ростове-на-Дону поставки нескольким АЗС будут ограничены на 72 часа.", "severity": "warning", "fuel_type": None, "price_delta_pct": None},
+        {"region": "Краснодарский край", "headline": "Стабильность в сети АТАН: очередей не зафиксировано", "body": "Топливная сеть АТАН в Краснодарском крае работает в штатном режиме. Цены не изменились.", "severity": "success", "fuel_type": None, "price_delta_pct": 0.0},
+        {"region": "Донецкая область", "headline": "ДНР-Нефть: поступление АИ-98 задержано на 3 суток", "body": "Из-за логистических сложностей поставка АИ-98 на АЗС сети ДНР-Нефть задержана. Запасы критические.", "severity": "critical", "fuel_type": "АИ-98", "price_delta_pct": 15.0},
+        {"region": "Запорожская область", "headline": "Временное закрытие АЗС на ул. Ленина для ТО цистерн", "body": "АЗС «АЗС Юг» №14 закрыта на плановую замену топливных цистерн. Ближайшая альтернатива в 2 км.", "severity": "info", "fuel_type": None, "price_delta_pct": None},
+        {"region": "Херсонская область", "headline": "Гибридное топливо AdBlue вновь доступно в Херсоне", "body": "После двухнедельного дефицита AdBlue (мочевина для дизелей) снова поступил в продажу в трёх точках Херсона.", "severity": "success", "fuel_type": "AdBlue", "price_delta_pct": -6.0},
+        {"region": "АР Крым и г. Севастополь", "headline": "Экстренное оповещение: сбой EPS на терминале Грифон", "body": "Технический сбой платёжной системы на АЗС «Грифон» в Севастополе: расчёт только наличными до устранения неполадки.", "severity": "warning", "fuel_type": None, "price_delta_pct": None},
+    ]
+
+    now = _now()
+    for i, ev in enumerate(INITIAL_NEWS):
+        hours_ago = _rng.randint(i * 2, i * 2 + 10)
+        db.add(NewsEvent(
+            region=ev["region"],
+            headline=ev["headline"],
+            body=ev.get("body"),
+            severity=ev["severity"],
+            fuel_type=ev.get("fuel_type"),
+            price_delta_pct=ev.get("price_delta_pct"),
+            source="Матрица Снабжения",
+            created_at=now - timedelta(hours=hours_ago),
+        ))
+    db.commit()
+    logger.info("Seeded %d initial news events.", len(INITIAL_NEWS))
+
+
+def _run_migrations() -> None:
+    """Add any missing columns that create_all won't auto-add to existing tables."""
+    from tma_backend.database import engine
+    # Use AUTOCOMMIT so DDL statements are not wrapped in a transaction.
+    # Required for PostgreSQL ALTER TABLE; SQLite ignores this option gracefully.
+    ddl_statements = [
+        "ALTER TABLE vpn_sessions ADD COLUMN IF NOT EXISTS warned_expiry BOOLEAN NOT NULL DEFAULT FALSE",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS checkin_streak INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_checkin_date TIMESTAMPTZ",
+    ]
+    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        for stmt in ddl_statements:
+            try:
+                conn.execute(text(stmt))
+            except Exception as _e:
+                logger.debug("Migration skipped (column likely exists): %s", _e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    _run_migrations()
     db = SessionLocal()
     try:
         seed_db(db)
@@ -83,8 +145,14 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(generate_analytics_snapshots, "interval", hours=1)
     scheduler.add_job(reset_daily_limits, "cron", hour=0, minute=0)
     scheduler.add_job(send_morning_digest, "cron", hour=7, minute=0)
+    scheduler.add_job(send_weekly_report, "cron", day_of_week="mon", hour=8, minute=0)
+    scheduler.add_job(detect_price_spikes, "interval", minutes=30)
+    scheduler.add_job(warn_vpn_expiry, "interval", minutes=5)
+    scheduler.add_job(warn_low_stock, "interval", minutes=20)
     scheduler.add_job(expire_vpn_sessions, "interval", minutes=1)
     scheduler.add_job(fluctuate_prices, "interval", minutes=15)
+    scheduler.add_job(generate_news_from_availability, "interval", hours=2)
+    _seed_news_events(db)
     scheduler.start()
     logger.info("Топливный Узел API запущен.")
 
@@ -122,6 +190,160 @@ def _xp_to_level(xp: int) -> str:
         if xp >= tier["min"]:
             return tier["level"]
     return "Новичок"
+
+
+# ──────────────────────────────────────────────────────────────────
+#  Achievement system
+# ──────────────────────────────────────────────────────────────────
+
+ACHIEVEMENTS: dict[str, dict] = {
+    # Check-in milestones
+    "first_checkin":    {"icon": "📅", "label": "Первый чекин",      "desc": "Первый ежедневный бонус", "xp": 20},
+    "checkin_7":        {"icon": "🔥", "label": "Огненная серия",    "desc": "7 чекинов подряд",        "xp": 50},
+    "checkin_30":       {"icon": "🏅", "label": "Марафонец",         "desc": "30 чекинов всего",        "xp": 100},
+    "checkin_100":      {"icon": "💎", "label": "Легенда чекинов",   "desc": "100 чекинов всего",       "xp": 200},
+    # XP / level milestones
+    "xp_500":           {"icon": "⚡", "label": "Первые 500 XP",     "desc": "Накоплено 500 XP",        "xp": 30},
+    "xp_1500":          {"icon": "👑", "label": "1500 XP",           "desc": "Достигнут уровень Командир", "xp": 75},
+    "xp_legend":        {"icon": "🌟", "label": "Легенда Тавриды",   "desc": "Достигнут высший уровень", "xp": 150},
+    # Social / subscription
+    "first_sub":        {"icon": "🔔", "label": "Подписчик",         "desc": "Первая подписка на АЗС",  "xp": 25},
+    "sub_5":            {"icon": "📡", "label": "Агент сети",         "desc": "5 подписок на АЗС",       "xp": 60},
+    # Crowd-reporting
+    "first_report":     {"icon": "📸", "label": "Наблюдатель",       "desc": "Первый краудрипорт",      "xp": 15},
+    "report_10":        {"icon": "🔭", "label": "Инспектор",         "desc": "10 краудрипортов",        "xp": 50},
+    # Purchase
+    "first_purchase":   {"icon": "🛒", "label": "Первая покупка",    "desc": "Первое приобретение топлива", "xp": 30},
+    "purchase_5":       {"icon": "⛽", "label": "Постоянный клиент", "desc": "5 покупок топлива",       "xp": 75},
+    # VPN
+    "first_vpn":        {"icon": "🔒", "label": "Конспиратор",       "desc": "Первая VPN-сессия",       "xp": 40},
+    # Referral
+    "first_refer":      {"icon": "🤝", "label": "Вербовщик",         "desc": "Первый приглашённый друг","xp": 50},
+    "refer_5":          {"icon": "🌐", "label": "Командир сети",     "desc": "5 приглашённых агентов",  "xp": 100},
+    # Games
+    "first_flip_win":   {"icon": "🃏", "label": "Удачливый",         "desc": "Первая победа в Флип",    "xp": 20},
+    "tap_champion":     {"icon": "👆", "label": "Тап-чемпион",       "desc": "Набрано 150+ тапов за игру", "xp": 30},
+}
+
+
+def _notify_achievement(user: "User", code: str) -> None:
+    """Send a Telegram push when the user unlocks an achievement."""
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    if not bot_token or not user.id:
+        return
+    ach = ACHIEVEMENTS.get(code, {})
+    icon = ach.get("icon", "🏆")
+    label = ach.get("label", code)
+    desc = ach.get("desc", "")
+    xp = ach.get("xp", 0)
+    text = (
+        f"{icon} *Достижение разблокировано!*\n\n"
+        f"*{label}*\n"
+        f"_{desc}_\n\n"
+        f"Бонус: *+{xp} XP*"
+    )
+    try:
+        with httpx.Client(timeout=5.0) as client:
+            client.post(
+                f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                json={"chat_id": user.id, "text": text, "parse_mode": "Markdown"},
+            )
+    except Exception as exc:
+        logger.warning("Achievement notify failed for user %s: %s", user.id, exc)
+
+
+def _check_achievements(user: "User", db: Session, context: dict | None = None) -> None:
+    """
+    Evaluate all achievement conditions for a user and unlock any newly earned ones.
+    Grants the achievement XP bonus and fires a Telegram push.
+    context: optional dict with extra signals (e.g. tap_score, flip_win).
+    """
+    if context is None:
+        context = {}
+
+    already = {
+        row.code
+        for row in db.query(UserAchievement.code)
+        .filter(UserAchievement.user_id == user.id)
+        .all()
+    }
+
+    checkin_count = db.query(UserCheckin).filter(UserCheckin.user_id == user.id).count()
+    sub_count = db.query(Subscription).filter(Subscription.user_id == user.id).count()
+    report_count = db.query(StationReport).filter(StationReport.user_id == user.id).count()
+    purchase_count = db.query(PurchaseHistory).filter(PurchaseHistory.user_id == user.id).count()
+    vpn_count = db.query(VpnSession).filter(VpnSession.user_id == user.id).count()
+    referral = db.query(ReferralCode).filter(ReferralCode.user_id == user.id).first()
+    ref_uses = referral.uses if referral else 0
+
+    to_unlock: list[str] = []
+
+    def _maybe(code: str, condition: bool) -> None:
+        if condition and code not in already:
+            to_unlock.append(code)
+
+    streak = user.checkin_streak or 0
+    _maybe("first_checkin",  checkin_count >= 1)
+    _maybe("checkin_7",      streak >= 7)        # 7-day CONSECUTIVE streak
+    _maybe("checkin_30",     checkin_count >= 30)
+    _maybe("checkin_100",    checkin_count >= 100)
+    _maybe("xp_500",         user.xp >= 500)
+    _maybe("xp_1500",        user.xp >= 1500)
+    _maybe("xp_legend",      user.level == "Легенда Тавриды")
+    _maybe("first_sub",      sub_count >= 1)
+    _maybe("sub_5",          sub_count >= 5)
+    _maybe("first_report",   report_count >= 1)
+    _maybe("report_10",      report_count >= 10)
+    _maybe("first_purchase", purchase_count >= 1)
+    _maybe("purchase_5",     purchase_count >= 5)
+    _maybe("first_vpn",      vpn_count >= 1)
+    _maybe("first_refer",    ref_uses >= 1)
+    _maybe("refer_5",        ref_uses >= 5)
+    _maybe("first_flip_win", context.get("flip_win", False))
+    _maybe("tap_champion",   context.get("tap_score", 0) >= 150)
+
+    for code in to_unlock:
+        ach = ACHIEVEMENTS[code]
+        db.add(UserAchievement(user_id=user.id, code=code))
+        user.xp += ach["xp"]
+        user.level = _xp_to_level(user.xp)
+        db.flush()
+        _notify_achievement(user, code)
+        logger.info("Achievement unlocked: user=%s code=%s", user.id, code)
+
+
+def _notify_levelup(user: "User", old_level: str) -> None:
+    """
+    Fire a Telegram push if the user just crossed a level boundary.
+    Called synchronously — uses httpx. Safe to call from any thread.
+    """
+    if user.level == old_level:
+        return
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    if not bot_token or not user.id:
+        return
+    level_emoji = {
+        "Новичок": "🌱",
+        "Разведчик": "🔦",
+        "Оперативник": "⚡",
+        "Командир": "🎖",
+        "Легенда Тавриды": "👑",
+    }
+    icon = level_emoji.get(user.level, "🏆")
+    text = (
+        f"{icon} *Новый уровень!*\n\n"
+        f"Вы достигли звания *{user.level}*!\n"
+        f"Суммарный XP: *{user.xp:,}*\n\n"
+        "Открывайте Матрицу Снабжения, чтобы заработать ещё больше XP."
+    ).replace(",", "\u202f")
+    try:
+        with httpx.Client(timeout=5.0) as client:
+            client.post(
+                f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                json={"chat_id": user.id, "text": text, "parse_mode": "Markdown"},
+            )
+    except Exception as exc:
+        logger.warning("Level-up notify failed for user %s: %s", user.id, exc)
 
 
 def _get_or_create_user(db: Session, user_id: int,
@@ -343,6 +565,7 @@ def simulate_availability_shifts():
 
 # Cooldown: don't re-alert the same region within 2 hours
 _crisis_last_alerted: dict[str, datetime] = {}
+_low_stock_last_alerted: dict[str, datetime] = {}
 
 
 def _detect_regional_crisis(db: Session) -> None:
@@ -534,9 +757,281 @@ def send_morning_digest():
         db.close()
 
 
+def send_weekly_report():
+    """
+    Monday 8 AM UTC: send all subscribed users a weekly fuel supply summary
+    showing the top 3 best-supplied regions and top 3 worst regions.
+    """
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    if not bot_token:
+        return
+
+    db = SessionLocal()
+    try:
+        # Collect unique chat_ids from subscriptions
+        chat_ids = [
+            row[0]
+            for row in db.query(Subscription.telegram_chat_id).distinct().all()
+        ]
+        if not chat_ids:
+            return
+
+        # Aggregate green% per region
+        from sqlalchemy import func as sqlfunc
+        region_rows = (
+            db.query(
+                GasStation.region,
+                sqlfunc.count(FuelStatus.id).label("total"),
+                sqlfunc.sum(sqlfunc.case((FuelStatus.status == "green", 1), else_=0)).label("green"),
+                sqlfunc.sum(sqlfunc.case((FuelStatus.status == "red", 1), else_=0)).label("red"),
+            )
+            .join(FuelStatus, FuelStatus.station_id == GasStation.id)
+            .group_by(GasStation.region)
+            .all()
+        )
+
+        if not region_rows:
+            return
+
+        scored = [
+            {
+                "name": r.region,
+                "green_pct": round(100 * r.green / r.total) if r.total else 0,
+                "red_pct": round(100 * r.red / r.total) if r.total else 0,
+            }
+            for r in region_rows
+        ]
+        scored.sort(key=lambda x: x["green_pct"], reverse=True)
+        best3 = scored[:3]
+        worst3 = sorted(scored, key=lambda x: x["green_pct"])[:3]
+
+        lines = ["📊 *Еженедельный отчёт — Матрица Снабжения*\n"]
+        lines.append("🟢 *Лучшее снабжение на этой неделе:*")
+        for r in best3:
+            lines.append(f"  • {r['name']} — {r['green_pct']}% в норме")
+        lines.append("\n🔴 *Критические зоны:*")
+        for r in worst3:
+            lines.append(f"  • {r['name']} — {r['red_pct']}% без топлива")
+        lines.append("\n_Откройте Матрицу, чтобы найти ближайшую заправку_ /tma")
+
+        text = "\n".join(lines)
+        sent = 0
+        for chat_id in chat_ids:
+            try:
+                with httpx.Client(timeout=8.0) as client:
+                    client.post(
+                        f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                        json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"},
+                    )
+                sent += 1
+            except Exception as exc:
+                logger.warning("Weekly report failed for chat %s: %s", chat_id, exc)
+
+        logger.info("Weekly report sent to %d/%d chats.", sent, len(chat_ids))
+    except Exception as e:
+        logger.error("send_weekly_report error: %s", e)
+    finally:
+        db.close()
+
+
+# Track previous multipliers to detect spikes
+_prev_multipliers: dict[tuple[str, str], float] = {}
+
+
+def detect_price_spikes():
+    """
+    Every 30 min: compare current FuelPriceEvent multipliers against the
+    last-seen values. If a region+fuel type jumped ≥15%, alert all subscribers
+    in that region via Telegram.
+    """
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    if not bot_token:
+        return
+
+    db = SessionLocal()
+    try:
+        events = db.query(FuelPriceEvent).all()
+        spikes: list[tuple[str, str, float, float]] = []  # region, fuel, old, new
+
+        for ev in events:
+            key = (ev.region, ev.fuel_type)
+            prev = _prev_multipliers.get(key)
+            if prev is not None and prev > 0:
+                change_pct = (ev.multiplier - prev) / prev * 100
+                if change_pct >= 15:
+                    spikes.append((ev.region, ev.fuel_type, prev, ev.multiplier))
+            _prev_multipliers[key] = ev.multiplier
+
+        if not spikes:
+            return
+
+        for region, fuel_type, old_mult, new_mult in spikes:
+            # Find all subscribers in this region
+            chat_ids = [
+                row[0]
+                for row in (
+                    db.query(Subscription.telegram_chat_id)
+                    .join(GasStation, GasStation.id == Subscription.station_id)
+                    .filter(GasStation.region == region)
+                    .distinct()
+                    .all()
+                )
+            ]
+            if not chat_ids:
+                continue
+
+            change_str = f"+{(new_mult - old_mult) / old_mult * 100:.0f}%"
+            text = (
+                f"📈 *Скачок цен — {region}*\n\n"
+                f"Топливо: *{fuel_type}*\n"
+                f"Цена выросла на *{change_str}* относительно предыдущего уровня.\n\n"
+                "Рассмотрите возможность заправиться сейчас, пока цены не выросли ещё больше."
+            )
+            logger.warning("Price spike alert: %s / %s %s → sent to %d chats", region, fuel_type, change_str, len(chat_ids))
+            for chat_id in chat_ids:
+                try:
+                    with httpx.Client(timeout=6.0) as client:
+                        client.post(
+                            f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                            json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"},
+                        )
+                except Exception as exc:
+                    logger.warning("Price spike notify failed for chat %s: %s", chat_id, exc)
+
+    except Exception as e:
+        logger.error("detect_price_spikes error: %s", e)
+    finally:
+        db.close()
+
+
 # ──────────────────────────────────────────────────────────────────
 #  Lifecycle
 # ──────────────────────────────────────────────────────────────────
+
+def warn_low_stock():
+    """
+    Every 20 min: if 30–50% of FuelStatus rows in a region are red
+    (below crisis threshold), send a warning to subscribers in that region.
+    Uses a 4-hour per-region cooldown to avoid alert fatigue.
+    """
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    if not bot_token:
+        return
+
+    db = SessionLocal()
+    try:
+        now = _now()
+        cooldown = timedelta(hours=4)
+
+        from sqlalchemy import func as sqlfunc
+        region_totals = (
+            db.query(
+                GasStation.region,
+                sqlfunc.count(FuelStatus.id).label("total"),
+                sqlfunc.sum(
+                    sqlfunc.case((FuelStatus.status == "red", 1), else_=0)
+                ).label("red_count"),
+            )
+            .join(FuelStatus, FuelStatus.station_id == GasStation.id)
+            .group_by(GasStation.region)
+            .all()
+        )
+
+        warn_regions: list[tuple[str, int]] = []
+        for row in region_totals:
+            if not row.total:
+                continue
+            pct = row.red_count / row.total
+            if 0.30 <= pct < 0.50:
+                last = _low_stock_last_alerted.get(row.region)
+                if last and (now - last) < cooldown:
+                    continue
+                warn_regions.append((row.region, int(pct * 100)))
+                _low_stock_last_alerted[row.region] = now
+
+        for region, pct in warn_regions:
+            subs = (
+                db.query(Subscription.telegram_chat_id)
+                .join(GasStation, GasStation.id == Subscription.station_id)
+                .filter(GasStation.region == region)
+                .distinct()
+                .all()
+            )
+            chat_ids = [s.telegram_chat_id for s in subs]
+            if not chat_ids:
+                continue
+            text = (
+                f"⚠️ *Внимание — нехватка топлива в регионе {region}*\n\n"
+                f"*{pct}%* АЗС в регионе показывают красный статус.\n"
+                "Рекомендуем заправиться заранее, ситуация может ухудшиться."
+            )
+            logger.info("Low-stock warning: %s (%d%%) → %d chats", region, pct, len(chat_ids))
+            for chat_id in chat_ids:
+                try:
+                    with httpx.Client(timeout=5.0) as client:
+                        client.post(
+                            f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                            json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"},
+                        )
+                except Exception:
+                    pass
+    except Exception as e:
+        logger.error("warn_low_stock error: %s", e)
+    finally:
+        db.close()
+
+
+def warn_vpn_expiry():
+    """
+    Every 5 min: send a 1-hour advance warning to users whose VPN session
+    expires in the next 60 minutes (only once per session via a flag).
+    """
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    if not bot_token:
+        return
+
+    db = SessionLocal()
+    try:
+        now = _now()
+        soon = now + timedelta(hours=1)
+        expiring = (
+            db.query(VpnSession)
+            .filter(
+                VpnSession.is_active == True,  # noqa: E712
+                VpnSession.expires_at > now,
+                VpnSession.expires_at <= soon,
+                VpnSession.warned_expiry == False,  # noqa: E712
+            )
+            .all()
+        )
+        for sess in expiring:
+            sess.warned_expiry = True
+            mins_left = max(0, int((sess.expires_at - now).total_seconds() // 60))
+            try:
+                with httpx.Client(timeout=5.0) as client:
+                    client.post(
+                        f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                        json={
+                            "chat_id": sess.telegram_chat_id,
+                            "text": (
+                                f"⏰ *VPN истекает через {mins_left} мин*\n\n"
+                                f"Ваш план «{sess.plan_name}» завершится через *{mins_left} минут*.\n"
+                                "Продлите доступ в разделе VPN, чтобы не терять соединение."
+                            ),
+                            "parse_mode": "Markdown",
+                        },
+                    )
+            except Exception:
+                pass
+        if expiring:
+            db.commit()
+            logger.info("Sent VPN expiry warnings to %d sessions.", len(expiring))
+    except Exception as e:
+        logger.error("warn_vpn_expiry error: %s", e)
+        db.rollback()
+    finally:
+        db.close()
+
 
 def expire_vpn_sessions():
     """Deactivate VPN sessions whose expires_at has passed; notify user via Telegram."""
@@ -589,6 +1084,57 @@ def health():
     return {"status": "ok", "time": _now().isoformat()}
 
 
+@app.get("/api/stats")
+def get_system_stats(db: Session = Depends(get_db)):
+    """Public system stats for the TMA dashboard header."""
+    from sqlalchemy import text as _text
+    def _count(q: str) -> int:
+        return db.execute(_text(q)).scalar() or 0
+
+    total_stations  = _count("SELECT count(*) FROM gas_stations")
+    total_users     = _count("SELECT count(*) FROM users")
+    total_purchases = _count("SELECT count(*) FROM purchase_history")
+    active_purchases= _count("SELECT count(*) FROM purchase_history WHERE status='active'")
+    total_news      = _count("SELECT count(*) FROM news_events")
+    total_reports   = _count("SELECT count(*) FROM station_reports")
+    avg_avail       = db.execute(_text("SELECT avg(availability_pct) FROM fuel_statuses")).scalar() or 0.0
+
+    # Station breakdown via SQL — cheap single-pass
+    rows = db.execute(_text("""
+        SELECT gs.id,
+               avg(fs.availability_pct) AS avg_pct
+        FROM gas_stations gs
+        LEFT JOIN fuel_statuses fs ON fs.station_id = gs.id
+        GROUP BY gs.id
+    """)).fetchall()
+
+    green_count = yellow_count = red_count = 0
+    for row in rows:
+        avg = row[1] or 0
+        if avg >= 60:
+            green_count += 1
+        elif avg >= 25:
+            yellow_count += 1
+        else:
+            red_count += 1
+
+    return {
+        "total_stations":      total_stations,
+        "total_users":         total_users,
+        "total_purchases":     total_purchases,
+        "active_purchases":    active_purchases,
+        "total_news":          total_news,
+        "total_reports":       total_reports,
+        "avg_availability_pct": round(float(avg_avail), 1),
+        "station_breakdown": {
+            "green":  green_count,
+            "yellow": yellow_count,
+            "red":    red_count,
+        },
+        "generated_at": _now().isoformat(),
+    }
+
+
 # ──────────────────────────────────────────────────────────────────
 #  Stations
 # ──────────────────────────────────────────────────────────────────
@@ -597,6 +1143,7 @@ def health():
 def list_stations(
     region: Optional[str] = None,
     zone_type: Optional[str] = None,
+    search: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     q = db.query(GasStation)
@@ -604,6 +1151,14 @@ def list_stations(
         q = q.filter(GasStation.region == region)
     if zone_type:
         q = q.filter(GasStation.zone_type == zone_type)
+    if search:
+        like = f"%{search}%"
+        q = q.filter(
+            GasStation.name.ilike(like) |
+            GasStation.address.ilike(like) |
+            GasStation.region.ilike(like) |
+            GasStation.network.ilike(like)
+        )
     stations = q.all()
 
     result = []
@@ -627,6 +1182,43 @@ def list_stations(
         }
         result.append(s_dict)
     return result
+
+
+@app.get("/api/top-stations")
+def get_top_stations(limit: int = 5, fuel_type: Optional[str] = None, db: Session = Depends(get_db)):
+    """Return top stations by average fuel availability percentage."""
+    from tma_backend.models import FuelStatus as FS
+    from sqlalchemy import func as sqlfunc, desc as sqldesc
+    q = (
+        db.query(
+            GasStation.id,
+            GasStation.name,
+            GasStation.region,
+            GasStation.network,
+            GasStation.queue_cars,
+            sqlfunc.avg(FS.availability_pct).label("avg_pct"),
+        )
+        .join(FS, FS.station_id == GasStation.id)
+    )
+    if fuel_type:
+        q = q.filter(FS.fuel_type == fuel_type)
+    rows = (
+        q.group_by(GasStation.id, GasStation.name, GasStation.region, GasStation.network, GasStation.queue_cars)
+        .order_by(sqldesc("avg_pct"))
+        .limit(max(1, min(limit, 20)))
+        .all()
+    )
+    return [
+        {
+            "id": r.id,
+            "name": r.name,
+            "region": r.region,
+            "network": r.network or "",
+            "queue_cars": r.queue_cars or 0,
+            "avg_availability_pct": round(float(r.avg_pct or 0), 1),
+        }
+        for r in rows
+    ]
 
 
 @app.get("/api/stations/{station_id}", response_model=GasStationOut)
@@ -676,8 +1268,11 @@ def report_station(
     # XP for reporting
     user = db.query(User).filter(User.id == body.user_id).first()
     if user:
+        old_level = user.level
         user.xp += 5
         user.level = _xp_to_level(user.xp)
+        _notify_levelup(user, old_level)
+        _check_achievements(user, db)
 
     db.commit()
     return {"ok": True, "message": "Отчёт принят. Спасибо за помощь сообществу!"}
@@ -784,8 +1379,11 @@ def purchase_voucher(body: PurchaseIn, db: Session = Depends(get_db)):
         )
         db.add(tracker)
 
+    old_level = user.level
     user.xp += 20
     user.level = _xp_to_level(user.xp)
+    _notify_levelup(user, old_level)
+    _check_achievements(user, db)
     db.commit()
     db.refresh(purchase)
 
@@ -970,8 +1568,11 @@ def flip_card(user_id: int, db: Session = Depends(get_db)):
     user.last_game_timestamp = now
 
     old_xp = user.xp
+    old_level = user.level
     user.xp = max(0, user.xp + total_xp)
     user.level = _xp_to_level(user.xp)
+    _notify_levelup(user, old_level)
+    _check_achievements(user, db, {"flip_win": total_xp > 0})
     db.commit()
 
     best = max(cards, key=lambda c: c.xp)
@@ -1025,6 +1626,8 @@ def submit_tap_score(user_id: int, body: TapScoreIn,
     user.daily_games_played += 1
     user.last_game_timestamp = _now()
     user.level = _xp_to_level(user.xp)
+    _notify_levelup(user, old_level)
+    _check_achievements(user, db, {"tap_score": capped_score})
     db.commit()
 
     return TapScoreOut(
@@ -1108,6 +1711,10 @@ def vpn_buy_stars(body: VpnBuyIn, db: Session = Depends(get_db)):
     db.add(sess)
     db.commit()
     _notify_vpn_activated(sess)
+    user = db.query(User).filter(User.id == body.user_id).first()
+    if user:
+        _check_achievements(user, db)
+        db.commit()
     return VpnInvoiceOut(
         stars_amount=stars,
         transaction_id=f"VPN-STARS-{sess.id}",
@@ -1149,6 +1756,10 @@ def vpn_buy_crypto(body: VpnBuyIn, db: Session = Depends(get_db)):
     db.add(sess)
     db.commit()
     _notify_vpn_activated(sess)
+    vpn_user = db.query(User).filter(User.id == body.user_id).first()
+    if vpn_user:
+        _check_achievements(vpn_user, db)
+        db.commit()
     return VpnInvoiceOut(
         checkout_url=result.checkout_url,
         transaction_id=result.transaction_id,
@@ -1221,23 +1832,81 @@ def daily_checkin(user_id: int, db: Session = Depends(get_db)):
             next_checkin_at=tomorrow,
         )
 
-    checkin = UserCheckin(user_id=user_id, xp_awarded=CHECKIN_XP)
+    # Streak tracking
+    now_date = now.date()
+    if user.last_checkin_date is not None:
+        last_d = user.last_checkin_date
+        if last_d.tzinfo is None:
+            last_d = last_d.replace(tzinfo=timezone.utc)
+        days_since = (now.replace(tzinfo=timezone.utc) - last_d).days
+        if days_since == 1:
+            user.checkin_streak = (user.checkin_streak or 0) + 1
+        elif days_since > 1:
+            user.checkin_streak = 1
+        # days_since == 0 shouldn't happen (already_done guard above)
+    else:
+        user.checkin_streak = 1
+    user.last_checkin_date = now
+
+    streak_bonus = 0
+    if user.checkin_streak >= 7:
+        streak_bonus = 25   # bonus XP for 7-day streak
+    elif user.checkin_streak >= 3:
+        streak_bonus = 10   # 3-day streak bonus
+
+    checkin_total = CHECKIN_XP + streak_bonus
+    checkin = UserCheckin(user_id=user_id, xp_awarded=checkin_total)
     db.add(checkin)
-    user.xp += CHECKIN_XP
+    old_level = user.level
+    user.xp += checkin_total
     user.level = _xp_to_level(user.xp)
+    _notify_levelup(user, old_level)
+    _check_achievements(user, db)
     db.commit()
 
+    streak_msg = ""
+    if user.checkin_streak >= 7:
+        streak_msg = f" 🔥 Серия {user.checkin_streak} дней! +{streak_bonus} бонус XP"
+    elif user.checkin_streak >= 3:
+        streak_msg = f" 🔥 Серия {user.checkin_streak} дней! +{streak_bonus} XP"
     return CheckinOut(
-        ok=True, xp_awarded=CHECKIN_XP, total_xp=user.xp, level=user.level,
+        ok=True, xp_awarded=checkin_total, total_xp=user.xp, level=user.level,
         already_done=False,
-        message=f"✅ Ежедневный бонус получен! +{CHECKIN_XP} XP",
+        message=f"✅ Ежедневный бонус получен! +{checkin_total} XP{streak_msg}",
         next_checkin_at=today_start + timedelta(days=1),
+        checkin_streak=user.checkin_streak or 0,
     )
 
 
 # ──────────────────────────────────────────────────────────────────
 #  Leaderboard
 # ──────────────────────────────────────────────────────────────────
+
+@app.get("/api/achievements/{user_id}")
+def get_achievements(user_id: int, db: Session = Depends(get_db)):
+    """Return all unlocked achievements and locked achievement definitions for a user."""
+    unlocked_rows = (
+        db.query(UserAchievement)
+        .filter(UserAchievement.user_id == user_id)
+        .all()
+    )
+    unlocked_codes = {r.code: r.unlocked_at for r in unlocked_rows}
+
+    result = []
+    for code, meta in ACHIEVEMENTS.items():
+        result.append({
+            "code": code,
+            "icon": meta["icon"],
+            "label": meta["label"],
+            "desc": meta["desc"],
+            "xp_bonus": meta["xp"],
+            "unlocked": code in unlocked_codes,
+            "unlocked_at": unlocked_codes.get(code),
+        })
+    # Sort: unlocked first (newest first), then locked
+    result.sort(key=lambda x: (not x["unlocked"], -(x["unlocked_at"].timestamp() if x["unlocked_at"] else 0)))
+    return {"achievements": result}
+
 
 @app.get("/api/leaderboard", response_model=LeaderboardOut)
 def get_leaderboard(user_id: Optional[int] = None, db: Session = Depends(get_db)):
@@ -1273,7 +1942,9 @@ def get_leaderboard(user_id: Optional[int] = None, db: Session = Depends(get_db)
             target = db.query(User).filter(User.id == user_id).first()
             user_xp = target.xp if target else 0
 
-    return LeaderboardOut(entries=entries, user_rank=user_rank, user_xp=user_xp)
+    from sqlalchemy import text as _txt
+    total_users = db.execute(_txt("SELECT count(*) FROM users")).scalar() or 0
+    return LeaderboardOut(entries=entries, user_rank=user_rank, user_xp=user_xp, total_users=total_users)
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -1314,11 +1985,17 @@ def use_referral(body: ReferralUseIn, db: Session = Depends(get_db)):
     referee = db.query(User).filter(User.id == body.user_id).first()
     referrer = db.query(User).filter(User.id == ref.user_id).first()
     if referee:
+        old_level_ref = referee.level
         referee.xp += REFERRAL_XP
         referee.level = _xp_to_level(referee.xp)
+        _notify_levelup(referee, old_level_ref)
+        _check_achievements(referee, db)
     if referrer:
+        old_level_rr = referrer.level
         referrer.xp += REFERRAL_XP
         referrer.level = _xp_to_level(referrer.xp)
+        _notify_levelup(referrer, old_level_rr)
+        _check_achievements(referrer, db)
     ref.uses += 1
     marker = UserCheckin(user_id=body.user_id, xp_awarded=-1)
     db.add(marker)
@@ -1383,6 +2060,10 @@ def create_subscription(body: SubscriptionIn, db: Session = Depends(get_db)):
     db.add(sub)
     db.commit()
     db.refresh(sub)
+    sub_user = db.query(User).filter(User.id == body.user_id).first()
+    if sub_user:
+        _check_achievements(sub_user, db)
+        db.commit()
 
     return SubscriptionOut(
         id=sub.id,
@@ -1650,6 +2331,78 @@ async def fluctuate_prices():
 
     except Exception as e:
         logger.error("fluctuate_prices error: %s", e)
+        db.rollback()
+    finally:
+        db.close()
+
+
+def generate_news_from_availability():
+    """
+    Every 2 hours: scan gas stations with critically low availability and
+    auto-generate news events so the crisis feed stays current.
+    """
+    import random as _rng
+    db = SessionLocal()
+    try:
+        now = _now()
+        CRITICAL_THRESHOLD = 20.0  # % below which a region triggers a news event
+        GOOD_THRESHOLD = 75.0      # % above which a positive news event is generated
+
+        # Aggregate avg availability per region
+        region_stats: dict[str, list[float]] = {}
+        stations = db.query(GasStation).all()
+        for st in stations:
+            avail_vals = [fs.availability_pct for fs in st.fuel_statuses]
+            if avail_vals:
+                region_stats.setdefault(st.region, []).append(
+                    sum(avail_vals) / len(avail_vals)
+                )
+
+        generated = 0
+        for region, vals in region_stats.items():
+            if not vals:
+                continue
+            avg = sum(vals) / len(vals)
+
+            # Check if we recently added a news event for this region (avoid spam)
+            recent_cutoff = now - timedelta(hours=4)
+            recent_count = (
+                db.query(NewsEvent)
+                .filter(NewsEvent.region == region, NewsEvent.created_at >= recent_cutoff)
+                .count()
+            )
+            if recent_count >= 2:
+                continue
+
+            if avg < CRITICAL_THRESHOLD and _rng.random() < 0.7:
+                fuel = _rng.choice(["АИ-92", "АИ-95", "ДТ"])
+                headlines = [
+                    f"Критический запас топлива в {region}: {avg:.0f}% доступности",
+                    f"Предупреждение: АЗС {region} заканчивают {fuel}",
+                    f"Дефицит {fuel} в {region} — матрица фиксирует нехватку",
+                ]
+                db.add(NewsEvent(
+                    region=region, headline=_rng.choice(headlines),
+                    body=f"Среднее по региону: {avg:.1f}% доступности топлива. Рекомендуем заправиться на станциях с зелёным статусом.",
+                    severity="critical", fuel_type=fuel, price_delta_pct=None,
+                    source="АвтоМатрица", created_at=now,
+                ))
+                generated += 1
+            elif avg > GOOD_THRESHOLD and _rng.random() < 0.4:
+                db.add(NewsEvent(
+                    region=region,
+                    headline=f"Стабилизация в {region}: доступность {avg:.0f}%",
+                    body="Ситуация с топливом нормализовалась. Поставки поступили в полном объёме.",
+                    severity="success", fuel_type=None, price_delta_pct=None,
+                    source="АвтоМатрица", created_at=now,
+                ))
+                generated += 1
+
+        if generated > 0:
+            db.commit()
+            logger.info("Auto-generated %d news events from availability data.", generated)
+    except Exception as e:
+        logger.error("generate_news_from_availability error: %s", e)
         db.rollback()
     finally:
         db.close()

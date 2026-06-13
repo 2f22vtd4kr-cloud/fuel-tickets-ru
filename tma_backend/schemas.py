@@ -46,6 +46,7 @@ class UserOut(BaseModel):
     daily_games_played: int
     flip_attempts_today: int
     premium_tier: Optional[str] = None
+    checkin_streak: int = 0
     model_config = {"from_attributes": True}
 
 
@@ -236,6 +237,7 @@ class CheckinOut(BaseModel):
     already_done: bool
     message: str
     next_checkin_at: Optional[datetime] = None
+    checkin_streak: int = 0
 
 
 # ── Leaderboard ───────────────────────────────────────────────────
@@ -252,6 +254,7 @@ class LeaderboardOut(BaseModel):
     entries: List[LeaderboardEntry]
     user_rank: Optional[int] = None
     user_xp: Optional[int] = None
+    total_users: int = 0
 
 
 # ── Referral ──────────────────────────────────────────────────────
