@@ -1,4 +1,6 @@
 #!/bin/bash
 set -e
-pnpm install --frozen-lockfile
-pnpm --filter db push
+
+pip install -r requirements.txt --quiet
+
+pnpm install --frozen-lockfile --ignore-scripts || pnpm install --frozen-lockfile
