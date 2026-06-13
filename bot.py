@@ -3,6 +3,7 @@ import io
 import csv
 import re
 import logging
+import signal
 import uuid
 import sqlite3
 import qrcode
@@ -2692,6 +2693,39 @@ async def conflict_error_handler(update: object, context) -> None:
         os._exit(1)
 
 
+def _polling_error_cb(error: Exception) -> None:
+    """Called by Updater._network_loop_retry on every polling-level error.
+    This is the only reliable interception point for 409 Conflict in PTB 20.x
+    because run_polling swallows the exception internally and retries forever.
+    """
+    if isinstance(error, Conflict):
+        logger.error(
+            "Конфликт (409): другой экземпляр бота уже запущен. "
+            "Завершение процесса немедленно."
+        )
+        os._exit(1)
+
+
+async def _run_bot_polling(app: Application) -> None:
+    """Manual polling startup that wires the updater-level error callback."""
+    async with app:
+        await app.updater.start_polling(
+            drop_pending_updates=True,
+            error_callback=_polling_error_cb,
+        )
+        await app.start()
+        stop_event = asyncio.Event()
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            try:
+                loop.add_signal_handler(sig, stop_event.set)
+            except (NotImplementedError, RuntimeError):
+                pass
+        await stop_event.wait()
+        await app.updater.stop()
+        await app.stop()
+
+
 def main() -> None:
     if not BOT_TOKEN:
         print("Ошибка: токен бота не задан.")
@@ -2756,7 +2790,7 @@ def main() -> None:
             print("❌ Ни REPLIT_DOMAINS, ни REPLIT_DEV_DOMAIN не заданы — запуск невозможен.")
             os._exit(1)
     else:
-        app.run_polling(drop_pending_updates=True)
+        asyncio.run(_run_bot_polling(app))
 
 
 if __name__ == "__main__":
