@@ -73,6 +73,7 @@ _Populate as you build — explicit user instructions worth remembering across s
 ## Gotchas
 
 - TMA Backend default port changed to 8000 (was 5001, not in Replit allowlist). Override with `TMA_PORT` env var.
+- SQLite DB is created at workspace root: `/home/runner/workspace/tma.db` (NOT `tma_backend/tma.db`) — uvicorn CWD is workspace root.
 - `react-leaflet@4.2.1` has peer dep warnings with React 19 — these are cosmetic, app works correctly.
 - `TMA_URL` in `bot.py` uses `REPLIT_DEV_DOMAIN` env var at runtime — will differ between dev and prod environments.
 - Bot conflict error on restart is transient — old getUpdates session expires within seconds.

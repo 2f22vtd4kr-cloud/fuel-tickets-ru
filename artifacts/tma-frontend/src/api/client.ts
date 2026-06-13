@@ -147,6 +147,28 @@ export const buyVpnCrypto = (userId: number, chatId: number, planId: string) =>
     body: JSON.stringify({ user_id: userId, telegram_chat_id: chatId, plan_id: planId, payment_method: "cryptobot" }),
   });
 
+// Dynamic prices
+export const fetchPrices = (region?: string) =>
+  req<import("@/types").PricesMap>(region ? `/prices/${encodeURIComponent(region)}` : "/prices");
+
+// News / crisis feed
+export const fetchNews = (region?: string, limit = 20) =>
+  req<import("@/types").NewsItem[]>(`/news?limit=${limit}${region ? `&region=${encodeURIComponent(region)}` : ""}`);
+
+// NeuroCredits
+export const fetchCreditsBalance = (userId: number) =>
+  req<{ balance: number; history: import("@/types").CreditTx[] }>(`/credits/balance/${userId}`);
+
+export const earnCredits = (userId: number, action: string) =>
+  req<{ ok: boolean; delta: number; balance: number }>(`/credits/earn/${userId}`, {
+    method: "POST",
+    body: JSON.stringify({ action }),
+  });
+
+// Premium
+export const fetchPremiumStatus = (userId: number) =>
+  req<import("@/types").PremiumStatus>(`/premium/status/${userId}`);
+
 // Daily check-in
 export const dailyCheckin = (userId: number) =>
   req<import("@/types").CheckinResult>(`/checkin/${userId}`, { method: "POST" });

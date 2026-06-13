@@ -23,8 +23,30 @@ export interface User {
   username: string | null;
   level: string;
   xp: number;
+  neurocredits: number;
   daily_games_played: number;
   flip_attempts_today: number;
+  premium_tier: string | null;
+}
+
+export interface FuelPrice {
+  base: number;
+  effective: number;
+  multiplier: number;
+  is_crisis: boolean;
+  events: { reason: string; multiplier: number }[];
+}
+
+export interface NewsItem {
+  id: number;
+  region: string;
+  headline: string;
+  body: string | null;
+  severity: "info" | "warning" | "critical";
+  fuel_type: string | null;
+  price_delta_pct: number | null;
+  source: string | null;
+  created_at: string;
 }
 
 export interface Purchase {
@@ -230,6 +252,28 @@ export interface Leaderboard {
   entries: LeaderboardEntry[];
   user_rank?: number;
   user_xp?: number;
+}
+
+// ── Dynamic prices ────────────────────────────────────────────────
+
+export type PricesMap = Record<string, Record<string, FuelPrice>>;
+
+// ── NeuroCredits ──────────────────────────────────────────────────
+
+export interface CreditTx {
+  delta: number;
+  reason: string;
+  balance_after: number;
+  created_at: string | null;
+}
+
+// ── Premium ───────────────────────────────────────────────────────
+
+export interface PremiumStatus {
+  tier: string | null;
+  expires_at: string | null;
+  is_active: boolean;
+  neurocredits: number;
 }
 
 // ── Referral ─────────────────────────────────────────────────────

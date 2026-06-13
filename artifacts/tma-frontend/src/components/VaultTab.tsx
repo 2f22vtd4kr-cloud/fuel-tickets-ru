@@ -236,6 +236,9 @@ export function VaultTab({ initialPurchaseId }: VaultTabProps) {
             }}>
               {user.xp.toLocaleString("ru")} XP
             </p>
+            <p style={{ margin: "0.15rem 0 0", color: "#db2777", fontSize: "0.72rem", fontWeight: 600 }}>
+              ⚡ {(user.neurocredits ?? 0).toLocaleString("ru")} НейроКредитов
+            </p>
             <p style={{ margin: 0, color: "#4b5563", fontSize: "0.68rem" }}>
               {active.length} активных ваучеров
             </p>

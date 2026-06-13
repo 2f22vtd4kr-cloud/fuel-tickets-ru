@@ -15,6 +15,7 @@ import httpx
 import uvicorn
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import Depends, FastAPI, HTTPException
+from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
@@ -24,6 +25,7 @@ from tma_backend.models import (
     AnalyticsSnapshot, DailyLimitTracker, FuelStatus, GasStation,
     PurchaseHistory, ReferralCode, StationReport, Subscription, User,
     UserCheckin, VpnSession,
+    FuelPriceEvent, NewsEvent, CreditTransaction, PremiumSubscription, RssCacheEntry,
 )
 from tma_backend.cards import draw_cards, RARITY_COLORS
 from tma_backend.payment import provider
@@ -358,6 +360,7 @@ async def startup():
     scheduler.add_job(generate_analytics_snapshots, "interval", hours=1)
     scheduler.add_job(reset_daily_limits, "cron", hour=0, minute=0)
     scheduler.add_job(expire_vpn_sessions, "interval", minutes=1)
+    scheduler.add_job(fluctuate_prices, "interval", minutes=15)
     scheduler.start()
     logger.info("Топливный Узел API запущен.")
 
@@ -1298,6 +1301,315 @@ def get_analytics(db: Session = Depends(get_db)):
         trend_data=trend_data,
         station_counts=station_counts,
     )
+
+
+# ──────────────────────────────────────────────────────────────────
+#  Dynamic Pricing Engine
+# ──────────────────────────────────────────────────────────────────
+
+def _compute_dynamic_price(db: Session, region: str, fuel_type: str, base_rub: int) -> dict:
+    """
+    Return current effective price for a fuel type in a region.
+    Applies active FuelPriceEvent multipliers on top of the base price.
+    """
+    now = _now()
+    events = (
+        db.query(FuelPriceEvent)
+        .filter(
+            FuelPriceEvent.region == region,
+            FuelPriceEvent.fuel_type == fuel_type,
+            FuelPriceEvent.is_active == True,  # noqa: E712
+        )
+        .filter(
+            (FuelPriceEvent.expires_at == None) | (FuelPriceEvent.expires_at > now)  # noqa: E711
+        )
+        .all()
+    )
+    combined = 1.0
+    for ev in events:
+        combined *= ev.multiplier
+    effective = round(base_rub * combined)
+    return {
+        "base": base_rub,
+        "effective": effective,
+        "multiplier": round(combined, 4),
+        "is_crisis": combined > 1.15,
+        "events": [{"reason": e.reason, "multiplier": e.multiplier} for e in events],
+    }
+
+
+def fluctuate_prices():
+    """
+    APScheduler job: every 15 min, randomly generate or expire price events
+    to create realistic market volatility. Logs significant shifts as NewsEvents.
+    """
+    db = SessionLocal()
+    try:
+        rng = random.Random()
+        now = _now()
+
+        # Expire old events
+        old = (
+            db.query(FuelPriceEvent)
+            .filter(FuelPriceEvent.expires_at < now)
+            .all()
+        )
+        for ev in old:
+            ev.is_active = False
+
+        # Generate new events with ~20% chance per iteration
+        from tma_backend.seed_regions import REGIONS, FUEL_PRICES_RUB
+        crisis_regions = [r for r in REGIONS if r["zone_type"] == "critical"]
+        for region in rng.sample(crisis_regions, min(3, len(crisis_regions))):
+            if rng.random() < 0.20:
+                fuel = rng.choice(["АИ-92", "АИ-95", "ДТ"])
+                shock = rng.choice([
+                    (1.08, "Увеличение спроса в зоне"),
+                    (1.15, "Ограничение поставок с нефтебазы"),
+                    (1.22, "Дефицит — приоритет государственным объектам"),
+                    (0.95, "Поступление новой партии, цена скорректирована"),
+                ])
+                mult, reason = shock
+                ev = FuelPriceEvent(
+                    region=region["name"],
+                    fuel_type=fuel,
+                    multiplier=mult,
+                    reason=reason,
+                    is_active=True,
+                    expires_at=now + timedelta(hours=rng.randint(2, 8)),
+                )
+                db.add(ev)
+
+                if mult >= 1.15:
+                    base = FUEL_PRICES_RUB.get(fuel, 55)
+                    new_price = round(base * mult)
+                    delta_pct = round((mult - 1.0) * 100, 1)
+                    news = NewsEvent(
+                        region=region["name"],
+                        headline=f"⚠ Корректировка цены: {fuel} +{delta_pct}% → {new_price} ₽/л",
+                        body=reason,
+                        severity="warning" if mult < 1.20 else "critical",
+                        fuel_type=fuel,
+                        price_delta_pct=delta_pct,
+                        source="РыночныйМонитор",
+                    )
+                    db.add(news)
+
+        db.commit()
+        logger.info("Price fluctuation tick complete.")
+    except Exception as e:
+        logger.error("fluctuate_prices error: %s", e)
+        db.rollback()
+    finally:
+        db.close()
+
+
+# ──────────────────────────────────────────────────────────────────
+#  NeuroCredits helpers
+# ──────────────────────────────────────────────────────────────────
+
+def _award_credits(db: Session, user: User, delta: int, reason: str) -> int:
+    """Apply delta to user.neurocredits, log a CreditTransaction, return new balance."""
+    user.neurocredits = max(0, (user.neurocredits or 0) + delta)
+    tx = CreditTransaction(
+        user_id=user.id,
+        delta=delta,
+        reason=reason,
+        balance_after=user.neurocredits,
+    )
+    db.add(tx)
+    return user.neurocredits
+
+
+# ──────────────────────────────────────────────────────────────────
+#  Prices API
+# ──────────────────────────────────────────────────────────────────
+
+@app.get("/api/prices")
+def get_prices(region: Optional[str] = None, db: Session = Depends(get_db)):
+    """Return current effective prices per fuel type, with crisis multipliers."""
+    from tma_backend.seed_regions import REGIONS, FUEL_PRICES_RUB, FUEL_TYPES
+    result: dict = {}
+    target_regions = (
+        [r for r in REGIONS if r["name"] == region]
+        if region else REGIONS
+    )
+    for reg in target_regions:
+        rname = reg["name"]
+        result[rname] = {}
+        for ft in FUEL_TYPES:
+            base = FUEL_PRICES_RUB.get(ft, 55)
+            result[rname][ft] = _compute_dynamic_price(db, rname, ft, base)
+    return result
+
+
+@app.get("/api/prices/{region_name}")
+def get_prices_for_region(region_name: str, db: Session = Depends(get_db)):
+    from tma_backend.seed_regions import FUEL_PRICES_RUB, FUEL_TYPES
+    result: dict = {}
+    for ft in FUEL_TYPES:
+        base = FUEL_PRICES_RUB.get(ft, 55)
+        result[ft] = _compute_dynamic_price(db, region_name, ft, base)
+    return result
+
+
+# ──────────────────────────────────────────────────────────────────
+#  News / Crisis Feed
+# ──────────────────────────────────────────────────────────────────
+
+@app.get("/api/news")
+def get_news(region: Optional[str] = None, limit: int = 30,
+             db: Session = Depends(get_db)):
+    """Return recent crisis/market news events, newest first."""
+    q = db.query(NewsEvent).order_by(NewsEvent.created_at.desc())
+    if region:
+        q = q.filter(NewsEvent.region == region)
+    items = q.limit(min(limit, 100)).all()
+    return [
+        {
+            "id": n.id,
+            "region": n.region,
+            "headline": n.headline,
+            "body": n.body,
+            "severity": n.severity,
+            "fuel_type": n.fuel_type,
+            "price_delta_pct": n.price_delta_pct,
+            "source": n.source,
+            "created_at": n.created_at.isoformat() if n.created_at else None,
+        }
+        for n in items
+    ]
+
+
+# ──────────────────────────────────────────────────────────────────
+#  NeuroCredits API
+# ──────────────────────────────────────────────────────────────────
+
+@app.get("/api/credits/balance/{user_id}")
+def credits_balance(user_id: int, db: Session = Depends(get_db)):
+    user = _get_or_create_user(db, user_id)
+    txs = (
+        db.query(CreditTransaction)
+        .filter(CreditTransaction.user_id == user_id)
+        .order_by(CreditTransaction.created_at.desc())
+        .limit(20)
+        .all()
+    )
+    return {
+        "balance": user.neurocredits or 0,
+        "history": [
+            {
+                "delta": t.delta,
+                "reason": t.reason,
+                "balance_after": t.balance_after,
+                "created_at": t.created_at.isoformat() if t.created_at else None,
+            }
+            for t in txs
+        ],
+    }
+
+
+class CreditsEarnIn(BaseModel):
+    action: str
+
+
+CREDIT_ACTIONS = {
+    "checkin":  50,
+    "tap_game": 10,
+    "report":   15,
+    "referral": 100,
+    "purchase": 25,
+}
+
+
+@app.post("/api/credits/earn/{user_id}")
+def credits_earn(user_id: int, body: CreditsEarnIn, db: Session = Depends(get_db)):
+    user = _get_or_create_user(db, user_id)
+    delta = CREDIT_ACTIONS.get(body.action, 0)
+    if delta <= 0:
+        raise HTTPException(400, detail="Неизвестное действие")
+    new_bal = _award_credits(db, user, delta, body.action)
+    db.commit()
+    return {"ok": True, "delta": delta, "balance": new_bal}
+
+
+# ──────────────────────────────────────────────────────────────────
+#  Premium Subscriptions
+# ──────────────────────────────────────────────────────────────────
+
+PREMIUM_TIERS = {
+    "operator": {"name": "Оператор", "days": 30, "price_usdt": 4.99},
+    "legend":   {"name": "Легенда",  "days": 365, "price_usdt": 29.99},
+}
+
+
+class PremiumBuyIn(BaseModel):
+    user_id: int
+    tier: str
+    payment_method: str = "cryptobot"
+
+
+@app.post("/api/premium/buy")
+def premium_buy(body: PremiumBuyIn, db: Session = Depends(get_db)):
+    tier = PREMIUM_TIERS.get(body.tier)
+    if not tier:
+        raise HTTPException(400, detail="Неверный тариф")
+    user = _get_or_create_user(db, body.user_id)
+    now = _now()
+
+    sub = PremiumSubscription(
+        user_id=body.user_id,
+        tier=body.tier,
+        payment_method=body.payment_method,
+        price_usdt=tier["price_usdt"],
+        starts_at=now,
+        expires_at=now + timedelta(days=tier["days"]),
+        is_active=True,
+    )
+    db.add(sub)
+    user.premium_tier = body.tier
+    user.premium_expires_at = sub.expires_at
+    _award_credits(db, user, 200, f"premium_activation_{body.tier}")
+    db.commit()
+    db.refresh(sub)
+    return {
+        "ok": True,
+        "tier": body.tier,
+        "tier_name": tier["name"],
+        "expires_at": sub.expires_at.isoformat(),
+        "neurocredits_bonus": 200,
+    }
+
+
+@app.get("/api/premium/status/{user_id}")
+def premium_status(user_id: int, db: Session = Depends(get_db)):
+    user = _get_or_create_user(db, user_id)
+    now = _now()
+
+    # Auto-expire
+    if (user.premium_tier and user.premium_expires_at and
+            user.premium_expires_at.replace(tzinfo=None) < now.replace(tzinfo=None)):
+        user.premium_tier = None
+        db.commit()
+
+    active_sub = (
+        db.query(PremiumSubscription)
+        .filter(
+            PremiumSubscription.user_id == user_id,
+            PremiumSubscription.is_active == True,  # noqa: E712
+            PremiumSubscription.expires_at > now,
+        )
+        .order_by(PremiumSubscription.expires_at.desc())
+        .first()
+    )
+    return {
+        "is_premium": active_sub is not None,
+        "tier": active_sub.tier if active_sub else None,
+        "tier_name": PREMIUM_TIERS.get(active_sub.tier, {}).get("name") if active_sub else None,
+        "expires_at": active_sub.expires_at.isoformat() if active_sub else None,
+        "neurocredits": user.neurocredits or 0,
+        "premium_tiers": PREMIUM_TIERS,
+    }
 
 
 # ──────────────────────────────────────────────────────────────────

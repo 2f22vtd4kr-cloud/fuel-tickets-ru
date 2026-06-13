@@ -1,6 +1,6 @@
 from sqlalchemy import (
     Boolean, Column, Integer, BigInteger, String, Float,
-    DateTime, ForeignKey, Index, UniqueConstraint,
+    DateTime, ForeignKey, Index, UniqueConstraint, Text,
 )
 from sqlalchemy.orm import relationship, declarative_base
 from datetime import datetime, timezone
@@ -19,10 +19,14 @@ class User(Base):
     username = Column(String, nullable=True)
     level = Column(String, default="Новичок")
     xp = Column(Integer, default=0)
+    neurocredits = Column(Integer, default=100)
     daily_games_played = Column(Integer, default=0)
     last_game_timestamp = Column(DateTime(timezone=True), nullable=True)
     flip_attempts_today = Column(Integer, default=0)
     last_flip_reset = Column(DateTime(timezone=True), nullable=True)
+    referral_code_used = Column(String, nullable=True)
+    premium_tier = Column(String, nullable=True)
+    premium_expires_at = Column(DateTime(timezone=True), nullable=True)
 
     purchases = relationship("PurchaseHistory", back_populates="user", lazy="dynamic")
     limits = relationship("DailyLimitTracker", back_populates="user", lazy="dynamic")
@@ -117,24 +121,13 @@ class StationReport(Base):
 
 
 class Subscription(Base):
-    """
-    A user subscribing to fuel-availability alerts for a specific station
-    (optionally for a specific fuel type).
-
-    When the station's dominant status changes to "green" (fuel appears),
-    the background scheduler sends a Telegram notification to telegram_chat_id.
-    """
     __tablename__ = "subscriptions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    # TMA user id (matches the users table)
     user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
-    # Telegram chat_id for sending push notifications (= user_id for private chats)
     telegram_chat_id = Column(BigInteger, nullable=False)
     station_id = Column(Integer, ForeignKey("gas_stations.id"), nullable=False)
-    # None = subscribe to overall station status; a fuel type = subscribe to that fuel only
     fuel_type = Column(String, nullable=True)
-    # Status we last notified the user about — prevents duplicate alerts
     last_notified_status = Column(String, nullable=True)
     last_notified_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=_now)
@@ -143,7 +136,6 @@ class Subscription(Base):
     station = relationship("GasStation", back_populates="subscriptions")
 
     __table_args__ = (
-        # One subscription per (user, station, fuel_type) combination
         UniqueConstraint("user_id", "station_id", "fuel_type",
                          name="uq_sub_user_station_fuel"),
         Index("ix_sub_station_id", "station_id"),
@@ -151,7 +143,6 @@ class Subscription(Base):
 
 
 class VpnSession(Base):
-    """A paid VPN session with auto-expiry."""
     __tablename__ = "vpn_sessions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -170,7 +161,6 @@ class VpnSession(Base):
 
 
 class UserCheckin(Base):
-    """Daily check-in record — one per user per UTC day."""
     __tablename__ = "user_checkins"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -183,7 +173,6 @@ class UserCheckin(Base):
 
 
 class ReferralCode(Base):
-    """One referral code per user — +200 XP per successful use."""
     __tablename__ = "referral_codes"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -206,3 +195,74 @@ class AnalyticsSnapshot(Base):
     red_count = Column(Integer, default=0)
     price_index = Column(Float, default=100.0)
     created_at = Column(DateTime(timezone=True), default=_now)
+
+
+class FuelPriceEvent(Base):
+    """Dynamic price multiplier per region+fuel — drives the crisis engine."""
+    __tablename__ = "fuel_price_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    region = Column(String, nullable=False, index=True)
+    fuel_type = Column(String, nullable=False)
+    multiplier = Column(Float, default=1.0)
+    reason = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), default=_now)
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (Index("ix_price_event_region", "region", "fuel_type"),)
+
+
+class NewsEvent(Base):
+    """Crisis/market news entries shown in the Matrix feed."""
+    __tablename__ = "news_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    region = Column(String, nullable=False)
+    headline = Column(String, nullable=False)
+    body = Column(Text, nullable=True)
+    severity = Column(String, default="warning")
+    fuel_type = Column(String, nullable=True)
+    price_delta_pct = Column(Float, nullable=True)
+    source = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_now)
+
+    __table_args__ = (Index("ix_news_region", "region"),)
+
+
+class CreditTransaction(Base):
+    """NeuroCredits ledger."""
+    __tablename__ = "credit_transactions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False, index=True)
+    delta = Column(Integer, nullable=False)
+    reason = Column(String, nullable=False)
+    balance_after = Column(Integer, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=_now)
+
+
+class PremiumSubscription(Base):
+    """Premium tier purchases (Оператор / Легенда)."""
+    __tablename__ = "premium_subscriptions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False, index=True)
+    tier = Column(String, nullable=False)
+    payment_method = Column(String, nullable=False)
+    transaction_id = Column(String, nullable=True)
+    price_usdt = Column(Float, nullable=True)
+    starts_at = Column(DateTime(timezone=True), default=_now)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), default=_now)
+
+
+class RssCacheEntry(Base):
+    """Rate-limits RSS feed fetches (4-hour cache)."""
+    __tablename__ = "rss_cache"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    feed_url = Column(String, unique=True, nullable=False)
+    last_fetched_at = Column(DateTime(timezone=True), nullable=True)
+    last_item_count = Column(Integer, default=0)

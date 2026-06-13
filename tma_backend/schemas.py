@@ -42,8 +42,10 @@ class UserOut(BaseModel):
     username: Optional[str]
     level: str
     xp: int
+    neurocredits: int = 100
     daily_games_played: int
     flip_attempts_today: int
+    premium_tier: Optional[str] = None
     model_config = {"from_attributes": True}
 
 

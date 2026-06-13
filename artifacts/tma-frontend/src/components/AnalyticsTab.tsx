@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Cell,
 } from "recharts";
-import { fetchAnalytics } from "@/api/client";
-import type { Analytics } from "@/types";
+import { fetchAnalytics, fetchNews } from "@/api/client";
+import type { Analytics, NewsItem } from "@/types";
 
 function Skeleton() {
   return (
@@ -84,15 +84,104 @@ const REGION_CHART_COLORS = [
   "#06b6d4", "#f97316", "#ec4899", "#8b5cf6", "#14b8a6",
 ];
 
+const SEVERITY_COLORS: Record<string, string> = {
+  critical: "#ef4444",
+  warning:  "#eab308",
+  info:     "#3b82f6",
+};
+
+const SEVERITY_ICONS: Record<string, string> = {
+  critical: "🔴",
+  warning:  "⚠️",
+  info:     "ℹ️",
+};
+
+function NewsTicker({ items }: { items: NewsItem[] }) {
+  const [idx, setIdx] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (items.length <= 1) return;
+    timerRef.current = setInterval(() => {
+      setIdx((i) => (i + 1) % items.length);
+    }, 4000);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [items.length]);
+
+  if (!items.length) return null;
+
+  const item = items[idx];
+  const color = SEVERITY_COLORS[item.severity] ?? "#6b7280";
+  const icon  = SEVERITY_ICONS[item.severity]  ?? "📡";
+
+  return (
+    <div style={{
+      margin: "0.75rem 1rem 0",
+      background: "#0b0b0f",
+      border: `1px solid ${color}44`,
+      borderLeft: `3px solid ${color}`,
+      borderRadius: "10px",
+      overflow: "hidden",
+    }}>
+      <div style={{
+        display: "flex", alignItems: "center", gap: "0.4rem",
+        padding: "0.4rem 0.75rem",
+        background: `${color}12`,
+        borderBottom: `1px solid ${color}22`,
+      }}>
+        <span style={{ fontSize: "0.65rem" }}>{icon}</span>
+        <span style={{ color, fontSize: "0.65rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          Сводка рынка
+        </span>
+        <span style={{ marginLeft: "auto", color: "#4b5563", fontSize: "0.6rem" }}>
+          {idx + 1}/{items.length}
+        </span>
+      </div>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={idx}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.3 }}
+          style={{ padding: "0.6rem 0.75rem" }}
+        >
+          <p style={{ margin: 0, color: "#e2e8f0", fontSize: "0.75rem", fontWeight: 600, lineHeight: 1.4 }}>
+            {item.region && <span style={{ color: "#a855f7" }}>[{item.region.split(" ").slice(-1)[0]}]</span>}{" "}
+            {item.headline}
+          </p>
+          {item.price_delta_pct !== null && item.price_delta_pct !== undefined && (
+            <p style={{ margin: "0.2rem 0 0", color: item.price_delta_pct > 0 ? "#ef4444" : "#22c55e", fontSize: "0.7rem", fontFamily: "'JetBrains Mono', monospace" }}>
+              {item.price_delta_pct > 0 ? "▲" : "▼"} {Math.abs(item.price_delta_pct).toFixed(1)}%
+              {item.fuel_type && <span style={{ color: "#6b7280" }}> · {item.fuel_type}</span>}
+            </p>
+          )}
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
+}
+
 export function AnalyticsTab() {
   const [data, setData] = useState<Analytics | null>(null);
+  const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchAnalytics()
-      .then((d) => { setData(d); setLoading(false); })
-      .catch((e) => { setError(String(e)); setLoading(false); });
+    Promise.all([
+      fetchAnalytics(),
+      fetchNews(undefined, 30).catch(() => [] as NewsItem[]),
+    ]).then(([analytics, newsItems]) => {
+      setData(analytics);
+      setNews(newsItems);
+      setLoading(false);
+    }).catch((e) => { setError(String(e)); setLoading(false); });
+
+    const interval = setInterval(() => {
+      fetchNews(undefined, 30).then(setNews).catch(() => {});
+    }, 60_000);
+    return () => clearInterval(interval);
   }, []);
 
   if (loading) return (
@@ -140,6 +229,9 @@ export function AnalyticsTab() {
           Актуальные данные по всем региональным узлам
         </p>
       </div>
+
+      {/* News ticker */}
+      <NewsTicker items={news} />
 
       {/* Stat cards */}
       <div style={{ padding: "0.75rem 1rem", display: "flex", gap: "0.5rem" }}>

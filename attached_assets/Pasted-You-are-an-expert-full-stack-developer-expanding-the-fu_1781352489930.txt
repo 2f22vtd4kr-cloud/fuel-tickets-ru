@@ -1,0 +1,43 @@
+You are an expert full-stack developer expanding the "fuel-tickets-ru" Telegram Bot + TMA project on Replit free tier. The project already covers fuel vouchers for ТЭС, Атан, ВТК/РТК etc. in Crimea/Sevastopol and has been extended to European Russia regions. Use Python (python-telegram-bot v20, FastAPI backend), React 19/Vite/TypeScript TMA frontend (Zustand, Framer Motion, react-leaflet), SQLite (WAL), Leaflet map with clustering/filters, gamification (XP, taps, flips), voucher system, and Crypto Bot payments. Strictly no paid services or heavy external API calls that cost money or require keys — everything self-hosted on Replit.
+
+This is the MASTER UPDATE to the existing repo. Focus on realism for the current heavy fuel crisis in Russia (supply shortages, regional spikes, logistics issues) while keeping the full cyberpunk "Топливный Узел — Матрица Снабжения" aesthetic (#050507 bg, violet/magenta neon, glitch effects, dystopian flavor text).
+
+### Critical Instructions Before Coding
+- First, explore the current project structure: list all files related to stations (seed scripts, data files, DB init, map components), bot commands, payments, and TMA tabs. Show me the structure.
+- Ask me for all required secret tokens and IDs: Crypto Bot token, my Telegram admin/user ID, any passwords for admin space, bot token if needed, etc. Do not hardcode anything — use environment variables or Replit secrets.
+- For the Telegram Mini App button: Suggest the exact URL format I should use in the bot's menu/button to open the TMA (e.g., the Replit-hosted URL). Update /start and other commands to deep-link directly to relevant TMA tabs/buttons (Catalog, Map, Vault, Premium, etc.) instead of old text responses.
+- Do NOT fetch any real external data (no live OSM API calls, no scraping). Simulate everything logically.
+
+### Step 1: Expand & Fix Gas Stations Database & Map
+- Use all unique stations from the two attached "Pasted Text.txt" files (avoid duplicates). Add more plausible stations for major networks (Роснефть, Лукойл, Газпромнефть, Татнефть, etc.) across European Russia + southern regions (Moscow, SPb, Krasnodar, Rostov, etc., plus Sevastopol, Simferopol, Donetsk, Lugansk, Mariupol, Melitopol, etc.).
+- Fix any impossible locations (e.g., middle of Black Sea) — adjust coordinates logically to real road/highway positions near cities.
+- Total target: 500+ stations. Each with: brand, address, lat/lng (plausible), fuel types (АИ-92/95/100, ДТ), simulated availability.
+- Update seeding script + map data. Add brand filters, region filters. Keep Leaflet performant with clustering.
+
+### Step 2: Implement Dynamic Fuel Price Algorithms (Simulation Model)
+Build a mathematical model for dynamic pricing based on simulated "fuel crisis" logic (no real data fetching):
+- Base price per liter (e.g., АИ-95 starts at 55-65 RUB equivalent in credits/USDT).
+- Factors influencing price (mathematical model):
+  - Supply shock multiplier: Random or scheduled "crisis events" (e.g., +15-40% during simulated refinery issues, logistics blocks on M4/M7).
+  - Regional demand: Higher in big cities (+10-25%), lower on highways.
+  - Time-based: Peak hours/weekends +5-15%.
+  - User tier modifier: Premium users see slight discounts or priority.
+- Use simple formulas + APScheduler for daily/weekly fluctuations. Log events in DB for "news feed" in app (e.g., "Матрица зафиксировала дефицит в Краснодарском крае — цены выросли на 18%").
+- Display dynamic prices in Catalog and Map popups. Users buy at current simulated rate with NeuroCredits or Crypto Bot.
+- Make it feel realistic to current events without external calls.
+
+### Step 3: "Нейронная Экономика Матрицы" Monetization (Full Freemium)
+- **NeuroCredits**: Earn via taps, daily login, reports, referrals. Spend on extra fuel, boosts, cosmetics.
+- **Premium Tiers** via Crypto Bot: Operator (monthly), Legend Tavrida. Handle invoices, expiry, auto-downgrade.
+- Referrals, leaderboards, black market drops, tournaments.
+- Digital collectibles, donations, simple sponsor pins.
+
+### Step 4: Integration & Polish
+- Update all bot commands to open TMA sections via deep links.
+- Full cyberpunk UI/UX for new features.
+- DB schema updates for credits, subscriptions, prices history, etc.
+- Seed realistic demo data including dynamic prices.
+
+Provide step-by-step plan: first structure exploration + secrets request + TMA URL suggestion, then station fixes + price model, then full monetization. Give code diffs/full files. Prioritize map accuracy and dynamic prices as quick wins. Keep everything lore-friendly to the Tavrida fuel matrix.
+
+Start now by exploring the project and asking for my secrets.

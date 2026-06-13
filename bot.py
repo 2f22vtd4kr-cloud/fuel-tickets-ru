@@ -40,7 +40,8 @@ PAID_AMOUNT_USDT   = 12          # фиксированная стоимость
 USDT_RUB_RATE      = 92          # курс конвертации для отображения суммы в рублях
 DB_PATH            = "vouchers.db"
 MAP_URL         = "https://fuel.sevtech.org/map"
-TMA_URL         = "https://3001-" + os.getenv("REPLIT_DEV_DOMAIN", "localhost")
+TMA_URL         = "https://fuel-tickets-ru--kolachenkovmyko.replit.app"
+ADMIN_ID        = 7103267900
 
 
 # ─── Deep-link helpers ────────────────────────────────────────────
@@ -649,11 +650,19 @@ def fmt_dt(iso: str | None) -> str:
 
 def main_menu_markup() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🗺️⛽ Топливный Узел — Матрица Снабжения", web_app=WebAppInfo(url=TMA_URL))],
-        [InlineKeyboardButton("📂 Получить бесплатный QR-код (Лимит 20л)", callback_data="free_quota")],
-        [InlineKeyboardButton("⚡ Заказать дополнительный объем (Платная доза)", callback_data="paid_quota")],
-        [InlineKeyboardButton("📜 Актуальные правила и сводки Правительства", callback_data="rules")],
-        [InlineKeyboardButton("🗺️ Карта остатков АЗС (fuel.sevtech.org)", url=MAP_URL)],
+        [InlineKeyboardButton("⛽ Матрица Снабжения", web_app=WebAppInfo(url=TMA_URL))],
+        [
+            InlineKeyboardButton("🗺 Карта АЗС", url=f"https://t.me/{BOT_USERNAME}?startapp=map" if BOT_USERNAME else TMA_URL),
+            InlineKeyboardButton("📦 Каталог", url=f"https://t.me/{BOT_USERNAME}?startapp=catalog" if BOT_USERNAME else TMA_URL),
+        ],
+        [
+            InlineKeyboardButton("🗄 Сейф", url=f"https://t.me/{BOT_USERNAME}?startapp=vault" if BOT_USERNAME else TMA_URL),
+            InlineKeyboardButton("🎮 Резерв", url=f"https://t.me/{BOT_USERNAME}?startapp=reserve" if BOT_USERNAME else TMA_URL),
+        ],
+        [InlineKeyboardButton("📊 Аналитика", url=f"https://t.me/{BOT_USERNAME}?startapp=analytics" if BOT_USERNAME else TMA_URL)],
+        [InlineKeyboardButton("📂 Бесплатный QR-ваучер (20 л)", callback_data="free_quota")],
+        [InlineKeyboardButton("⚡ Доп. объём (платная доза)", callback_data="paid_quota")],
+        [InlineKeyboardButton("🗺️ Карта АЗС fuel.sevtech.org", url=MAP_URL)],
     ])
 
 
@@ -676,6 +685,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data.clear()
     user = update.effective_user
     # Notify admin when a new user starts the bot for the first time
+    if user and user.id == ADMIN_ID:
+        await update.message.reply_text(
+            "🔑 *Режим администратора активен*\nID: `7103267900`",
+            parse_mode="Markdown",
+        )
     if user and ADMIN_CHAT_ID and user.id != ADMIN_CHAT_ID:
         is_new = _is_new_user(user.id)
         if is_new:
@@ -1998,6 +2012,46 @@ async def copy_ref_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 # ─── /broadcast (admin) ───────────────────────────────────────────
 
+async def price_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show current fuel prices from the TMA backend."""
+    import aiohttp
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"{TMA_URL}/api/prices", timeout=aiohttp.ClientTimeout(total=6)) as resp:
+                if resp.status != 200:
+                    raise ValueError(f"HTTP {resp.status}")
+                data = await resp.json()
+    except Exception as exc:
+        await update.message.reply_text(
+            f"⚠️ Не удалось получить котировки: {exc}\n\nОткройте Матрицу для актуальных цен.",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("⛽ Матрица Снабжения", web_app=WebAppInfo(url=TMA_URL))
+            ]]),
+        )
+        return
+
+    lines = ["⛽ *Текущие котировки ГСМ*\n"]
+    for region, fuels in list(data.items())[:6]:
+        region_short = region.split()[-1] if len(region) > 25 else region
+        lines.append(f"📍 *{region_short}*")
+        for fuel, price_data in list(fuels.items())[:4]:
+            if not isinstance(price_data, dict):
+                continue
+            eff = price_data.get("effective", "—")
+            crisis = " 🔴" if price_data.get("is_crisis") else ""
+            lines.append(f"  {fuel}: `{eff} ₽/л`{crisis}")
+        lines.append("")
+
+    lines.append("_Цены обновляются каждые 15 минут_")
+    await update.message.reply_text(
+        "\n".join(lines),
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("⛽ Открыть Матрицу", web_app=WebAppInfo(url=TMA_URL))
+        ]]),
+    )
+
+
 async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a message to all users who have chat records in the DB."""
     if not ADMIN_CHAT_ID or update.effective_chat.id != ADMIN_CHAT_ID:
@@ -2104,6 +2158,7 @@ def main() -> None:
     app.add_handler(CommandHandler("vpn",           vpn_cmd))
     app.add_handler(CommandHandler("mystats",       mystats_cmd))
     app.add_handler(CommandHandler("refer",         refer_cmd))
+    app.add_handler(CommandHandler("price",         price_cmd))
     app.add_handler(CommandHandler("broadcast",     broadcast_cmd))
     app.add_handler(CallbackQueryHandler(vpn_callback,     pattern=r"^vpn_"))
     app.add_handler(CallbackQueryHandler(copy_ref_callback, pattern=r"^copy_ref_"))

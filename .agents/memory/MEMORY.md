@@ -1,3 +1,4 @@
 - [TMA Backend port](tma-backend-port.md) — port 5001 is not in Replit allowlist; use 8000 (override with TMA_PORT).
+- [TMA SQLite DB path](tma-db-path.md) — DB lives at workspace root `/home/runner/workspace/tma.db`, NOT `tma_backend/tma.db`.
 - [Map tab never remount](map-never-remount.md) — pass `visible: boolean` prop + CSS visibility toggle; do NOT conditionally render the map component.
 - [react-leaflet React 19 peer](react-leaflet-react19.md) — react-leaflet@4.x has peer dep warnings with React 19; they are cosmetic, app works.
