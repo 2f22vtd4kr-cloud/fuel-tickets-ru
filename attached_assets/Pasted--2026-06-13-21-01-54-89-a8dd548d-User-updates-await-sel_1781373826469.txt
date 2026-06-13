@@ -1,0 +1,131 @@
+
+2026-06-13 21:01:54.89
+a8dd548d
+User
+updates = await self.bot.get_updates(
+
+2026-06-13 21:01:54.89
+a8dd548d
+User
+updates = await super().get_updates(
+
+2026-06-13 21:01:54.89
+a8dd548d
+User
+result = await func(self, *args, **kwargs) # skipcq: PYL-E1102
+
+2026-06-13 21:01:54.89
+a8dd548d
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+2026-06-13 21:01:54.89
+a8dd548d
+User
+raise exc
+
+2026-06-13 21:01:54.89
+a8dd548d
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+2026-06-13 21:01:54.89
+a8dd548d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages/telegram/ext/_updater.py", line 373, in polling_action_cb
+
+2026-06-13 21:01:54.89
+a8dd548d
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+2026-06-13 21:01:54.89
+a8dd548d
+User
+^^^^^^^^^^^^^^^^^
+
+2026-06-13 21:01:54.89
+a8dd548d
+User
+^^^^^^^^^^^^^^^^^
+
+2026-06-13 21:01:54.89
+a8dd548d
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+2026-06-13 21:01:54.89
+a8dd548d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages/telegram/ext/_updater.py", line 373, in polling_action_cb
+
+2026-06-13 21:01:54.89
+a8dd548d
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+2026-06-13 21:01:54.89
+a8dd548d
+User
+raise exc
+
+2026-06-13 21:01:54.89
+a8dd548d
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+2026-06-13 21:01:54.89
+a8dd548d
+User
+result = await func(self, *args, **kwargs) # skipcq: PYL-E1102
+
+2026-06-13 21:01:54.89
+a8dd548d
+User
+updates = await super().get_updates(
+
+2026-06-13 21:01:54.89
+a8dd548d
+User
+updates = await self.bot.get_updates(
+
+2026-06-13 21:01:54.89
+a8dd548d
+User
+Traceback (most recent call last):
+
+
+2026-06-13 21:01:54.89
+a8dd548d
+User
+2026-06-13 18:01:54,726 - telegram.ext.Application - ERROR - No error handlers are registered, logging exception.
+
+2026-06-13 21:01:54.89
+a8dd548d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages/telegram/ext/_updater.py", line 384, in polling_action_cb
+
+2026-06-13 21:01:54.89
+a8dd548d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages/telegram/_bot.py", line 3584, in get_updates
+
+2026-06-13 21:01:54.89
+a8dd548d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages/telegram/ext/_extbot.py", line 558, in get_updates
+
+2026-06-13 21:01:54.89
+a8dd548d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages/telegram/ext/_updater.py", line 688, in _network_loop_retry
+
+2026-06-13 21:01:54.89
+a8dd548d
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.12/site-packages/telegram/_bot.py", line 525, in decorator
+
+2026-06-13 21:01:54.89
+a8dd548d
+User
+await self._post
