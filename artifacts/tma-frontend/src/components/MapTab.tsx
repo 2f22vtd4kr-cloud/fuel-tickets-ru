@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, useMap, useMapEvents, Rectangle, Tooltip } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
 import { Marker, Popup } from "react-leaflet";
 import L from "leaflet";
@@ -64,6 +64,46 @@ function MapRecenter({ lat, lng, zoom }: { lat: number; lng: number; zoom: numbe
 const FUEL_OPTIONS = ["АИ-92", "АИ-95", "АИ-95+", "АИ-100", "ДТ", "ДТ+", "Газ"];
 const POPUP_FUELS = ["АИ-92", "АИ-95", "ДТ"];
 
+// Region bounding boxes from seed_regions.py — used for the heatmap overlay
+const REGION_BOUNDS: { name: string; latMin: number; latMax: number; lngMin: number; lngMax: number }[] = [
+  { name: "АР Крым и г. Севастополь",   latMin: 44.38, latMax: 45.50, lngMin: 33.40, lngMax: 36.00 },
+  { name: "Донецкая область",            latMin: 47.50, latMax: 48.60, lngMin: 37.00, lngMax: 38.90 },
+  { name: "Луганская область",           latMin: 48.00, latMax: 49.10, lngMin: 38.50, lngMax: 39.80 },
+  { name: "Запорожская область",         latMin: 47.00, latMax: 48.10, lngMin: 34.70, lngMax: 36.40 },
+  { name: "Херсонская область",          latMin: 46.10, latMax: 47.10, lngMin: 32.30, lngMax: 34.20 },
+  { name: "Белгородская область",        latMin: 50.30, latMax: 51.10, lngMin: 35.80, lngMax: 37.80 },
+  { name: "Курская область",             latMin: 51.30, latMax: 52.20, lngMin: 35.40, lngMax: 37.20 },
+  { name: "Воронежская область",         latMin: 50.50, latMax: 52.00, lngMin: 38.50, lngMax: 40.50 },
+  { name: "Брянская область",            latMin: 52.30, latMax: 53.20, lngMin: 32.80, lngMax: 34.80 },
+  { name: "Орловская область",           latMin: 52.40, latMax: 53.30, lngMin: 35.50, lngMax: 37.00 },
+  { name: "Новгородская область",        latMin: 57.60, latMax: 59.00, lngMin: 30.80, lngMax: 33.00 },
+  { name: "Псковская область",           latMin: 56.80, latMax: 58.40, lngMin: 27.80, lngMax: 30.20 },
+  { name: "г. Москва и Новая Москва",   latMin: 55.55, latMax: 55.92, lngMin: 37.15, lngMax: 37.90 },
+  { name: "Московская область",          latMin: 55.00, latMax: 56.50, lngMin: 36.00, lngMax: 40.00 },
+  { name: "г. Санкт-Петербург",         latMin: 59.82, latMax: 60.08, lngMin: 30.05, lngMax: 30.55 },
+  { name: "Ленинградская область",       latMin: 59.00, latMax: 61.00, lngMin: 28.50, lngMax: 32.50 },
+  { name: "Краснодарский край",          latMin: 44.80, latMax: 45.50, lngMin: 38.00, lngMax: 41.00 },
+  { name: "Ростовская область",          latMin: 47.00, latMax: 48.50, lngMin: 39.00, lngMax: 41.50 },
+  { name: "Ставропольский край",         latMin: 44.00, latMax: 45.50, lngMin: 41.00, lngMax: 44.00 },
+  { name: "Нижегородская область",       latMin: 55.50, latMax: 57.00, lngMin: 43.00, lngMax: 45.50 },
+  { name: "Республика Татарстан",        latMin: 54.50, latMax: 56.50, lngMin: 48.50, lngMax: 52.00 },
+  { name: "Самарская область",           latMin: 52.50, latMax: 54.50, lngMin: 49.50, lngMax: 52.50 },
+  { name: "Республика Башкортостан",     latMin: 53.50, latMax: 56.00, lngMin: 54.00, lngMax: 59.00 },
+  { name: "Тульская область",            latMin: 53.50, latMax: 54.50, lngMin: 36.80, lngMax: 38.50 },
+  { name: "Волгоградская область",       latMin: 48.00, latMax: 50.50, lngMin: 43.00, lngMax: 45.50 },
+  { name: "Астраханская область",        latMin: 45.50, latMax: 47.50, lngMin: 46.00, lngMax: 48.50 },
+  { name: "Пермский край",               latMin: 57.50, latMax: 59.50, lngMin: 55.50, lngMax: 58.50 },
+  { name: "Саратовская область",         latMin: 50.50, latMax: 52.50, lngMin: 44.00, lngMax: 47.00 },
+  { name: "Ярославская область",         latMin: 57.50, latMax: 58.50, lngMin: 38.50, lngMax: 40.50 },
+  { name: "Тверская область",            latMin: 56.50, latMax: 58.00, lngMin: 33.00, lngMax: 36.00 },
+];
+
+function availabilityColor(pct: number): string {
+  if (pct >= 60) return "#22c55e";
+  if (pct >= 25) return "#eab308";
+  return "#ef4444";
+}
+
 function PopupContent({ station }: { station: GasStation }) {
   const getPrice = usePriceStore((s) => s.getPrice);
   return (
@@ -123,6 +163,16 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
   const { viewport, filterStatus, filterFuel, filterRegion, filterNetwork, setFilter, selectedStationId, selectStation } =
     useMapStore();
   const [showFilters, setShowFilters] = useState(false);
+  const [showHeatmap, setShowHeatmap] = useState(true);
+
+  // Per-region availability stats for heatmap
+  const regionStats = REGION_BOUNDS.map((rb) => {
+    const regionStations = stations.filter((s) => s.region === rb.name);
+    if (!regionStations.length) return { ...rb, avgPct: null as number | null };
+    const allPcts = regionStations.flatMap((s) => s.fuel_statuses.map((f) => f.availability_pct));
+    const avgPct = allPcts.length ? allPcts.reduce((a, b) => a + b, 0) / allPcts.length : null;
+    return { ...rb, avgPct };
+  });
 
   useEffect(() => {
     fetch();
@@ -206,6 +256,25 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
               }}
             />
           )}
+        </button>
+
+        {/* Heatmap toggle */}
+        <button
+          onClick={() => setShowHeatmap((v) => !v)}
+          style={{
+            background: showHeatmap ? "rgba(168,85,247,0.18)" : "rgba(20,20,28,0.92)",
+            border: `1px solid ${showHeatmap ? "#a855f755" : "#22222f"}`,
+            borderRadius: "10px",
+            color: showHeatmap ? "#a855f7" : "#9ca3af",
+            padding: "0.4rem 0.6rem",
+            fontSize: "0.78rem",
+            cursor: "pointer",
+            backdropFilter: "blur(12px)",
+            display: "flex", alignItems: "center", gap: "0.25rem",
+          }}
+          title="Тепловая карта регионов"
+        >
+          🌡
         </button>
 
         {/* Station count badge */}
@@ -431,6 +500,34 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
         />
         <MapViewportSync />
         <MapRecenter lat={viewport.lat} lng={viewport.lng} zoom={viewport.zoom} />
+
+        {/* Region heatmap overlay */}
+        {showHeatmap && regionStats.map((r) => {
+          if (r.avgPct === null) return null;
+          const color = availabilityColor(r.avgPct);
+          return (
+            <Rectangle
+              key={r.name}
+              bounds={[[r.latMin, r.lngMin], [r.latMax, r.lngMax]]}
+              pathOptions={{
+                color,
+                weight: 1,
+                opacity: 0.5,
+                fillColor: color,
+                fillOpacity: r.avgPct < 25 ? 0.22 : 0.12,
+              }}
+            >
+              <Tooltip sticky direction="center" opacity={0.92}>
+                <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "#e2e8f0", background: "transparent" }}>
+                  {r.name}
+                  <br />
+                  <span style={{ color, fontFamily: "monospace" }}>{Math.round(r.avgPct)}%</span>
+                  <span style={{ color: "#9ca3af", fontWeight: 400 }}> наличие</span>
+                </div>
+              </Tooltip>
+            </Rectangle>
+          );
+        })}
 
         <MarkerClusterGroup
           chunkedLoading

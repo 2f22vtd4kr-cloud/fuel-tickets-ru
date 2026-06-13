@@ -2375,27 +2375,51 @@ def generate_news_from_availability():
             if recent_count >= 2:
                 continue
 
-            if avg < CRITICAL_THRESHOLD and _rng.random() < 0.7:
-                fuel = _rng.choice(["АИ-92", "АИ-95", "ДТ"])
+            if avg < CRITICAL_THRESHOLD and _rng.random() < 0.75:
+                fuel = _rng.choice(["АИ-92", "АИ-95", "ДТ", "АИ-95+"])
+                queue_est = _rng.randint(15, 65)
+                price_spike = round(_rng.uniform(8.5, 22.0), 1)
                 headlines = [
-                    f"Критический запас топлива в {region}: {avg:.0f}% доступности",
-                    f"Предупреждение: АЗС {region} заканчивают {fuel}",
-                    f"Дефицит {fuel} в {region} — матрица фиксирует нехватку",
+                    f"ЭКСТРЕННО: {region} — запасы {fuel} на критическом уровне ({avg:.0f}%)",
+                    f"⚠ Дефицит {fuel} в {region}: очереди до {queue_est} авто на АЗС",
+                    f"Матрица фиксирует ЧС в {region}: {avg:.0f}% наличия {fuel}",
+                    f"АЗС {region} массово отключают {fuel} — лимиты введены",
+                    f"СРОЧНО: нехватка {fuel} в {region}, цены выросли на {price_spike}%",
+                ]
+                bodies = [
+                    f"Региональный мониторинг зафиксировал критическое снижение запасов {fuel} до {avg:.1f}%. На большинстве АЗС введены ограничения по объёму отпуска. Ожидайте нормализацию в течение 24–72 часов.",
+                    f"Среднее по {region}: {avg:.1f}% доступности {fuel}. Очереди на ведущих станциях сети составляют от 20 до {queue_est} автомобилей. Рекомендуем обращаться на АЗС зелёного статуса.",
+                    f"Ситуация классифицирована как топливный дефицит. Введён режим нормирования. Лимит — не более 30 л {fuel} на ТС. Ориентировочные сроки пополнения запасов — 48 часов.",
                 ]
                 db.add(NewsEvent(
                     region=region, headline=_rng.choice(headlines),
-                    body=f"Среднее по региону: {avg:.1f}% доступности топлива. Рекомендуем заправиться на станциях с зелёным статусом.",
-                    severity="critical", fuel_type=fuel, price_delta_pct=None,
-                    source="АвтоМатрица", created_at=now,
+                    body=_rng.choice(bodies),
+                    severity="critical", fuel_type=fuel,
+                    price_delta_pct=round(_rng.uniform(5.0, price_spike), 1),
+                    source="АвтоМатрица · ИИ-мониторинг", created_at=now,
+                ))
+                generated += 1
+            elif avg < 40.0 and avg >= CRITICAL_THRESHOLD and _rng.random() < 0.5:
+                fuel = _rng.choice(["АИ-92", "АИ-95", "ДТ"])
+                price_d = round(_rng.uniform(2.5, 8.0), 1)
+                db.add(NewsEvent(
+                    region=region,
+                    headline=f"Напряжённость в {region}: {fuel} заканчивается ({avg:.0f}%)",
+                    body=f"Запасы {fuel} в {region} снизились до {avg:.1f}%. Часть АЗС перешла в режим ограниченного отпуска. Рост цен: +{price_d}% к уровню прошлой недели.",
+                    severity="warning", fuel_type=fuel,
+                    price_delta_pct=price_d,
+                    source="АвтоМатрица · Предупреждение", created_at=now,
                 ))
                 generated += 1
             elif avg > GOOD_THRESHOLD and _rng.random() < 0.4:
+                price_drop = round(_rng.uniform(1.0, 5.5), 1)
                 db.add(NewsEvent(
                     region=region,
-                    headline=f"Стабилизация в {region}: доступность {avg:.0f}%",
-                    body="Ситуация с топливом нормализовалась. Поставки поступили в полном объёме.",
-                    severity="success", fuel_type=None, price_delta_pct=None,
-                    source="АвтоМатрица", created_at=now,
+                    headline=f"Нормализация в {region}: доступность {avg:.0f}%",
+                    body=f"Ситуация с топливом в {region} стабилизировалась. Доступность по всем видам: {avg:.1f}%. Поставки прибыли в полном объёме. Цены скорректировались на -{price_drop}%.",
+                    severity="success", fuel_type=None,
+                    price_delta_pct=-price_drop,
+                    source="АвтоМатрица · Мониторинг", created_at=now,
                 ))
                 generated += 1
 

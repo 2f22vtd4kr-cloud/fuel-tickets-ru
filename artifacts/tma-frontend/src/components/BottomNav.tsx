@@ -5,6 +5,7 @@ interface Props {
   active: TabId;
   onChange: (tab: TabId) => void;
   visible?: boolean;
+  badges?: Partial<Record<TabId, number>>;
 }
 
 const TABS: { id: TabId; emoji: string; label: string }[] = [
@@ -15,7 +16,7 @@ const TABS: { id: TabId; emoji: string; label: string }[] = [
   { id: "reserve",   emoji: "🎰", label: "Фортуна" },
 ];
 
-export function BottomNav({ active, onChange, visible = true }: Props) {
+export function BottomNav({ active, onChange, visible = true, badges = {} }: Props) {
   return (
     <motion.nav
       animate={{ y: visible ? 0 : "100%" }}
@@ -32,6 +33,7 @@ export function BottomNav({ active, onChange, visible = true }: Props) {
     >
       {TABS.map((tab) => {
         const isActive = active === tab.id;
+        const badgeCount = badges[tab.id] ?? 0;
         return (
           <button
             key={tab.id}
@@ -59,13 +61,36 @@ export function BottomNav({ active, onChange, visible = true }: Props) {
                 transition={{ type: "spring", damping: 25, stiffness: 300 }}
               />
             )}
-            <motion.span
-              animate={{ scale: isActive ? 1.15 : 1 }}
-              transition={{ type: "spring", damping: 20 }}
-              style={{ fontSize: "1.25rem", lineHeight: 1 }}
-            >
-              {tab.emoji}
-            </motion.span>
+            <div style={{ position: "relative", lineHeight: 1 }}>
+              <motion.span
+                animate={{ scale: isActive ? 1.15 : 1 }}
+                transition={{ type: "spring", damping: 20 }}
+                style={{ fontSize: "1.25rem", lineHeight: 1, display: "block" }}
+              >
+                {tab.emoji}
+              </motion.span>
+              {badgeCount > 0 && (
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  style={{
+                    position: "absolute",
+                    top: "-4px", right: "-6px",
+                    background: "linear-gradient(135deg,#ef4444,#dc2626)",
+                    color: "#fff",
+                    borderRadius: "99px",
+                    minWidth: "16px", height: "16px",
+                    fontSize: "0.5rem", fontWeight: 800,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    padding: "0 3px",
+                    boxShadow: "0 0 8px #ef444488",
+                    border: "1px solid rgba(255,255,255,0.15)",
+                  }}
+                >
+                  {badgeCount > 99 ? "99+" : badgeCount}
+                </motion.div>
+              )}
+            </div>
             <span style={{
               fontSize: "0.6rem",
               color: isActive ? "#a855f7" : "#6b7280",

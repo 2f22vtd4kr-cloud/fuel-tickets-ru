@@ -89,8 +89,16 @@ export default function App() {
   const vpnSuggested = useRef(false);
 
   const { init: initUser } = useUserStore();
-  const { fetch: fetchStations } = useStationStore();
+  const { fetch: fetchStations, stations } = useStationStore();
   const { selectStation } = useMapStore();
+
+  const crisisCount = stations.reduce((n, s) => {
+    const avg = s.fuel_statuses.length
+      ? s.fuel_statuses.reduce((a, b) => a + b.availability_pct, 0) / s.fuel_statuses.length
+      : 100;
+    return avg < 25 ? n + 1 : n;
+  }, 0);
+
   const { initPrices, connectWs } = usePriceStore();
 
   // ── Price store + WebSocket live feed ───────────────────────────
@@ -211,7 +219,7 @@ export default function App() {
         onClick={() => { setVpnTroubleshooter(false); setShowVpn(true); }}
         title="VPN-доступ"
         style={{
-          position: "fixed", bottom: "72px", right: "12px",
+          position: "fixed", bottom: "72px", left: "12px",
           zIndex: 9500,
           width: "40px", height: "40px",
           borderRadius: "50%",
@@ -277,7 +285,12 @@ export default function App() {
         )}
       </div>
 
-      <BottomNav active={activeTab} onChange={handleTabChange} visible={navVisible} />
+      <BottomNav
+        active={activeTab}
+        onChange={handleTabChange}
+        visible={navVisible}
+        badges={crisisCount > 0 ? { catalog: crisisCount } : {}}
+      />
     </ErrorBoundary>
   );
 }

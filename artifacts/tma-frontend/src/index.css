@@ -172,6 +172,11 @@ input, textarea { -webkit-user-select: text; user-select: text; }
   100% { transform: scale(2.5); opacity: 0; }
 }
 
+@keyframes pulse-ring {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50%       { opacity: 0.2; transform: scale(1.04); }
+}
+
 /* Skeleton loading shimmer */
 .skeleton {
   background: linear-gradient(

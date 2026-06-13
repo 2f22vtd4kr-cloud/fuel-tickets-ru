@@ -104,43 +104,81 @@ export function StationCard({ station, onClose }: Props) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 20 }}
-      style={{ background: "#14141c", border: "1px solid #22222f", borderRadius: "16px", overflow: "hidden" }}
+      style={{
+        background: "linear-gradient(160deg,#0d0d18,#100812)",
+        border: `1px solid ${statusColor}30`,
+        borderRadius: "20px",
+        overflow: "hidden",
+        boxShadow: `0 0 28px ${statusColor}15, 0 4px 24px #00000060`,
+      }}
     >
       {/* Status top bar */}
-      <div style={{ height: "3px", background: `linear-gradient(90deg, ${statusColor}88, ${statusColor})` }} />
+      <div style={{ height: "2px", background: `linear-gradient(90deg, transparent, ${statusColor}, ${statusColor}88, transparent)` }} />
 
       {/* Header */}
-      <div style={{ padding: "0.85rem 1rem 0.6rem", borderBottom: "1px solid #22222f" }}>
+      <div style={{ padding: "0.9rem 1rem 0.65rem", borderBottom: `1px solid ${statusColor}15` }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.2rem" }}>
-              <span style={{ width: "9px", height: "9px", borderRadius: "50%", background: statusColor, boxShadow: `0 0 10px ${statusColor}`, flexShrink: 0 }} />
-              <span style={{ color: "#e2e8f0", fontWeight: 700, fontSize: "0.95rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem" }}>
+              <span style={{
+                width: "10px", height: "10px", borderRadius: "50%",
+                background: statusColor,
+                boxShadow: `0 0 12px ${statusColor}, 0 0 4px ${statusColor}`,
+                flexShrink: 0,
+                animation: dominantStatus === "red" ? "crisisPulse 1.2s infinite" : "none",
+              }} />
+              <span style={{ color: "#f1f5f9", fontWeight: 800, fontSize: "0.98rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "-0.01em" }}>
                 {station.name}
               </span>
             </div>
-            <p style={{ color: "#6b7280", fontSize: "0.75rem", margin: "0 0 0.25rem" }}>{station.address}</p>
-            <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", alignItems: "center" }}>
-              <span style={{ color: "#4b5563", fontSize: "0.7rem" }}>{station.region}</span>
-              <span style={{ background: `${zoneInfo.color}18`, border: `1px solid ${zoneInfo.color}33`, borderRadius: "4px", color: zoneInfo.color, fontSize: "0.6rem", padding: "0.05rem 0.35rem" }}>
+            <p style={{ color: "#4b5563", fontSize: "0.7rem", margin: "0 0 0.3rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              📍 {station.address}
+            </p>
+            <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", alignItems: "center" }}>
+              <span style={{ color: "#374151", fontSize: "0.62rem" }}>{station.region.split(" ").slice(-1)[0]}</span>
+              <span style={{ background: `${zoneInfo.color}15`, border: `1px solid ${zoneInfo.color}35`, borderRadius: "5px", color: zoneInfo.color, fontSize: "0.58rem", fontWeight: 700, padding: "0.05rem 0.35rem" }}>
                 {zoneInfo.label}
               </span>
-              <span style={{ background: "#a855f711", border: "1px solid #a855f733", borderRadius: "4px", color: "#a855f7", fontSize: "0.6rem", padding: "0.05rem 0.35rem" }}>
+              <span style={{ background: station.queue_cars > 8 ? "#ef444415" : "#a855f710", border: `1px solid ${station.queue_cars > 8 ? "#ef444435" : "#a855f730"}`, borderRadius: "5px", color: station.queue_cars > 8 ? "#ef4444" : "#a855f7", fontSize: "0.58rem", fontWeight: 700, padding: "0.05rem 0.35rem" }}>
                 🚗 {station.queue_cars} авто
               </span>
+              {station.network && (
+                <span style={{ background: "#14141c", border: "1px solid #1e1e2a", borderRadius: "5px", color: "#6b7280", fontSize: "0.58rem", padding: "0.05rem 0.35rem" }}>
+                  {station.network}
+                </span>
+              )}
             </div>
           </div>
           <div style={{ display: "flex", gap: "4px", alignItems: "center", flexShrink: 0, marginLeft: "0.5rem" }}>
-            <button onClick={handleToggleSubscription} disabled={subLoading} title={subStatus?.subscribed ? "Отписаться" : "Подписаться"}
-              style={{ background: "none", border: "none", cursor: subLoading ? "wait" : "pointer", fontSize: "1.15rem", padding: "0 0.1rem", opacity: subLoading ? 0.5 : 1, filter: subStatus?.subscribed ? "drop-shadow(0 0 6px #eab308)" : "none" }}>
+            <button
+              onClick={handleToggleSubscription}
+              disabled={subLoading}
+              title={subStatus?.subscribed ? "Отписаться" : "Подписаться"}
+              style={{
+                background: subStatus?.subscribed ? "#1a140a" : "none",
+                border: subStatus?.subscribed ? "1px solid #eab30840" : "none",
+                borderRadius: "8px",
+                cursor: subLoading ? "wait" : "pointer",
+                fontSize: "1.1rem",
+                padding: "0.2rem 0.3rem",
+                opacity: subLoading ? 0.5 : 1,
+                filter: subStatus?.subscribed ? "drop-shadow(0 0 8px #eab308)" : "opacity(0.6)",
+              }}
+            >
               {subStatus?.subscribed ? "🔔" : "🔕"}
             </button>
             {onClose && (
-              <button onClick={onClose} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: "1.2rem", padding: "0 0 0 0.1rem" }}>✕</button>
+              <button
+                onClick={onClose}
+                style={{ background: "#22222f", border: "none", color: "#6b7280", cursor: "pointer", fontSize: "0.8rem", padding: "0.25rem 0.45rem", borderRadius: "6px" }}
+              >
+                ✕
+              </button>
             )}
           </div>
         </div>
       </div>
+      <style>{`@keyframes crisisPulse{0%,100%{opacity:1;box-shadow:0 0 12px currentColor}50%{opacity:0.5;box-shadow:0 0 4px currentColor}}`}</style>
 
       {/* Summary row */}
       <div style={{ padding: "0.5rem 1rem", borderBottom: "1px solid #0f0f17", display: "flex", gap: "0.75rem", alignItems: "center" }}>
