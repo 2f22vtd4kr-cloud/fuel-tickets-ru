@@ -168,8 +168,53 @@ def init_db() -> None:
             rows
         )
         logger.info(f"БД заполнена: {len(rows)} ваучеров.")
+    # New-user tracking for admin notifications
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS bot_users (
+            chat_id    INTEGER PRIMARY KEY,
+            first_seen TEXT NOT NULL
+        )
+    """)
     con.commit()
     con.close()
+
+
+def _is_new_user(chat_id: int) -> bool:
+    """Returns True if this chat_id has never been seen before."""
+    con = _conn()
+    row = con.execute("SELECT 1 FROM bot_users WHERE chat_id = ?", (chat_id,)).fetchone()
+    con.close()
+    return row is None
+
+
+def _mark_user_seen(chat_id: int) -> None:
+    """Record that this user has been seen (idempotent)."""
+    con = _conn()
+    con.execute(
+        "INSERT OR IGNORE INTO bot_users (chat_id, first_seen) VALUES (?, ?)",
+        (chat_id, datetime.now(timezone.utc).isoformat()),
+    )
+    con.commit()
+    con.close()
+
+
+def get_bot_user_count() -> int:
+    """Total unique users who have ever started the bot."""
+    con = _conn()
+    count = con.execute("SELECT COUNT(*) FROM bot_users").fetchone()[0]
+    con.close()
+    return count
+
+
+def get_recent_bot_users(limit: int = 10) -> list[dict]:
+    """Returns the most recently seen bot users."""
+    con = _conn()
+    rows = con.execute(
+        "SELECT chat_id, first_seen FROM bot_users ORDER BY first_seen DESC LIMIT ?",
+        (limit,),
+    ).fetchall()
+    con.close()
+    return [{"chat_id": r[0], "first_seen": r[1]} for r in rows]
 
 
 def _today_str() -> str:
@@ -614,6 +659,8 @@ def main_menu_markup() -> InlineKeyboardMarkup:
 
 def admin_menu_markup() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
+        [InlineKeyboardButton("📊 Статистика системы",          callback_data="admin_stats")],
+        [InlineKeyboardButton("👥 Активность пользователей",    callback_data="admin_users")],
         [InlineKeyboardButton("🔍 Проверить статус ваучера",    callback_data="admin_check")],
         [InlineKeyboardButton("🚫 Погасить ваучер",             callback_data="admin_redeem")],
         [InlineKeyboardButton("📤 Экспорт в CSV",               callback_data="admin_export")],
@@ -627,6 +674,21 @@ def admin_menu_markup() -> InlineKeyboardMarkup:
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data.clear()
+    user = update.effective_user
+    # Notify admin when a new user starts the bot for the first time
+    if user and ADMIN_CHAT_ID and user.id != ADMIN_CHAT_ID:
+        is_new = _is_new_user(user.id)
+        if is_new:
+            _mark_user_seen(user.id)
+            uname = f"@{user.username}" if user.username else f"#{user.id}"
+            fname = user.full_name or ""
+            asyncio.create_task(notify_admin(
+                context.bot,
+                f"👤 *Новый пользователь*\n"
+                f"Имя: {fname}\n"
+                f"Логин: {uname}\n"
+                f"ID: `{user.id}`",
+            ))
     await update.message.reply_text(
         "🏛 *Система государственного учёта и распределения ГСМ*\n"
         "_Департамент цифрового развития города Севастополя_\n\n"
@@ -1149,6 +1211,36 @@ async def menu_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             "🛂 *Режим контролёра АЗС* — выберите действие:",
             parse_mode="Markdown",
             reply_markup=admin_menu_markup()
+        )
+
+    elif data == "admin_stats":
+        if not context.user_data.get("admin_authenticated"):
+            await query.answer("🔒 Нет доступа", show_alert=True)
+            return
+        stats_text = _build_stats_text()
+        await query.edit_message_text(
+            stats_text, parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("◀️ Меню контролёра", callback_data="admin_menu")
+            ]])
+        )
+
+    elif data == "admin_users":
+        if not context.user_data.get("admin_authenticated"):
+            await query.answer("🔒 Нет доступа", show_alert=True)
+            return
+        total = get_bot_user_count()
+        recent = get_recent_bot_users(10)
+        lines = [f"👥 *Активность пользователей*\n\nВсего уникальных: *{total}*\n\n*Последние 10 новых:*"]
+        for u in recent:
+            cid = u["chat_id"]
+            dt  = u["first_seen"][:16].replace("T", " ")
+            lines.append(f"• `{cid}` — {dt} UTC")
+        await query.edit_message_text(
+            "\n".join(lines), parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("◀️ Меню контролёра", callback_data="admin_menu")
+            ]])
         )
 
     elif data == "admin_check":

@@ -66,9 +66,11 @@ interface MapTabProps {
   visible: boolean;
   /** Station to pre-select on first render (from deep-link startParam) */
   initialStationId?: number;
+  navVisible?: boolean;
+  onNavToggle?: () => void;
 }
 
-export function MapTab({ visible, initialStationId }: MapTabProps) {
+export function MapTab({ visible, initialStationId, navVisible = true, onNavToggle }: MapTabProps) {
   const { stations, fetch, loading } = useStationStore();
   const { viewport, filterStatus, filterFuel, setFilter, selectedStationId, selectStation } =
     useMapStore();
@@ -259,16 +261,43 @@ export function MapTab({ visible, initialStationId }: MapTabProps) {
         )}
       </AnimatePresence>
 
+      {/* Nav toggle button — bottom-right corner of map */}
+      {onNavToggle && (
+        <button
+          onClick={onNavToggle}
+          style={{
+            position: "absolute",
+            bottom: navVisible ? "4.5rem" : "0.75rem",
+            right: "0.75rem",
+            zIndex: 1000,
+            background: "rgba(20,20,28,0.92)",
+            border: "1px solid #22222f",
+            borderRadius: "10px",
+            color: "#e2e8f0",
+            padding: "0.4rem 0.6rem",
+            fontSize: "0.9rem",
+            cursor: "pointer",
+            backdropFilter: "blur(12px)",
+            transition: "bottom 0.3s",
+            lineHeight: 1,
+          }}
+          title={navVisible ? "Скрыть навигацию" : "Показать навигацию"}
+        >
+          {navVisible ? "⬇" : "⬆"}
+        </button>
+      )}
+
       {/* Leaflet Map */}
       <MapContainer
         center={[viewport.lat, viewport.lng]}
         zoom={viewport.zoom}
         style={{ width: "100%", height: "100%", background: "#050507" }}
         zoomControl={false}
+        attributionControl={false}
       >
         <TileLayer
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-          attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+          attribution=""
           subdomains="abcd"
           maxZoom={19}
         />

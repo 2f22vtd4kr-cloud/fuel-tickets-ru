@@ -7,15 +7,16 @@ import { useToast } from "@/components/Toast";
 import type { FlipResult } from "@/types";
 
 const TIER_COLORS: Record<string, string> = {
-  "Новичок": "#6b7280",
-  "Караванщик": "#eab308",
-  "Хранитель Карты": "#a855f7",
-  "Легенда Тавриды": "#db2777",
+  "🚶 Пешеход":          "#6b7280",
+  "🚲 Самокатчик":       "#22c55e",
+  "🛵 Мопедист":         "#3b82f6",
+  "🚗 Извозчик":         "#eab308",
+  "🚛 Дальнобойщик":     "#f97316",
+  "⚡ Бензиновый Барон": "#a855f7",
+  "👑 Владелец НПЗ":     "#db2777",
 };
 
 // ─── Card Flip Game ───────────────────────────────────────────────
-
-const CARD_EMOJIS = ["🛢️", "🎖️", "🏆", "🛢️", "🛢️", "🛢️", "🎖️", "🛢️", "🛢️", "🛢️"];
 
 const RESULT_CONFIG: Record<string, { emoji: string; color: string; title: string }> = {
   empty:   { emoji: "🛢️", color: "#6b7280", title: "Пустая цистерна" },
@@ -67,7 +68,7 @@ function FlipGame() {
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
           <h3 style={{ margin: 0, color: "#e2e8f0", fontSize: "0.95rem", fontWeight: 700 }}>
-            🃏 Календарь поставок
+            🃏 Бензиновое Таро...мда🤞
           </h3>
           <span style={{
             background: flipsRemaining > 0 ? "#a855f722" : "#ef444422",
@@ -78,11 +79,11 @@ function FlipGame() {
             fontSize: "0.72rem",
             fontWeight: 600,
           }}>
-            {flipsRemaining} попытки
+            {flipsRemaining} попытка
           </span>
         </div>
         <p style={{ color: "#6b7280", fontSize: "0.75rem", margin: "0 0 1rem" }}>
-          Переверните карту, чтобы узнать судьбу поставок. 3 попытки в сутки.
+          Переверните карту, чтобы узнать судьбу поставок. 1 попытка в сутки.
         </p>
 
         {/* 10 cards grid */}
@@ -276,7 +277,6 @@ function TapGame() {
 
         {phase === "playing" && (
           <>
-            {/* HUD */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
               <span style={{
                 fontFamily: "'JetBrains Mono', monospace",
@@ -292,7 +292,6 @@ function TapGame() {
                 {timeLeft}s
               </span>
             </div>
-            {/* Time bar */}
             <div style={{ height: "3px", background: "#0b0b0f", borderRadius: "2px", marginBottom: "0.5rem", overflow: "hidden" }}>
               <div style={{
                 height: "100%", width: `${timePercent}%`,
@@ -300,7 +299,6 @@ function TapGame() {
                 transition: "width 1s linear, background 0.3s",
               }} />
             </div>
-            {/* Game arena */}
             <div style={{
               position: "relative",
               height: "220px",
@@ -377,10 +375,13 @@ function TapGame() {
 // ─── XP Tiers ─────────────────────────────────────────────────────
 
 const TIERS = [
-  { name: "Новичок",         min: 0,    max: 99 },
-  { name: "Караванщик",      min: 100,  max: 499 },
-  { name: "Хранитель Карты", min: 500,  max: 1499 },
-  { name: "Легенда Тавриды", min: 1500, max: null },
+  { name: "🚶 Пешеход",          min: 0,       max: 9999 },
+  { name: "🚲 Самокатчик",       min: 10000,   max: 49999 },
+  { name: "🛵 Мопедист",         min: 50000,   max: 149999 },
+  { name: "🚗 Извозчик",         min: 150000,  max: 299999 },
+  { name: "🚛 Дальнобойщик",     min: 300000,  max: 499999 },
+  { name: "⚡ Бензиновый Барон", min: 500000,  max: 799999 },
+  { name: "👑 Владелец НПЗ",     min: 800000,  max: null },
 ];
 
 function XpTiers() {
@@ -416,7 +417,7 @@ function XpTiers() {
                   {tier.name}
                 </p>
                 <p style={{ margin: 0, color: "#4b5563", fontSize: "0.68rem" }}>
-                  {tier.max ? `${tier.min} – ${tier.max} XP` : `${tier.min}+ XP`}
+                  {tier.max !== null ? `${tier.min.toLocaleString("ru")} – ${tier.max.toLocaleString("ru")} XP` : `${tier.min.toLocaleString("ru")}+ XP`}
                 </p>
               </div>
               {isActive && (
@@ -436,7 +437,7 @@ function XpTiers() {
   );
 }
 
-// ─── Reserve Tab ──────────────────────────────────────────────────
+// ─── Fortune Tab ──────────────────────────────────────────────────
 
 export function ReserveTab() {
   const { user } = useUserStore();
@@ -446,7 +447,7 @@ export function ReserveTab() {
       {/* Header */}
       <div style={{ padding: "1rem 1rem 0.75rem" }}>
         <h2 style={{ margin: "0 0 0.15rem", color: "#e2e8f0", fontSize: "1.1rem", fontWeight: 700 }}>
-          🎰 Резервная матрица
+          🎰 Заправочный автомат
         </h2>
         <p style={{ margin: 0, color: "#6b7280", fontSize: "0.75rem" }}>
           Игровые механики · XP · Ежедневные бонусы
@@ -459,7 +460,7 @@ export function ReserveTab() {
             borderRadius: "8px", padding: "0.2rem 0.5rem",
           }}>
             <span style={{ color: "#a855f7", fontSize: "0.75rem", fontWeight: 700 }}>
-              {user.xp} XP
+              {user.xp.toLocaleString("ru")} XP
             </span>
             <span style={{ color: "#6b7280", fontSize: "0.72rem" }}>·</span>
             <span style={{ color: TIER_COLORS[user.level] ?? "#6b7280", fontSize: "0.72rem" }}>
@@ -475,4 +476,3 @@ export function ReserveTab() {
     </div>
   );
 }
-

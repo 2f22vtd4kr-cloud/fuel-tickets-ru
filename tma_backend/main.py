@@ -609,16 +609,23 @@ def get_vault(user_id: int, db: Session = Depends(get_db)):
 #  Games
 # ──────────────────────────────────────────────────────────────────
 
-MAX_FLIPS_PER_DAY = 3
+MAX_FLIPS_PER_DAY = 1
 
 @app.post("/api/game/flip/{user_id}", response_model=FlipResultOut)
 def flip_card(user_id: int, db: Session = Depends(get_db)):
     user = _get_or_create_user(db, user_id)
 
     # Reset flip counter if new day
+    # SQLite strips timezone on retrieval → normalise both sides to naive UTC
     now = _now()
     last_reset = user.last_flip_reset
-    if last_reset is None or (now - last_reset).days >= 1:
+    if last_reset is None:
+        reset_needed = True
+    else:
+        lr_naive = last_reset.replace(tzinfo=None) if last_reset.tzinfo else last_reset
+        now_naive = now.replace(tzinfo=None)
+        reset_needed = (now_naive - lr_naive).days >= 1
+    if reset_needed:
         user.flip_attempts_today = 0
         user.last_flip_reset = now
 
@@ -672,6 +679,7 @@ def flip_card(user_id: int, db: Session = Depends(get_db)):
     db.commit()
 
     attempts_remaining = max(0, MAX_FLIPS_PER_DAY - user.flip_attempts_today)
+    db.refresh(user)
     return FlipResultOut(
         result_type=result_type,
         message=message,

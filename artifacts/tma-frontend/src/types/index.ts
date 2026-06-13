@@ -142,8 +142,11 @@ export const STATUS_LABELS: Record<string, string> = {
 };
 
 export const XP_TIER_THRESHOLDS = [
-  { min: 0,    max: 99,   level: "Новичок" },
-  { min: 100,  max: 499,  level: "Караванщик" },
-  { min: 500,  max: 1499, level: "Хранитель Карты" },
-  { min: 1500, max: null, level: "Легенда Тавриды" },
+  { min: 0,       max: 9999,   level: "🚶 Пешеход" },
+  { min: 10000,   max: 49999,  level: "🚲 Самокатчик" },
+  { min: 50000,   max: 149999, level: "🛵 Мопедист" },
+  { min: 150000,  max: 299999, level: "🚗 Извозчик" },
+  { min: 300000,  max: 499999, level: "🚛 Дальнобойщик" },
+  { min: 500000,  max: 799999, level: "⚡ Бензиновый Барон" },
+  { min: 800000,  max: null,   level: "👑 Владелец НПЗ" },
 ];

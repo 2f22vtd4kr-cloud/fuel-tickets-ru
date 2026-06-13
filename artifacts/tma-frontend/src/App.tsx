@@ -79,6 +79,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>(DEFAULT_TAB);
   const [initialStationId, setInitialStationId] = useState<number | undefined>();
   const [initialPurchaseId, setInitialPurchaseId] = useState<number | undefined>();
+  const [navVisible, setNavVisible] = useState(true);
 
   const { init: initUser } = useUserStore();
   const { fetch: fetchStations } = useStationStore();
@@ -156,6 +157,8 @@ export default function App() {
   const handleTabChange = (tab: TabId) => {
     hapticSelect();
     setActiveTab(tab);
+    // Always show nav when switching tabs from outside the map
+    if (!navVisible) setNavVisible(true);
   };
 
   return (
@@ -173,13 +176,16 @@ export default function App() {
           flex: 1,
           position: "relative",
           overflow: "hidden",
-          paddingBottom: "60px", // reserve space for BottomNav
+          paddingBottom: navVisible ? "60px" : "0px",
+          transition: "padding-bottom 0.3s",
         }}
       >
         {/* Map — always mounted, hidden via CSS when another tab is active */}
         <MapTab
           visible={activeTab === "map"}
           initialStationId={initialStationId}
+          navVisible={navVisible}
+          onNavToggle={() => setNavVisible((v) => !v)}
         />
 
         {activeTab === "analytics" && (
@@ -204,7 +210,7 @@ export default function App() {
         )}
       </div>
 
-      <BottomNav active={activeTab} onChange={handleTabChange} />
+      <BottomNav active={activeTab} onChange={handleTabChange} visible={navVisible} />
     </ErrorBoundary>
   );
 }

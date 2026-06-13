@@ -4,6 +4,7 @@ import type { TabId } from "@/types";
 interface Props {
   active: TabId;
   onChange: (tab: TabId) => void;
+  visible?: boolean;
 }
 
 const TABS: { id: TabId; emoji: string; label: string }[] = [
@@ -11,20 +12,24 @@ const TABS: { id: TabId; emoji: string; label: string }[] = [
   { id: "analytics", emoji: "📊", label: "Аналитика" },
   { id: "catalog",   emoji: "⛽", label: "Каталог" },
   { id: "vault",     emoji: "🗄️", label: "Мой Сейф" },
-  { id: "reserve",   emoji: "🎰", label: "Резерв" },
+  { id: "reserve",   emoji: "🎰", label: "Фортуна" },
 ];
 
-export function BottomNav({ active, onChange }: Props) {
+export function BottomNav({ active, onChange, visible = true }: Props) {
   return (
-    <nav style={{
-      position: "fixed", bottom: 0, left: 0, right: 0,
-      background: "rgba(11,11,15,0.92)",
-      backdropFilter: "blur(20px)",
-      borderTop: "1px solid #22222f",
-      display: "flex", alignItems: "stretch",
-      paddingBottom: "env(safe-area-inset-bottom, 0px)",
-      zIndex: 100,
-    }}>
+    <motion.nav
+      animate={{ y: visible ? 0 : "100%" }}
+      transition={{ type: "spring", damping: 28, stiffness: 300 }}
+      style={{
+        position: "fixed", bottom: 0, left: 0, right: 0,
+        background: "rgba(11,11,15,0.92)",
+        backdropFilter: "blur(20px)",
+        borderTop: "1px solid #22222f",
+        display: "flex", alignItems: "stretch",
+        paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        zIndex: 100,
+      }}
+    >
       {TABS.map((tab) => {
         const isActive = active === tab.id;
         return (
@@ -73,6 +78,6 @@ export function BottomNav({ active, onChange }: Props) {
           </button>
         );
       })}
-    </nav>
+    </motion.nav>
   );
 }
