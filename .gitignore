@@ -1,8 +1,13 @@
 # See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
 
 # compiled output
-dist
 tmp
+# dist is generally ignored but tma-frontend/dist must be committed for production
+dist
+!artifacts/tma-frontend/dist
+!artifacts/tma-frontend/dist/**
+!artifacts/api-server/dist
+!artifacts/api-server/dist/**
 out-tsc
 *.tsbuildinfo
 .expo

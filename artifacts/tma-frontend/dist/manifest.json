@@ -1,0 +1,42 @@
+{
+  "name": "Топливный Узел — Матрица Снабжения",
+  "short_name": "Топливный Узел",
+  "description": "Карта АЗС и мониторинг топлива в реальном времени",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#050507",
+  "theme_color": "#db2777",
+  "lang": "ru",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["navigation", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Карта АЗС",
+      "short_name": "Карта",
+      "description": "Открыть карту заправочных станций",
+      "url": "/#map",
+      "icons": [{"src": "/icon-192.png", "sizes": "192x192"}]
+    },
+    {
+      "name": "Каталог",
+      "short_name": "Каталог",
+      "description": "Купить топливный талон",
+      "url": "/#catalog",
+      "icons": [{"src": "/icon-192.png", "sizes": "192x192"}]
+    }
+  ]
+}
