@@ -17,16 +17,22 @@ import { StationCard } from "@/components/StationCard";
 
 function createStationIcon(status: string) {
   const color = STATUS_COLORS[status] ?? "#9ca3af";
+  const pulse = status === "red" ? `<div style="position:absolute;inset:-4px;border-radius:50%;border:1.5px solid ${color};opacity:0.4;animation:mrkPulse 1.8s ease-in-out infinite;"></div>` : "";
   return L.divIcon({
-    html: `<div style="
-      width:14px;height:14px;border-radius:50%;
-      background:${color};
-      border:2px solid rgba(255,255,255,0.4);
-      box-shadow:0 0 10px ${color}88,0 0 4px ${color};
-    "></div>`,
+    html: `<style>@keyframes mrkPulse{0%,100%{transform:scale(1);opacity:0.4}50%{transform:scale(1.55);opacity:0}}</style>
+    <div style="position:relative;width:16px;height:16px;">
+      ${pulse}
+      <div style="
+        width:16px;height:16px;border-radius:50%;
+        background:radial-gradient(circle at 35% 30%, ${color}ff, ${color}99);
+        border:1.5px solid rgba(255,255,255,0.35);
+        box-shadow:0 0 12px ${color}99,0 0 4px ${color},0 2px 4px #00000066;
+        position:relative;z-index:1;
+      "></div>
+    </div>`,
     className: "",
-    iconSize: [14, 14],
-    iconAnchor: [7, 7],
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
   });
 }
 
@@ -106,41 +112,45 @@ function availabilityColor(pct: number): string {
 
 function PopupContent({ station }: { station: GasStation }) {
   const getPrice = usePriceStore((s) => s.getPrice);
+  const avg = station.fuel_statuses.length
+    ? Math.round(station.fuel_statuses.reduce((a, b) => a + b.availability_pct, 0) / station.fuel_statuses.length)
+    : 0;
+  const color = avg >= 60 ? "#22c55e" : avg >= 25 ? "#eab308" : "#ef4444";
   return (
     <div style={{
-      background: "#14141c", color: "#e2e8f0",
-      padding: "0.6rem 0.7rem", borderRadius: "8px",
-      fontSize: "0.8rem", minWidth: "180px",
+      background: "#0d0d18", color: "#e2e8f0",
+      padding: "0.65rem 0.75rem", borderRadius: "10px",
+      fontSize: "0.8rem", minWidth: "190px",
+      border: `1px solid ${color}22`,
+      boxShadow: `0 4px 16px #00000088`,
     }}>
-      <strong style={{ display: "block", marginBottom: "0.2rem" }}>{station.name}</strong>
-      <span style={{ color: "#6b7280", fontSize: "0.72rem" }}>{station.address}</span>
-      <div style={{ marginTop: "0.45rem", display: "flex", gap: "0.3rem", flexWrap: "wrap" }}>
+      {/* Top accent */}
+      <div style={{ height: "1px", background: `linear-gradient(90deg,transparent,${color},transparent)`, marginBottom: "0.45rem" }} />
+      <strong style={{ display: "block", marginBottom: "0.15rem", color: "#f1f5f9", fontSize: "0.82rem" }}>{station.name}</strong>
+      <span style={{ color: "#374151", fontSize: "0.65rem" }}>📍 {station.address.slice(0, 32)}</span>
+      {/* Availability */}
+      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.4rem", marginBottom: "0.35rem" }}>
+        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "1.1rem", fontWeight: 800, color, lineHeight: 1 }}>{avg}%</span>
+        <span style={{ color: "#374151", fontSize: "0.6rem" }}>🚗 {station.queue_cars} авт.</span>
+        {station.network && <span style={{ color: "#4b5563", fontSize: "0.58rem" }}>{station.network}</span>}
+      </div>
+      {/* Prices */}
+      <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap" }}>
         {POPUP_FUELS.map((ft) => {
           const p = getPrice(station.region, ft);
           if (!p) return null;
           const crisis = p.is_crisis;
           return (
-            <span
-              key={ft}
-              className={crisis ? "crisis-badge" : ""}
-              style={{
-                background: crisis ? "rgba(255,0,136,0.08)" : "rgba(168,85,247,0.08)",
-                border: `1px solid ${crisis ? "#ff008855" : "#a855f733"}`,
-                borderRadius: "6px",
-                padding: "0.1rem 0.4rem",
-                fontSize: "0.7rem",
-              }}
-            >
-              <span style={{ color: "#9ca3af" }}>{ft}&#8239;</span>
-              <span
-                className={crisis ? "crisis-price-text" : ""}
-                style={crisis ? undefined : {
-                  color: "#a855f7",
-                  fontFamily: "'JetBrains Mono', monospace",
-                  fontWeight: 700,
-                }}
-              >
-                {p.effective}₽
+            <span key={ft} style={{
+              background: crisis ? "#ef444412" : "#a855f710",
+              border: `1px solid ${crisis ? "#ef444430" : "#a855f728"}`,
+              borderRadius: "5px",
+              padding: "0.08rem 0.35rem",
+              fontSize: "0.68rem",
+            }}>
+              <span style={{ color: "#4b5563" }}>{ft} </span>
+              <span style={{ color: crisis ? "#ef4444" : "#a855f7", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>
+                {p.effective}₽{crisis && "▲"}
               </span>
             </span>
           );
@@ -306,130 +316,102 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
               left: "0.75rem",
               right: "0.75rem",
               zIndex: 1000,
-              background: "rgba(20,20,28,0.96)",
-              border: "1px solid #22222f",
-              borderRadius: "14px",
-              padding: "0.75rem",
-              backdropFilter: "blur(20px)",
+              background: "rgba(10,10,18,0.97)",
+              border: "1px solid #a855f722",
+              borderRadius: "16px",
+              padding: "0.85rem",
+              backdropFilter: "blur(24px)",
+              boxShadow: "0 8px 32px #00000088, 0 0 0 1px #a855f710",
+              overflow: "hidden",
             }}
           >
-            <p style={{ color: "#6b7280", fontSize: "0.72rem", margin: "0 0 0.5rem" }}>
-              СТАТУС
-            </p>
-            <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
-              {(["all", "green", "yellow", "red"] as const).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setFilter("filterStatus", s)}
-                  style={{
-                    background:
-                      filterStatus === s
-                        ? s === "all"
-                          ? "#a855f7"
-                          : { green: "#22c55e", yellow: "#eab308", red: "#ef4444" }[s]
-                        : "#0b0b0f",
-                    border: "1px solid #22222f",
-                    borderRadius: "8px",
-                    color: filterStatus === s ? "#fff" : "#9ca3af",
-                    padding: "0.3rem 0.65rem",
-                    fontSize: "0.75rem",
-                    cursor: "pointer",
-                  }}
-                >
-                  {s === "all"
-                    ? "Все"
-                    : s === "green"
-                    ? "В наличии"
-                    : s === "yellow"
-                    ? "Ограничено"
-                    : "Нет"}
-                </button>
-              ))}
-            </div>
-            <p style={{ color: "#6b7280", fontSize: "0.72rem", margin: "0 0 0.5rem" }}>
-              ТОПЛИВО
-            </p>
-            <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
+            {/* Top accent line */}
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#a855f7,transparent)" }} />
+
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.65rem" }}>
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#4b5563", fontSize: "0.55rem", letterSpacing: "0.14em" }}>ФИЛЬТР_МАТРИЦА</span>
               <button
-                onClick={() => setFilter("filterFuel", null)}
-                style={{
-                  background: filterFuel === null ? "#a855f7" : "#0b0b0f",
-                  border: "1px solid #22222f",
-                  borderRadius: "8px",
-                  color: filterFuel === null ? "#fff" : "#9ca3af",
-                  padding: "0.3rem 0.65rem",
-                  fontSize: "0.75rem",
-                  cursor: "pointer",
-                }}
-              >
-                Все
-              </button>
-              {FUEL_OPTIONS.map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setFilter("filterFuel", f)}
-                  style={{
-                    background: filterFuel === f ? "#a855f7" : "#0b0b0f",
-                    border: "1px solid #22222f",
-                    borderRadius: "8px",
-                    color: filterFuel === f ? "#fff" : "#9ca3af",
-                    padding: "0.3rem 0.65rem",
-                    fontSize: "0.75rem",
-                    cursor: "pointer",
-                  }}
-                >
-                  {f}
-                </button>
-              ))}
+                onClick={() => setShowFilters(false)}
+                style={{ background: "none", border: "none", color: "#374151", cursor: "pointer", fontSize: "0.7rem", padding: "0.1rem 0.3rem" }}
+              >✕</button>
             </div>
 
-            <p style={{ color: "#6b7280", fontSize: "0.72rem", margin: "0 0 0.5rem" }}>
-              РЕГИОН
-            </p>
-            <select
-              value={filterRegion ?? ""}
-              onChange={(e) => setFilter("filterRegion", e.target.value || null)}
-              style={{
-                width: "100%",
-                background: "#0b0b0f",
-                border: "1px solid #22222f",
-                borderRadius: "8px",
-                color: filterRegion ? "#e2e8f0" : "#6b7280",
-                padding: "0.35rem 0.6rem",
-                fontSize: "0.75rem",
-                outline: "none",
-                cursor: "pointer",
-              }}
-            >
-              <option value="">Все регионы</option>
-              {uniqueRegions.map((r) => (
-                <option key={r} value={r}>{r.length > 38 ? r.slice(0, 38) + "…" : r}</option>
-              ))}
-            </select>
+            {/* Status */}
+            <p style={{ color: "#374151", fontSize: "0.6rem", margin: "0 0 0.35rem", textTransform: "uppercase", letterSpacing: "0.12em" }}>Статус АЗС</p>
+            <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", marginBottom: "0.65rem" }}>
+              {(["all", "green", "yellow", "red"] as const).map((s) => {
+                const colors = { all: "#a855f7", green: "#22c55e", yellow: "#eab308", red: "#ef4444" };
+                const labels = { all: "Все", green: "✓ Норма", yellow: "⚠ Мало", red: "✕ Нет" };
+                const active = filterStatus === s;
+                const c = colors[s];
+                return (
+                  <button key={s} onClick={() => setFilter("filterStatus", s)} style={{
+                    background: active ? `${c}22` : "#0b0b10",
+                    border: `1px solid ${active ? c : "#1e1e2a"}`,
+                    borderRadius: "8px",
+                    color: active ? c : "#4b5563",
+                    padding: "0.28rem 0.6rem",
+                    fontSize: "0.72rem",
+                    fontWeight: active ? 700 : 400,
+                    cursor: "pointer",
+                    boxShadow: active ? `0 0 8px ${c}30` : "none",
+                    transition: "all 0.15s",
+                  }}>
+                    {labels[s]}
+                  </button>
+                );
+              })}
+            </div>
 
-            <p style={{ color: "#6b7280", fontSize: "0.72rem", margin: "0.75rem 0 0.5rem" }}>
-              СЕТЬ АЗС
-            </p>
-            <select
-              value={filterNetwork ?? ""}
-              onChange={(e) => setFilter("filterNetwork", e.target.value || null)}
-              style={{
-                width: "100%",
-                background: "#0b0b0f",
-                border: "1px solid #22222f",
-                borderRadius: "8px",
-                color: filterNetwork ? "#e2e8f0" : "#6b7280",
-                padding: "0.35rem 0.6rem",
-                fontSize: "0.75rem",
-                outline: "none",
-                cursor: "pointer",
-              }}
-            >
-              <option value="">Все сети</option>
-              {uniqueNetworks.map((n) => (
-                <option key={n} value={n}>{n.length > 38 ? n.slice(0, 38) + "…" : n}</option>
-              ))}
-            </select>
+            {/* Fuel */}
+            <p style={{ color: "#374151", fontSize: "0.6rem", margin: "0 0 0.35rem", textTransform: "uppercase", letterSpacing: "0.12em" }}>Тип топлива</p>
+            <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap", marginBottom: "0.65rem" }}>
+              {[null, ...FUEL_OPTIONS].map((f) => {
+                const active = f === null ? filterFuel === null : filterFuel === f;
+                return (
+                  <button key={f ?? "__all"} onClick={() => setFilter("filterFuel", f)} style={{
+                    background: active ? "#a855f720" : "#0b0b10",
+                    border: `1px solid ${active ? "#a855f7" : "#1e1e2a"}`,
+                    borderRadius: "7px",
+                    color: active ? "#a855f7" : "#4b5563",
+                    padding: "0.25rem 0.55rem",
+                    fontSize: "0.7rem",
+                    fontWeight: active ? 700 : 400,
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                  }}>
+                    {f ?? "Все"}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Region + Network in a row */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem", marginBottom: "0.5rem" }}>
+              <div>
+                <p style={{ color: "#374151", fontSize: "0.6rem", margin: "0 0 0.3rem", textTransform: "uppercase", letterSpacing: "0.12em" }}>Регион</p>
+                <select
+                  value={filterRegion ?? ""}
+                  onChange={(e) => setFilter("filterRegion", e.target.value || null)}
+                  style={{ width: "100%", background: "#0b0b10", border: `1px solid ${filterRegion ? "#a855f744" : "#1e1e2a"}`, borderRadius: "8px", color: filterRegion ? "#e2e8f0" : "#4b5563", padding: "0.3rem 0.5rem", fontSize: "0.7rem", outline: "none", cursor: "pointer" }}
+                >
+                  <option value="">Все</option>
+                  {uniqueRegions.map((r) => <option key={r} value={r}>{r.split(" ").slice(-2).join(" ").slice(0, 20)}</option>)}
+                </select>
+              </div>
+              <div>
+                <p style={{ color: "#374151", fontSize: "0.6rem", margin: "0 0 0.3rem", textTransform: "uppercase", letterSpacing: "0.12em" }}>Сеть</p>
+                <select
+                  value={filterNetwork ?? ""}
+                  onChange={(e) => setFilter("filterNetwork", e.target.value || null)}
+                  style={{ width: "100%", background: "#0b0b10", border: `1px solid ${filterNetwork ? "#a855f744" : "#1e1e2a"}`, borderRadius: "8px", color: filterNetwork ? "#e2e8f0" : "#4b5563", padding: "0.3rem 0.5rem", fontSize: "0.7rem", outline: "none", cursor: "pointer" }}
+                >
+                  <option value="">Все</option>
+                  {uniqueNetworks.map((n) => <option key={n} value={n}>{n.slice(0, 20)}</option>)}
+                </select>
+              </div>
+            </div>
 
             {(filterStatus !== "all" || filterFuel || filterRegion || filterNetwork) && (
               <button
@@ -440,18 +422,18 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
                   setFilter("filterNetwork", null);
                 }}
                 style={{
-                  marginTop: "0.6rem",
                   width: "100%",
-                  background: "none",
-                  border: "1px solid #22222f",
+                  background: "#ef444412",
+                  border: "1px solid #ef444430",
                   borderRadius: "8px",
-                  color: "#6b7280",
+                  color: "#ef4444",
                   padding: "0.3rem",
-                  fontSize: "0.72rem",
+                  fontSize: "0.7rem",
                   cursor: "pointer",
+                  fontWeight: 600,
                 }}
               >
-                ✕ Сбросить фильтры
+                ✕ Сбросить все фильтры
               </button>
             )}
           </motion.div>

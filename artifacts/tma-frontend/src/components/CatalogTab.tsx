@@ -452,19 +452,26 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
         </div>
       </div>
 
-      <div style={{ padding: "0.5rem 1rem 0.35rem" }}>
+      <div style={{ padding: "0.5rem 1rem 0.35rem", position: "relative" }}>
+        <div style={{ position: "absolute", left: "1.7rem", top: "50%", transform: "translateY(-50%)", color: "#4b5563", fontSize: "0.8rem", pointerEvents: "none", zIndex: 1 }}>🔍</div>
         <input
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Поиск по сети, региону…"
           style={{
             width: "100%", boxSizing: "border-box",
-            background: "#14141c", border: "1px solid #22222f",
-            borderRadius: "10px", color: "#e2e8f0",
-            padding: "0.6rem 0.75rem", fontSize: "0.85rem",
-            outline: "none",
+            background: "linear-gradient(135deg,#0d0d18,#14141c)", border: `1px solid ${searchQuery ? "#a855f744" : "#1e1e2a"}`,
+            borderRadius: "12px", color: "#e2e8f0",
+            padding: "0.62rem 0.75rem 0.62rem 2.2rem", fontSize: "0.82rem",
+            outline: "none", transition: "border-color 0.2s",
           }}
         />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery("")}
+            style={{ position: "absolute", right: "1.7rem", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#4b5563", cursor: "pointer", fontSize: "0.8rem", padding: "0 0.2rem" }}
+          >✕</button>
+        )}
       </div>
       <div style={{ padding: "0 1rem 0.5rem", display: "flex", gap: "0.35rem", alignItems: "center" }}>
         <span style={{ color: "#4b5563", fontSize: "0.65rem", marginRight: "0.1rem" }}>Сорт:</span>
@@ -492,9 +499,9 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
 
       {!selectedStation && !searchQuery && sortMode === "availability" && (
         <div style={{ padding: "0 1rem 0.75rem" }}>
-          <p style={{ margin: "0 0 0.4rem", color: "#4b5563", fontSize: "0.64rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-            ⭐ Лучшая доступность прямо сейчас
-          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.45rem" }}>
+            <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e", fontSize: "0.46rem", letterSpacing: "0.14em" }}>ТОП_ДОСТУПНОСТЬ</span>
+          </div>
           <div style={{ display: "flex", gap: "0.4rem", overflowX: "auto", paddingBottom: "0.25rem" }}>
             {[...stations]
               .sort((a, b) => {
@@ -503,24 +510,29 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
                 return avgB - avgA;
               })
               .slice(0, 5)
-              .map((s) => {
+              .map((s, rank) => {
                 const avg = s.fuel_statuses.length ? Math.round(s.fuel_statuses.reduce((acc, f) => acc + f.availability_pct, 0) / s.fuel_statuses.length) : 0;
                 const color = avg >= 60 ? "#22c55e" : avg >= 25 ? "#eab308" : "#ef4444";
                 return (
-                  <div
+                  <motion.div
                     key={s.id}
+                    whileTap={{ scale: 0.95 }}
                     onClick={() => setSelectedStation(s)}
                     style={{
-                      flexShrink: 0, minWidth: "130px", maxWidth: "140px",
-                      background: "#14141c", border: `1px solid ${color}33`,
-                      borderRadius: "10px", padding: "0.55rem 0.65rem",
-                      cursor: "pointer",
+                      flexShrink: 0, minWidth: "120px", maxWidth: "135px",
+                      background: `linear-gradient(160deg,#0a0d18,${color}08)`,
+                      border: `1px solid ${color}30`,
+                      borderRadius: "12px", padding: "0.55rem 0.65rem",
+                      cursor: "pointer", position: "relative", overflow: "hidden",
+                      boxShadow: `0 0 12px ${color}12`,
                     }}
                   >
-                    <p style={{ margin: "0 0 0.15rem", color, fontFamily: "'JetBrains Mono',monospace", fontSize: "1.1rem", fontWeight: 700 }}>{avg}%</p>
-                    <p style={{ margin: 0, color: "#e2e8f0", fontSize: "0.68rem", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</p>
-                    <p style={{ margin: 0, color: "#4b5563", fontSize: "0.6rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.network}</p>
-                  </div>
+                    <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: `linear-gradient(90deg,transparent,${color},transparent)` }} />
+                    <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.42rem", marginBottom: "0.15rem" }}>#{rank + 1}</div>
+                    <p style={{ margin: "0 0 0.1rem", color, fontFamily: "'JetBrains Mono',monospace", fontSize: "1.15rem", fontWeight: 800, lineHeight: 1, textShadow: `0 0 8px ${color}44` }}>{avg}%</p>
+                    <p style={{ margin: 0, color: "#e2e8f0", fontSize: "0.65rem", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</p>
+                    <p style={{ margin: "0.1rem 0 0", color: "#374151", fontSize: "0.57rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.network || "АЗС"}</p>
+                  </motion.div>
                 );
               })}
           </div>
@@ -676,15 +688,18 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
               style={{
-                background: "#f59e0b11",
+                background: "linear-gradient(135deg,#f59e0b12,#0d0d18)",
                 border: "1px solid #f59e0b33",
-                borderRadius: "10px",
-                padding: "0.5rem 0.75rem",
+                borderRadius: "12px",
+                padding: "0.55rem 0.8rem",
                 marginBottom: "0.75rem",
-                fontSize: "0.72rem",
+                fontSize: "0.7rem",
                 color: "#f59e0b",
+                position: "relative", overflow: "hidden",
               }}
             >
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#f59e0b66,transparent)" }} />
+              <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.46rem", letterSpacing: "0.12em", color: "#f59e0b88", marginBottom: "0.1rem" }}>TELEGRAM_STARS</div>
               ⭐ Оплата через Telegram Stars — нажмите кнопку, откроется платёж в Telegram
             </motion.div>
           )}
@@ -693,15 +708,18 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
               style={{
-                background: "#3b82f611",
+                background: "linear-gradient(135deg,#3b82f612,#0d0d18)",
                 border: "1px solid #3b82f633",
-                borderRadius: "10px",
-                padding: "0.5rem 0.75rem",
+                borderRadius: "12px",
+                padding: "0.55rem 0.8rem",
                 marginBottom: "0.75rem",
-                fontSize: "0.72rem",
+                fontSize: "0.7rem",
                 color: "#3b82f6",
+                position: "relative", overflow: "hidden",
               }}
             >
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#3b82f666,transparent)" }} />
+              <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.46rem", letterSpacing: "0.12em", color: "#3b82f688", marginBottom: "0.1rem" }}>CRYPTO_BOT_USDT</div>
               💎 Оплата USDT через @CryptoBot — откроется в новой вкладке
             </motion.div>
           )}

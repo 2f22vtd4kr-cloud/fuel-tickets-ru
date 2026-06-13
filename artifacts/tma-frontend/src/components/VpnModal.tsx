@@ -28,52 +28,67 @@ function ActiveSessionBanner({ session, onClose }: { session: VpnSession; onClos
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
       style={{
-        background: "linear-gradient(135deg,#0d2e1a,#0a1f12)",
+        background: "linear-gradient(135deg,#071a0f,#0a1f12)",
         border: "1px solid #22c55e44",
-        borderRadius: "14px",
+        borderRadius: "16px",
         padding: "1rem",
         marginBottom: "1rem",
         display: "flex",
         flexDirection: "column",
         gap: "0.4rem",
+        position: "relative",
+        overflow: "hidden",
+        boxShadow: "0 0 24px #22c55e14",
       }}
     >
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#22c55e,transparent)" }} />
+      <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e66", fontSize: "0.44rem", letterSpacing: "0.16em", marginBottom: "0.15rem" }}>VPN_АКТИВЕН · ЗАЩИЩЕНО</div>
       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-        <span style={{ fontSize: "1.1rem" }}>🛡️</span>
-        <span style={{ color: "#22c55e", fontWeight: 700, fontSize: "0.95rem" }}>
-          VPN активен — {session.plan_name}
+        <motion.span
+          animate={{ scale: [1, 1.1, 1] }}
+          transition={{ repeat: Infinity, duration: 2 }}
+          style={{ fontSize: "1.1rem" }}
+        >🛡️</motion.span>
+        <span style={{ color: "#22c55e", fontWeight: 800, fontSize: "0.95rem" }}>
+          {session.plan_name}
         </span>
-      </div>
-      <div style={{ color: "#6b7280", fontSize: "0.75rem" }}>
-        Осталось: <span style={{ color: "#e2e8f0", fontWeight: 600 }}>{timer}</span>
+        <span style={{
+          marginLeft: "auto",
+          fontFamily: "'JetBrains Mono',monospace",
+          fontSize: "1.1rem", fontWeight: 800,
+          color: "#22c55e",
+          textShadow: "0 0 10px #22c55e66",
+        }}>{timer}</span>
       </div>
       <div style={{
         background: "#050507",
-        borderRadius: "8px",
-        padding: "0.4rem 0.6rem",
-        fontFamily: "monospace",
-        fontSize: "0.72rem",
+        borderRadius: "10px",
+        padding: "0.5rem 0.65rem",
+        fontFamily: "'JetBrains Mono',monospace",
+        fontSize: "0.68rem",
         color: "#a855f7",
-        letterSpacing: "0.05em",
+        letterSpacing: "0.04em",
         wordBreak: "break-all",
+        border: "1px solid #a855f720",
       }}>
         {session.config_key}
       </div>
-      <p style={{ margin: 0, color: "#6b7280", fontSize: "0.7rem" }}>
-        Используйте этот ключ в приложении WireGuard или Outline для подключения.
+      <p style={{ margin: 0, color: "#374151", fontSize: "0.68rem" }}>
+        Используйте этот ключ в приложении WireGuard или Outline.
       </p>
       <button
         onClick={onClose}
         style={{
           alignSelf: "flex-end",
-          marginTop: "0.25rem",
-          background: "none",
-          border: "1px solid #22222f",
+          marginTop: "0.15rem",
+          background: "#22c55e12",
+          border: "1px solid #22c55e30",
           borderRadius: "8px",
-          color: "#6b7280",
+          color: "#22c55e",
           padding: "0.3rem 0.8rem",
           fontSize: "0.72rem",
           cursor: "pointer",
+          fontWeight: 600,
         }}
       >
         Закрыть
@@ -151,23 +166,27 @@ export function VpnModal({ onClose, isTroubleshooter = false }: Props) {
         transition={{ type: "spring", damping: 28, stiffness: 280 }}
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: "#0d0d14",
-          border: "1px solid #22222f",
+          background: "linear-gradient(180deg,#0d0d18,#0a0a12)",
+          border: "1px solid #a855f720",
           borderRadius: "20px 20px 0 0",
-          padding: "1.25rem 1rem 2rem",
+          padding: "0 0 2rem",
           width: "100%",
           maxHeight: "88vh",
           overflowY: "auto",
+          position: "relative",
         }}
       >
+        <div style={{ position: "sticky", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#a855f7,#db2777,transparent)", zIndex: 10 }} />
+        <div style={{ padding: "1.25rem 1rem 0" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.8rem" }}>
           <div>
-            <h2 style={{ margin: 0, color: "#e2e8f0", fontSize: "1.1rem", fontWeight: 700 }}>
+            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#4b5563", fontSize: "0.46rem", letterSpacing: "0.14em", marginBottom: "0.15rem" }}>МАТРИЦА_ДОСТУПА · VPN</div>
+            <h2 style={{ margin: 0, color: "#e2e8f0", fontSize: "1.1rem", fontWeight: 800 }}>
               🔒 VPN-доступ
             </h2>
             {isTroubleshooter && (
-              <p style={{ margin: "0.2rem 0 0", color: "#f59e0b", fontSize: "0.72rem" }}>
-                ⚠️ Обнаружены проблемы с соединением — VPN может помочь
+              <p style={{ margin: "0.2rem 0 0", color: "#f59e0b", fontSize: "0.72rem", fontFamily: "'JetBrains Mono',monospace" }}>
+                ⚠ Обнаружены проблемы с соединением
               </p>
             )}
           </div>
@@ -213,32 +232,41 @@ export function VpnModal({ onClose, isTroubleshooter = false }: Props) {
               ))}
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-              {VPN_PLANS.map((plan) => (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              {VPN_PLANS.map((plan, idx) => (
                 <motion.div
                   key={plan.id}
-                  whileTap={{ scale: 0.98 }}
+                  whileTap={{ scale: 0.97 }}
                   style={{
-                    background: "linear-gradient(135deg,#14141c,#0d0d14)",
-                    border: "1px solid #22222f",
-                    borderRadius: "14px",
+                    background: idx === 1
+                      ? "linear-gradient(135deg,#13092a,#0d0d18)"
+                      : "linear-gradient(135deg,#0d0d18,#13141c)",
+                    border: `1px solid ${idx === 1 ? "#a855f740" : "#1e1e2a"}`,
+                    borderRadius: "16px",
                     padding: "0.85rem 0.9rem",
                     display: "flex",
                     alignItems: "center",
                     gap: "0.75rem",
+                    position: "relative",
+                    overflow: "hidden",
+                    boxShadow: idx === 1 ? "0 0 20px #a855f718" : "none",
                   }}
                 >
+                  {idx === 1 && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#a855f7,transparent)" }} />}
+                  {idx === 1 && (
+                    <div style={{ position: "absolute", top: "0.45rem", right: "4.2rem", fontFamily: "'JetBrains Mono',monospace", fontSize: "0.42rem", color: "#a855f766", letterSpacing: "0.1em" }}>POPULAR</div>
+                  )}
                   <div style={{ fontSize: "1.5rem", minWidth: "2rem", textAlign: "center" }}>
                     {plan.emoji}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ color: "#e2e8f0", fontWeight: 700, fontSize: "0.9rem" }}>
+                    <div style={{ color: "#e2e8f0", fontWeight: 800, fontSize: "0.88rem", display: "flex", alignItems: "center", gap: "0.3rem" }}>
                       {plan.name}
-                      <span style={{ color: "#6b7280", fontWeight: 400, fontSize: "0.72rem", marginLeft: "0.4rem" }}>
-                        {plan.durationMin} мин
-                      </span>
                     </div>
-                    <div style={{ color: "#6b7280", fontSize: "0.7rem", marginTop: "0.15rem", lineHeight: 1.4 }}>
+                    <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.44rem", letterSpacing: "0.12em", marginTop: "0.1rem" }}>
+                      {plan.durationMin} МИН · WIREGUARD
+                    </div>
+                    <div style={{ color: "#4b5563", fontSize: "0.68rem", marginTop: "0.15rem", lineHeight: 1.4 }}>
                       {plan.subtitle}
                     </div>
                   </div>
@@ -250,13 +278,14 @@ export function VpnModal({ onClose, isTroubleshooter = false }: Props) {
                       border: "none",
                       borderRadius: "10px",
                       color: "#fff",
-                      padding: "0.45rem 0.7rem",
+                      padding: "0.5rem 0.75rem",
                       fontSize: "0.78rem",
                       fontWeight: 700,
                       cursor: loading === plan.id ? "wait" : "pointer",
                       opacity: loading === plan.id ? 0.6 : 1,
                       whiteSpace: "nowrap",
                       minWidth: "70px",
+                      boxShadow: "0 0 12px #a855f740",
                     }}
                   >
                     {loading === plan.id
@@ -269,11 +298,12 @@ export function VpnModal({ onClose, isTroubleshooter = false }: Props) {
               ))}
             </div>
 
-            <p style={{ margin: "0.8rem 0 0", color: "#4b5563", fontSize: "0.65rem", lineHeight: 1.5, textAlign: "center" }}>
+            <p style={{ margin: "0.8rem 0 0", color: "#374151", fontSize: "0.65rem", lineHeight: 1.5, textAlign: "center" }}>
               После оплаты вам будет выдан персональный WireGuard-ключ. Соединение отключается автоматически по истечении выбранного времени.
             </p>
           </>
         )}
+        </div>
       </motion.div>
     </motion.div>
   );

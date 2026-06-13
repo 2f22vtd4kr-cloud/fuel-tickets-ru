@@ -583,13 +583,13 @@ def _detect_regional_crisis(db: Session) -> None:
     cooldown = timedelta(hours=2)
 
     # Aggregate red % per region
-    from sqlalchemy import func as sqlfunc
+    from sqlalchemy import func as sqlfunc, case as sqlcase
     region_totals = (
         db.query(
             GasStation.region,
             sqlfunc.count(FuelStatus.id).label("total"),
             sqlfunc.sum(
-                sqlfunc.case((FuelStatus.status == "red", 1), else_=0)
+                sqlcase((FuelStatus.status == "red", 1), else_=0)
             ).label("red_count"),
         )
         .join(FuelStatus, FuelStatus.station_id == GasStation.id)
@@ -778,13 +778,13 @@ def send_weekly_report():
             return
 
         # Aggregate green% per region
-        from sqlalchemy import func as sqlfunc
+        from sqlalchemy import func as sqlfunc, case as sqlcase
         region_rows = (
             db.query(
                 GasStation.region,
                 sqlfunc.count(FuelStatus.id).label("total"),
-                sqlfunc.sum(sqlfunc.case((FuelStatus.status == "green", 1), else_=0)).label("green"),
-                sqlfunc.sum(sqlfunc.case((FuelStatus.status == "red", 1), else_=0)).label("red"),
+                sqlfunc.sum(sqlcase((FuelStatus.status == "green", 1), else_=0)).label("green"),
+                sqlfunc.sum(sqlcase((FuelStatus.status == "red", 1), else_=0)).label("red"),
             )
             .join(FuelStatus, FuelStatus.station_id == GasStation.id)
             .group_by(GasStation.region)
@@ -924,13 +924,13 @@ def warn_low_stock():
         now = _now()
         cooldown = timedelta(hours=4)
 
-        from sqlalchemy import func as sqlfunc
+        from sqlalchemy import func as sqlfunc, case as sqlcase
         region_totals = (
             db.query(
                 GasStation.region,
                 sqlfunc.count(FuelStatus.id).label("total"),
                 sqlfunc.sum(
-                    sqlfunc.case((FuelStatus.status == "red", 1), else_=0)
+                    sqlcase((FuelStatus.status == "red", 1), else_=0)
                 ).label("red_count"),
             )
             .join(FuelStatus, FuelStatus.station_id == GasStation.id)

@@ -133,58 +133,81 @@ function FlipGame() {
   return (
     <div style={{ padding: "0 1rem 1.5rem" }}>
       <div style={{
-        background: "#14141c",
-        border: `1px solid ${result ? glowColor + "55" : "#22222f"}`,
-        borderRadius: "16px",
+        background: result ? `linear-gradient(160deg,#0d0d18,${glowColor}08)` : "linear-gradient(160deg,#0d0d18,#14141c)",
+        border: `1px solid ${result ? glowColor + "44" : "#1e1e2a"}`,
+        borderRadius: "18px",
         padding: "1rem",
-        boxShadow: result ? `0 0 24px ${glowColor}22` : "none",
-        transition: "border-color 0.5s, box-shadow 0.5s",
+        boxShadow: result ? `0 0 32px ${glowColor}20` : "0 4px 20px #00000030",
+        transition: "border-color 0.5s, box-shadow 0.5s, background 0.5s",
+        position: "relative",
+        overflow: "hidden",
       }}>
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: result ? `linear-gradient(90deg,transparent,${glowColor},transparent)` : "linear-gradient(90deg,transparent,#a855f7,transparent)" }} />
         {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.6rem" }}>
-          <h3 style={{ margin: 0, color: "#e2e8f0", fontSize: "0.95rem", fontWeight: 700 }}>
-            🃏 Бензиновое Таро...мда🤞
-          </h3>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.55rem" }}>
+          <div>
+            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.48rem", letterSpacing: "0.15em", marginBottom: "0.15rem" }}>СИСТЕМА_ТАРО · v2.0</div>
+            <h3 style={{ margin: 0, color: "#e2e8f0", fontSize: "0.92rem", fontWeight: 800 }}>
+              🃏 Бензиновое Таро
+            </h3>
+          </div>
           <span style={{
-            background: hasAttempts ? "#a855f722" : "#22222f",
-            border: `1px solid ${hasAttempts ? "#a855f744" : "#33333f"}`,
-            color: hasAttempts ? "#a855f7" : "#4b5563",
-            borderRadius: "8px",
-            padding: "0.2rem 0.5rem",
-            fontSize: "0.7rem",
-            fontWeight: 600,
+            background: hasAttempts ? "#a855f718" : "#14141c",
+            border: `1px solid ${hasAttempts ? "#a855f740" : "#22222f"}`,
+            color: hasAttempts ? "#a855f7" : "#374151",
+            borderRadius: "8px", padding: "0.2rem 0.5rem",
+            fontSize: "0.65rem", fontWeight: 700, fontFamily: "'JetBrains Mono',monospace",
           }}>
-            {played ? "Сыграно" : "1 раз в сутки"}
+            {played ? "✓ Сыграно" : "× 1/день"}
           </span>
         </div>
 
-        <p style={{ color: "#6b7280", fontSize: "0.73rem", margin: "0 0 0.75rem" }}>
-          Один бросок в сутки — 5 случайных карт из 200+. XP начисляется мгновенно.
+        <p style={{ color: "#4b5563", fontSize: "0.7rem", margin: "0 0 0.75rem", lineHeight: 1.4 }}>
+          5 случайных карт из 200+. XP начисляется мгновенно. Следующий бросок — завтра.
         </p>
 
         {/* Card grid or result */}
         {!result ? (
-          <div style={{ textAlign: "center", padding: "1.5rem 0" }}>
+          <div style={{ textAlign: "center", padding: "1rem 0" }}>
+            {hasAttempts && (
+              <div style={{ display: "flex", justifyContent: "center", gap: "0.3rem", marginBottom: "1rem" }}>
+                {[...Array(5)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    animate={{ rotateY: [0, 10, -10, 0], y: [0, -4, 0] }}
+                    transition={{ duration: 2, repeat: Infinity, delay: i * 0.2, ease: "easeInOut" }}
+                    style={{
+                      width: "36px", height: "52px", borderRadius: "6px",
+                      background: `linear-gradient(135deg,#1e1e2a,#a855f718)`,
+                      border: "1px solid #a855f733",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: "1.1rem",
+                      boxShadow: "0 4px 12px #00000040",
+                    }}
+                  >❓</motion.div>
+                ))}
+              </div>
+            )}
             <motion.button
               whileTap={{ scale: 0.93 }}
+              whileHover={hasAttempts && !loading ? { scale: 1.03 } : {}}
               onClick={handleDraw}
               disabled={!hasAttempts || loading}
               style={{
-                background: (!hasAttempts || loading)
-                  ? "#22222f"
-                  : "linear-gradient(135deg,#a855f7,#db2777)",
-                color: (!hasAttempts || loading) ? "#4b5563" : "#fff",
-                border: "none",
-                borderRadius: "14px",
-                padding: "0.85rem 2.5rem",
-                fontSize: "0.95rem",
-                fontWeight: 700,
+                background: (!hasAttempts || loading) ? "#14141c" : "linear-gradient(135deg,#a855f7,#db2777)",
+                color: (!hasAttempts || loading) ? "#374151" : "#fff",
+                border: `1px solid ${(!hasAttempts || loading) ? "#22222f" : "transparent"}`,
+                borderRadius: "14px", padding: "0.85rem 2.5rem",
+                fontSize: "0.92rem", fontWeight: 700,
                 cursor: (!hasAttempts || loading) ? "not-allowed" : "pointer",
-                boxShadow: (!hasAttempts || loading) ? "none" : "0 0 20px #a855f755",
+                boxShadow: (!hasAttempts || loading) ? "none" : "0 0 24px #a855f760, 0 4px 16px #00000040",
               }}
             >
-              {loading ? "🔀 Перемешиваю колоду…" : played ? "⏳ Завтра — новый розыгрыш" : "🃏 Вскрыть 5 карт"}
+              {loading ? "🔀 Перемешиваю…" : played ? "⏳ Завтра" : "🃏 Вскрыть 5 карт"}
             </motion.button>
+            {!hasAttempts && !played && (
+              <p style={{ color: "#374151", fontSize: "0.65rem", marginTop: "0.5rem" }}>Попытки исчерпаны</p>
+            )}
           </div>
         ) : (
           <>
@@ -321,34 +344,67 @@ function TapGame() {
   return (
     <div style={{ padding: "0 1rem 1.5rem" }}>
       <div style={{
-        background: "#14141c", border: "1px solid #22222f",
-        borderRadius: "16px", padding: "1rem", overflow: "hidden",
+        background: phase === "playing"
+          ? (timeLeft <= 8 ? "linear-gradient(160deg,#1a0808,#0d0d18)" : "linear-gradient(160deg,#0a0d18,#0d0d18)")
+          : "linear-gradient(160deg,#0d0d18,#14141c)",
+        border: `1px solid ${phase === "playing" ? (timeLeft <= 8 ? "#ef444433" : "#22c55e22") : "#1e1e2a"}`,
+        borderRadius: "18px", padding: "1rem", overflow: "hidden",
+        transition: "background 0.5s, border-color 0.5s",
+        position: "relative",
+        boxShadow: phase === "playing" ? (timeLeft <= 8 ? "0 0 24px #ef444418" : "0 0 24px #22c55e18") : "0 4px 20px #00000030",
       }}>
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: phase === "playing" ? (timeLeft <= 8 ? "linear-gradient(90deg,transparent,#ef4444,transparent)" : "linear-gradient(90deg,transparent,#22c55e,transparent)") : "linear-gradient(90deg,transparent,#22c55e88,transparent)" }} />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-          <h3 style={{ margin: 0, color: "#e2e8f0", fontSize: "0.95rem", fontWeight: 700 }}>
-            ⚡ Заправка на скорость
-          </h3>
-          <span style={{ color: "#6b7280", fontSize: "0.75rem" }}>
-            Рекорд: <span style={{ color: "#eab308", fontWeight: 700 }}>{tapHighScore}</span>
-          </span>
+          <div>
+            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.48rem", letterSpacing: "0.15em", marginBottom: "0.12rem" }}>ИГРА_СКОРОСТИ · 30с</div>
+            <h3 style={{ margin: 0, color: "#e2e8f0", fontSize: "0.92rem", fontWeight: 800 }}>
+              ⚡ Заправка на скорость
+            </h3>
+          </div>
+          {tapHighScore > 0 && (
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#eab308", fontSize: "0.9rem", fontWeight: 700, lineHeight: 1 }}>{tapHighScore}</div>
+              <div style={{ color: "#374151", fontSize: "0.52rem" }}>рекорд</div>
+            </div>
+          )}
         </div>
 
         {phase === "idle" && (
-          <div style={{ textAlign: "center", padding: "1.5rem 0" }}>
-            <p style={{ color: "#6b7280", fontSize: "0.78rem", margin: "0 0 1rem" }}>
-              30 секунд. Нажимайте ⛽, избегайте 🔴. Заработайте XP!
-            </p>
-            <button
+          <div style={{ textAlign: "center", padding: "1rem 0" }}>
+            <div style={{ display: "flex", justifyContent: "center", gap: "1.5rem", marginBottom: "0.85rem" }}>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: "1.5rem", marginBottom: "0.2rem" }}>⛽</div>
+                <div style={{ color: "#22c55e", fontSize: "0.58rem", fontFamily: "'JetBrains Mono',monospace" }}>+1 очко</div>
+              </div>
+              <div style={{ width: "1px", background: "#1e1e2a" }} />
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: "1.5rem", marginBottom: "0.2rem" }}>🪣</div>
+                <div style={{ color: "#ef4444", fontSize: "0.58rem", fontFamily: "'JetBrains Mono',monospace" }}>-1 очко</div>
+              </div>
+              <div style={{ width: "1px", background: "#1e1e2a" }} />
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "1rem", fontWeight: 700, color: "#eab308" }}>30с</div>
+                <div style={{ color: "#4b5563", fontSize: "0.58rem" }}>таймер</div>
+              </div>
+            </div>
+            <motion.button
+              whileTap={{ scale: 0.94 }}
+              whileHover={{ scale: 1.04 }}
               onClick={startGame}
               style={{
-                background: "linear-gradient(135deg,#a855f7,#db2777)",
-                color: "#fff", border: "none", borderRadius: "12px",
-                padding: "0.75rem 2rem", fontSize: "0.9rem",
-                fontWeight: 600, cursor: "pointer",
+                background: "linear-gradient(135deg,#22c55e,#16a34a)",
+                color: "#fff", border: "none", borderRadius: "14px",
+                padding: "0.8rem 2.2rem", fontSize: "0.9rem", fontWeight: 700,
+                cursor: "pointer", boxShadow: "0 0 20px #22c55e50, 0 4px 16px #00000040",
               }}
             >
-              Начать игру
-            </button>
+              ⚡ Начать игру
+            </motion.button>
+            {tapHighScore > 0 && (
+              <p style={{ color: "#4b5563", fontSize: "0.62rem", marginTop: "0.5rem", fontFamily: "'JetBrains Mono',monospace" }}>
+                Ваш рекорд: <span style={{ color: "#eab308" }}>{tapHighScore}</span>
+              </p>
+            )}
           </div>
         )}
 
@@ -686,62 +742,81 @@ function DailyCheckin() {
       <motion.div
         whileTap={{ scale: 0.98 }}
         style={{
-          background: done ? "#0d1f0d" : "linear-gradient(135deg,#14141c,#1a0a1f)",
-          border: `1px solid ${done ? "#22c55e44" : "#a855f744"}`,
-          borderRadius: "16px",
+          background: done
+            ? "linear-gradient(135deg,#0a1a0a,#0d1f0d)"
+            : "linear-gradient(135deg,#0d0d18,#1a0a1f)",
+          border: `1px solid ${done ? "#22c55e44" : "#a855f733"}`,
+          borderRadius: "18px",
           padding: "1rem",
-          display: "flex",
-          alignItems: "center",
-          gap: "1rem",
+          position: "relative",
+          overflow: "hidden",
+          boxShadow: done ? "0 0 24px #22c55e12" : "0 0 24px #a855f712",
         }}
       >
-        <div style={{ fontSize: "2rem" }}>{done ? "✅" : "🎁"}</div>
-        <div style={{ flex: 1 }}>
-          <p style={{ margin: 0, color: "#e2e8f0", fontWeight: 700, fontSize: "0.9rem" }}>
-            Ежедневный бонус
-          </p>
-          <p style={{ margin: "0.1rem 0 0.4rem", color: "#6b7280", fontSize: "0.72rem" }}>
-            {done
-              ? `Получен. Следующий${nextTime ? ` в ${nextTime}` : " завтра"}`
-              : "+50 XP каждые 24 часа — просто загляните сюда"}
-          </p>
-          {/* Streak dots */}
-          <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
-            {streakDots.map((filled, i) => (
-              <div key={i} style={{
-                width: "10px", height: "10px", borderRadius: "50%",
-                background: filled ? "#f59e0b" : "#22222f",
-                border: `1px solid ${filled ? "#f59e0b88" : "#33333f"}`,
-                boxShadow: filled ? "0 0 5px #f59e0b66" : "none",
-                transition: "all 0.3s",
-              }} />
-            ))}
-            {streak > 0 && (
-              <span style={{ color: "#f59e0b", fontSize: "0.65rem", marginLeft: "4px", fontWeight: 700 }}>
-                {streak >= 7 ? "🔥 MAX" : `${streak}/7`}
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: done ? "linear-gradient(90deg,transparent,#22c55e,transparent)" : "linear-gradient(90deg,transparent,#a855f7,#db2777,transparent)" }} />
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+          <motion.div
+            animate={done ? {} : { scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
+            transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+            style={{ fontSize: "2rem", flexShrink: 0 }}
+          >
+            {done ? "✅" : "🎁"}
+          </motion.div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.1rem" }}>
+              <p style={{ margin: 0, color: "#e2e8f0", fontWeight: 800, fontSize: "0.88rem" }}>
+                Ежедневный бонус
+              </p>
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", background: "#f59e0b18", border: "1px solid #f59e0b33", borderRadius: "4px", color: "#f59e0b", fontSize: "0.52rem", fontWeight: 700, padding: "0.08rem 0.3rem" }}>
+                +50 XP
               </span>
-            )}
+            </div>
+            <p style={{ margin: "0 0 0.5rem", color: "#4b5563", fontSize: "0.68rem" }}>
+              {done
+                ? `Получен${nextTime ? ` · следующий в ${nextTime}` : " · до завтра"}`
+                : "Каждые 24 часа. Серия дней = бонусные XP"}
+            </p>
+            {/* Streak dots */}
+            <div style={{ display: "flex", gap: "5px", alignItems: "center" }}>
+              {streakDots.map((filled, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: i * 0.06 }}
+                  style={{
+                    width: "12px", height: "12px", borderRadius: "50%",
+                    background: filled ? "#f59e0b" : "#1a1a24",
+                    border: `1px solid ${filled ? "#f59e0b66" : "#2a2a38"}`,
+                    boxShadow: filled ? "0 0 6px #f59e0b66" : "none",
+                    transition: "all 0.3s",
+                    flexShrink: 0,
+                  }}
+                />
+              ))}
+              {streak > 0 && (
+                <span style={{ color: "#f59e0b", fontSize: "0.62rem", marginLeft: "4px", fontWeight: 700, fontFamily: "'JetBrains Mono',monospace" }}>
+                  {streak >= 7 ? "🔥 MAX!" : `🔥 ×${streak}`}
+                </span>
+              )}
+            </div>
           </div>
+          <button
+            onClick={handleCheckin}
+            disabled={done || loading}
+            style={{
+              background: done ? "#14141c" : "linear-gradient(135deg,#22c55e,#16a34a)",
+              border: `1px solid ${done ? "#22222f" : "transparent"}`,
+              borderRadius: "12px", color: done ? "#374151" : "#fff",
+              padding: "0.55rem 1rem", fontSize: "0.78rem", fontWeight: 700,
+              cursor: done || loading ? "not-allowed" : "pointer",
+              whiteSpace: "nowrap", flexShrink: 0,
+              boxShadow: done ? "none" : "0 0 16px #22c55e50",
+            }}
+          >
+            {loading ? "…" : done ? "✓ Готово" : "Получить"}
+          </button>
         </div>
-        <button
-          onClick={handleCheckin}
-          disabled={done || loading}
-          style={{
-            background: done
-              ? "#22222f"
-              : "linear-gradient(135deg,#22c55e,#16a34a)",
-            border: "none",
-            borderRadius: "10px",
-            color: done ? "#4b5563" : "#fff",
-            padding: "0.5rem 0.9rem",
-            fontSize: "0.78rem",
-            fontWeight: 700,
-            cursor: done || loading ? "not-allowed" : "pointer",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {loading ? "…" : done ? "Готово" : "Получить"}
-        </button>
       </motion.div>
     </div>
   );

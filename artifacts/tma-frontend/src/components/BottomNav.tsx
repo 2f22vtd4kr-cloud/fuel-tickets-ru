@@ -23,9 +23,10 @@ export function BottomNav({ active, onChange, visible = true, badges = {} }: Pro
       transition={{ type: "spring", damping: 28, stiffness: 300 }}
       style={{
         position: "fixed", bottom: 0, left: 0, right: 0,
-        background: "rgba(11,11,15,0.92)",
-        backdropFilter: "blur(20px)",
-        borderTop: "1px solid #22222f",
+        background: "rgba(8,8,13,0.97)",
+        backdropFilter: "blur(24px)",
+        borderTop: "1px solid #1e1e2a",
+        boxShadow: "0 -4px 32px rgba(0,0,0,0.6), 0 -1px 0 #a855f710",
         display: "flex", alignItems: "stretch",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
         zIndex: 10000,

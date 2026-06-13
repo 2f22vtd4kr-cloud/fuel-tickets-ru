@@ -206,9 +206,10 @@ export function StationCard({ station, onClose }: Props) {
       {/* Live prices */}
       <div style={{ padding: "0.6rem 1rem", borderBottom: "1px solid #0f0f17" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.45rem" }}>
-          <span style={{ color: "#6b7280", fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>Цены сейчас</span>
-          <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: connected ? "#22c55e" : "#4b5563", boxShadow: connected ? "0 0 5px #22c55e" : "none" }} />
-          {connected && <span style={{ color: "#22c55e44", fontSize: "0.58rem" }}>LIVE</span>}
+          <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.46rem", letterSpacing: "0.14em" }}>ЦЕНЫ_СЕЙЧАС</div>
+          <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: connected ? "#22c55e" : "#4b5563", boxShadow: connected ? "0 0 5px #22c55e" : "none", flexShrink: 0 }} />
+          {connected && <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e66", fontSize: "0.46rem", letterSpacing: "0.1em" }}>LIVE</span>}
+          <div style={{ flex: 1, height: "1px", background: "linear-gradient(90deg,#1e1e2a,transparent)" }} />
         </div>
         <div style={{ display: "flex", gap: "0.4rem" }}>
           {DISPLAY_FUELS.map((ft) => {
@@ -239,7 +240,10 @@ export function StationCard({ station, onClose }: Props) {
 
       {/* Fuel statuses */}
       <div style={{ padding: "0.65rem 1rem", borderBottom: "1px solid #0f0f17" }}>
-        <div style={{ color: "#6b7280", fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.45rem" }}>Наличие по типам</div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.45rem" }}>
+          <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.46rem", letterSpacing: "0.14em" }}>НАЛИЧИЕ_ТОПЛИВА</div>
+          <div style={{ flex: 1, height: "1px", background: "linear-gradient(90deg,#1e1e2a,transparent)" }} />
+        </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
           {station.fuel_statuses.map((fs) => {
             const fc = STATUS_COLORS[fs.status];
@@ -267,31 +271,36 @@ export function StationCard({ station, onClose }: Props) {
       </div>
 
       {/* Report buttons */}
-      <div style={{ padding: "0.65rem 1rem 0.5rem", display: "flex", gap: "0.5rem" }}>
-        <button onClick={() => handleReport("available")} style={{ flex: 1, padding: "0.5rem", background: "#16a34a22", border: "1px solid #22c55e44", borderRadius: "10px", color: "#22c55e", fontSize: "0.8rem", cursor: "pointer", fontWeight: 600 }}>
-          ✓ Есть
-        </button>
-        <button onClick={() => handleReport("unavailable")} style={{ flex: 1, padding: "0.5rem", background: "#dc262622", border: "1px solid #ef444444", borderRadius: "10px", color: "#ef4444", fontSize: "0.8rem", cursor: "pointer", fontWeight: 600 }}>
-          ✕ Нет
-        </button>
-        <button
-          onClick={() => {
-            const fuels = station.fuel_statuses.map(f => `${f.fuel_type}: ${f.availability_pct}%`).join(", ");
-            const text = encodeURIComponent(`⛽ ${station.name}\n📍 ${station.region} — ${station.address}\n${fuels}\n\nМатрица Снабжения`);
-            const url = `https://t.me/share/url?url=${encodeURIComponent("https://t.me/")}&text=${text}`;
-            window.open(url, "_blank");
-          }}
-          style={{ padding: "0.5rem 0.7rem", background: "#1e40af22", border: "1px solid #3b82f644", borderRadius: "10px", color: "#3b82f6", fontSize: "0.85rem", cursor: "pointer" }}
-          title="Поделиться в Telegram"
-        >
-          ✈️
-        </button>
+      <div style={{ padding: "0.65rem 1rem 0.5rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.4rem" }}>
+          <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.46rem", letterSpacing: "0.14em" }}>КРАУДРЕПОРТ · +5 XP</div>
+          <div style={{ flex: 1, height: "1px", background: "linear-gradient(90deg,#1e1e2a,transparent)" }} />
+        </div>
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <button onClick={() => handleReport("available")} style={{ flex: 1, padding: "0.55rem 0.5rem", background: "linear-gradient(135deg,#16a34a15,#22c55e0d)", border: "1px solid #22c55e44", borderRadius: "10px", color: "#22c55e", fontSize: "0.8rem", cursor: "pointer", fontWeight: 700, boxShadow: "0 0 8px #22c55e18" }}>
+            ✓ Есть топливо
+          </button>
+          <button onClick={() => handleReport("unavailable")} style={{ flex: 1, padding: "0.55rem 0.5rem", background: "linear-gradient(135deg,#dc262615,#ef44440d)", border: "1px solid #ef444444", borderRadius: "10px", color: "#ef4444", fontSize: "0.8rem", cursor: "pointer", fontWeight: 700, boxShadow: "0 0 8px #ef444418" }}>
+            ✕ Нет топлива
+          </button>
+          <button
+            onClick={() => {
+              const fuels = station.fuel_statuses.map(f => `${f.fuel_type}: ${f.availability_pct}%`).join(", ");
+              const text = encodeURIComponent(`⛽ ${station.name}\n📍 ${station.region} — ${station.address}\n${fuels}\n\nМатрица Снабжения`);
+              const url = `https://t.me/share/url?url=${encodeURIComponent("https://t.me/")}&text=${text}`;
+              window.open(url, "_blank");
+            }}
+            style={{ padding: "0.55rem 0.7rem", background: "#1e40af18", border: "1px solid #3b82f640", borderRadius: "10px", color: "#3b82f6", fontSize: "0.85rem", cursor: "pointer" }}
+            title="Поделиться в Telegram"
+          >✈️</button>
+        </div>
       </div>
 
       {/* Footer */}
-      <div style={{ padding: "0.4rem 1rem 0.7rem", fontSize: "0.68rem", color: "#374151", textAlign: "center", borderTop: "1px solid #22222f" }}>
-        Данные синхронизированы · Очередь: используйте{" "}
-        <a href="https://t.me/sev_fuel_ochered_bot" target="_blank" style={{ color: "#a855f7", textDecoration: "none" }}>@sev_fuel_ochered_bot</a>
+      <div style={{ padding: "0.35rem 1rem 0.65rem", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem", borderTop: "1px solid #0f0f17" }}>
+        <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 5px #22c55e" }} />
+        <span style={{ fontSize: "0.6rem", color: "#374151" }}>Данные синхронизированы ·</span>
+        <a href="https://t.me/sev_fuel_ochered_bot" target="_blank" style={{ color: "#a855f7", textDecoration: "none", fontSize: "0.6rem" }}>@sev_fuel_ochered_bot</a>
       </div>
     </motion.div>
   );
