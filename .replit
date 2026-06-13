@@ -57,13 +57,13 @@ waitForPort = 8000
 name = "TMA Frontend"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "webview"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "pnpm --filter @workspace/tma-frontend run dev"
-waitForPort = 3001
-
-[workflows.workflow.metadata]
-outputType = "console"
+waitForPort = 5000
 
 [agent]
 stack = "BEST_EFFORT_FALLBACK"
@@ -84,6 +84,10 @@ externalPort = 4200
 [[ports]]
 localPort = 3003
 externalPort = 3003
+
+[[ports]]
+localPort = 5000
+externalPort = 5173
 
 [[ports]]
 localPort = 8000
