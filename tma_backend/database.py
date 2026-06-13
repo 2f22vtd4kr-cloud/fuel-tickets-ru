@@ -1,7 +1,9 @@
 """
-Database connection, WAL mode activation, table creation, and seeding.
+Database connection, table creation, and seeding.
+Uses PostgreSQL (DATABASE_URL env var) in production, SQLite in development.
 """
 
+import os
 import logging
 from datetime import datetime, timezone
 from sqlalchemy import create_engine, event, text
@@ -11,24 +13,40 @@ from tma_backend.models import Base, GasStation, FuelStatus, AnalyticsSnapshot
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = "tma.db"
-DATABASE_URL = f"sqlite:///{DB_PATH}"
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    pool_pre_ping=True,
-)
+if DATABASE_URL:
+    # Production: Replit-managed PostgreSQL
+    # SQLAlchemy requires postgresql:// not postgres://
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+        pool_size=5,
+        max_overflow=10,
+    )
+    logger.info("Using PostgreSQL database.")
+else:
+    # Development: local SQLite
+    DB_PATH = "tma.db"
+    _sqlite_url = f"sqlite:///{DB_PATH}"
+    engine = create_engine(
+        _sqlite_url,
+        connect_args={"check_same_thread": False},
+        pool_pre_ping=True,
+    )
 
-# Activate WAL mode for concurrent read/write performance
-@event.listens_for(engine, "connect")
-def set_wal_mode(dbapi_connection, connection_record):
-    cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA journal_mode=WAL")
-    cursor.execute("PRAGMA synchronous=NORMAL")
-    cursor.execute("PRAGMA cache_size=-64000")   # 64 MB cache
-    cursor.execute("PRAGMA foreign_keys=ON")
-    cursor.close()
+    @event.listens_for(engine, "connect")
+    def set_wal_mode(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.execute("PRAGMA cache_size=-64000")
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+    logger.info("Using SQLite database (development).")
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -76,7 +94,7 @@ def seed_db(db: Session) -> None:
             queue_cars=s["queue_cars"],
         )
         db.add(station)
-        db.flush()   # get station.id
+        db.flush()
 
         for fs_data in s["fuel_statuses"]:
             fs = FuelStatus(
@@ -91,13 +109,11 @@ def seed_db(db: Session) -> None:
     db.commit()
     logger.info("Seeding complete.")
 
-    # Immediately generate first analytics snapshot
     _generate_snapshot(db)
 
 
 def _generate_snapshot(db: Session) -> None:
     """Write one analytics snapshot row per region."""
-    from sqlalchemy import func
     from tma_backend.seed_regions import REGIONS
 
     now = datetime.now(timezone.utc)

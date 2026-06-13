@@ -16,6 +16,7 @@ import httpx
 
 import uvicorn
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
@@ -64,11 +65,40 @@ async def _broadcast_prices(data: dict) -> None:
     _price_ws_clients -= dead
 
 
+scheduler = AsyncIOScheduler(timezone="UTC")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    db = SessionLocal()
+    try:
+        seed_db(db)
+        _fix_water_stations(db)
+    finally:
+        db.close()
+
+    scheduler.add_job(simulate_availability_shifts, "interval", minutes=30)
+    scheduler.add_job(remove_expired_reports, "interval", minutes=10)
+    scheduler.add_job(generate_analytics_snapshots, "interval", hours=1)
+    scheduler.add_job(reset_daily_limits, "cron", hour=0, minute=0)
+    scheduler.add_job(send_morning_digest, "cron", hour=7, minute=0)
+    scheduler.add_job(expire_vpn_sessions, "interval", minutes=1)
+    scheduler.add_job(fluctuate_prices, "interval", minutes=15)
+    scheduler.start()
+    logger.info("Топливный Узел API запущен.")
+
+    yield
+
+    scheduler.shutdown()
+
+
 app = FastAPI(
     title="Топливный Узел API",
     version="1.0.0",
     docs_url="/api/docs",
     redoc_url=None,
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -78,8 +108,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-scheduler = AsyncIOScheduler(timezone="UTC")
 
 # ──────────────────────────────────────────────────────────────────
 #  Helpers
@@ -303,11 +331,91 @@ def simulate_availability_shifts():
 
         db.commit()
 
+        # ── Regional crisis detection ───────────────────────────────
+        _detect_regional_crisis(db)
+
     except Exception as e:
         logger.error("simulate_availability_shifts error: %s", e)
         db.rollback()
     finally:
         db.close()
+
+
+# Cooldown: don't re-alert the same region within 2 hours
+_crisis_last_alerted: dict[str, datetime] = {}
+
+
+def _detect_regional_crisis(db: Session) -> None:
+    """
+    If >50% of FuelStatus rows in a region are 'red', fire an emergency
+    Telegram alert to every subscriber who has a station in that region.
+    Respects a 2-hour per-region cooldown.
+    """
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    if not bot_token:
+        return
+
+    now = _now()
+    cooldown = timedelta(hours=2)
+
+    # Aggregate red % per region
+    from sqlalchemy import func as sqlfunc
+    region_totals = (
+        db.query(
+            GasStation.region,
+            sqlfunc.count(FuelStatus.id).label("total"),
+            sqlfunc.sum(
+                sqlfunc.case((FuelStatus.status == "red", 1), else_=0)
+            ).label("red_count"),
+        )
+        .join(FuelStatus, FuelStatus.station_id == GasStation.id)
+        .group_by(GasStation.region)
+        .all()
+    )
+
+    crisis_regions: list[str] = []
+    for row in region_totals:
+        if row.total and (row.red_count / row.total) >= 0.5:
+            last = _crisis_last_alerted.get(row.region)
+            if last and (now - last) < cooldown:
+                continue
+            crisis_regions.append(row.region)
+            _crisis_last_alerted[row.region] = now
+
+    if not crisis_regions:
+        return
+
+    for region in crisis_regions:
+        # Collect unique chat IDs subscribed to any station in this region
+        subs = (
+            db.query(Subscription.telegram_chat_id)
+            .join(GasStation, GasStation.id == Subscription.station_id)
+            .filter(GasStation.region == region)
+            .distinct()
+            .all()
+        )
+        chat_ids = [s.telegram_chat_id for s in subs]
+
+        if not chat_ids:
+            continue
+
+        text = (
+            f"🚨 *КРИЗИС СНАБЖЕНИЯ — {region}*\n\n"
+            "Более 50% АЗС в регионе показывают КРАСНЫЙ статус.\n"
+            "Топливный резерв критически истощён.\n\n"
+            "Откройте Матрицу Снабжения, чтобы найти работающие станции."
+        )
+        logger.warning("Regional crisis detected: %s (%d subscribers notified)", region, len(chat_ids))
+
+        for chat_id in chat_ids:
+            try:
+                with httpx.Client(timeout=6.0) as client:
+                    client.post(
+                        f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                        json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"},
+                    )
+            except Exception as exc:
+                logger.warning("Crisis alert failed for chat %s: %s", chat_id, exc)
 
 
 def remove_expired_reports():
@@ -365,6 +473,67 @@ def reset_daily_limits():
         db.close()
 
 
+def send_morning_digest():
+    """
+    Daily 7 AM UTC digest: send each user with active subscriptions a
+    summary of their tracked stations' current fuel status.
+    """
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    if not bot_token:
+        return
+
+    db = SessionLocal()
+    try:
+        # Group subscriptions by telegram_chat_id
+        subs = db.query(Subscription).all()
+        by_chat: dict[int, list] = {}
+        for s in subs:
+            by_chat.setdefault(s.telegram_chat_id, []).append(s)
+
+        if not by_chat:
+            return
+
+        for chat_id, user_subs in by_chat.items():
+            lines = ["☀️ *Утренний дайджест — Матрица Снабжения*\n"]
+            for sub in user_subs[:8]:  # cap at 8 stations per digest
+                station = db.query(GasStation).filter(GasStation.id == sub.station_id).first()
+                if not station:
+                    continue
+                fuel_q = db.query(FuelStatus).filter(FuelStatus.station_id == sub.station_id)
+                if sub.fuel_type:
+                    fuel_q = fuel_q.filter(FuelStatus.fuel_type == sub.fuel_type)
+                statuses = fuel_q.all()
+                if not statuses:
+                    continue
+
+                status_parts = []
+                for fs in statuses:
+                    emoji = {"green": "🟢", "yellow": "🟡", "red": "🔴"}.get(fs.status, "⚪")
+                    status_parts.append(f"{emoji} {fs.fuel_type} {fs.availability_pct}%")
+
+                lines.append(f"⛽ *{station.name}*\n   {' · '.join(status_parts)}")
+
+            if len(lines) <= 1:
+                continue
+
+            lines.append("\n_Открыть карту: /tma_")
+            text = "\n".join(lines)
+            try:
+                with httpx.Client(timeout=8.0) as client:
+                    client.post(
+                        f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                        json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"},
+                    )
+            except Exception as exc:
+                logger.warning("Morning digest failed for chat %s: %s", chat_id, exc)
+
+        logger.info("Morning digest sent to %d chats.", len(by_chat))
+    except Exception as e:
+        logger.error("send_morning_digest error: %s", e)
+    finally:
+        db.close()
+
+
 # ──────────────────────────────────────────────────────────────────
 #  Lifecycle
 # ──────────────────────────────────────────────────────────────────
@@ -408,29 +577,6 @@ def expire_vpn_sessions():
         db.close()
 
 
-@app.on_event("startup")
-async def startup():
-    init_db()
-    db = SessionLocal()
-    try:
-        seed_db(db)
-        _fix_water_stations(db)
-    finally:
-        db.close()
-
-    scheduler.add_job(simulate_availability_shifts, "interval", minutes=30)
-    scheduler.add_job(remove_expired_reports, "interval", minutes=10)
-    scheduler.add_job(generate_analytics_snapshots, "interval", hours=1)
-    scheduler.add_job(reset_daily_limits, "cron", hour=0, minute=0)
-    scheduler.add_job(expire_vpn_sessions, "interval", minutes=1)
-    scheduler.add_job(fluctuate_prices, "interval", minutes=15)
-    scheduler.start()
-    logger.info("Топливный Узел API запущен.")
-
-
-@app.on_event("shutdown")
-async def shutdown():
-    scheduler.shutdown()
 
 
 # ──────────────────────────────────────────────────────────────────

@@ -1753,6 +1753,8 @@ async def post_init(application: Application) -> None:
         BotCommand("mystats",       "Мои XP, уровень и место в рейтинге"),
         BotCommand("refer",         "Реферальный код — +200 XP за каждого друга"),
         BotCommand("broadcast",     "[Admin] Рассылка сообщения всем пользователям"),
+        BotCommand("status",        "Обзор снабжения по регионам прямо сейчас"),
+        BotCommand("digest",        "Мой дайджест — статус подписанных АЗС"),
     ])
     logger.info("Командное меню Telegram зарегистрировано.")
     asyncio.create_task(_invoice_cleanup_loop(application.bot))
@@ -2052,6 +2054,122 @@ async def price_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
+async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show a regional fuel availability overview fetched from the TMA backend."""
+    backend = "http://localhost:8000"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{backend}/api/analytics",
+                timeout=aiohttp.ClientTimeout(total=8),
+            ) as resp:
+                if resp.status != 200:
+                    raise ValueError(f"HTTP {resp.status}")
+                data = await resp.json()
+    except Exception as exc:
+        await update.message.reply_text(
+            f"⚠️ Не удалось получить данные: {exc}\n\nОткройте Матрицу для актуальной карты.",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🗺 Открыть карту", web_app=WebAppInfo(url=TMA_URL))
+            ]]),
+        )
+        return
+
+    regions = data.get("regions", [])
+    if not regions:
+        await update.message.reply_text("Данные временно недоступны.")
+        return
+
+    lines = ["🗺 *Обзор снабжения по регионам*\n"]
+    for r in regions[:10]:
+        name = r.get("name", "—")
+        green = r.get("green_pct", 0)
+        yellow = r.get("yellow_pct", 0)
+        red = r.get("red_pct", 0)
+        if green >= 60:
+            icon = "🟢"
+        elif green + yellow >= 40:
+            icon = "🟡"
+        else:
+            icon = "🔴"
+        lines.append(f"{icon} *{name}*: {green:.0f}% норм · {yellow:.0f}% мало · {red:.0f}% нет")
+
+    lines.append("\n_Обновлено только что_")
+    await update.message.reply_text(
+        "\n".join(lines),
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("🗺 Открыть карту", web_app=WebAppInfo(url=TMA_URL))
+        ]]),
+    )
+
+
+async def digest_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Send the user an on-demand fuel digest for their subscribed stations."""
+    chat_id = update.effective_user.id
+    backend = "http://localhost:8000"
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{backend}/api/subscriptions/{chat_id}",
+                timeout=aiohttp.ClientTimeout(total=8),
+            ) as resp:
+                data = await resp.json() if resp.status == 200 else {}
+                subs = data.get("subscriptions", [])
+    except Exception:
+        subs = []
+
+    if not subs:
+        await update.message.reply_text(
+            "🔕 У вас нет подписок — дайджест пуст.\n\n"
+            "Откройте Матрицу, найдите АЗС на карте и нажмите 🔔 для подписки.",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("⛽ Открыть Матрицу", web_app=WebAppInfo(url=TMA_URL))
+            ]]),
+        )
+        return
+
+    lines = ["📋 *Дайджест по вашим АЗС*\n"]
+    for sub in subs[:8]:
+        station_id = sub.get("station_id")
+        station_name = sub.get("station_name", f"АЗС #{station_id}")
+        sub_fuel = sub.get("fuel_type")
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{backend}/api/stations/{station_id}",
+                    timeout=aiohttp.ClientTimeout(total=6),
+                ) as resp:
+                    station = await resp.json() if resp.status == 200 else {}
+        except Exception:
+            station = {}
+
+        fuel_statuses = station.get("fuel_status", [])
+        if sub_fuel:
+            fuel_statuses = [f for f in fuel_statuses if f.get("fuel_type") == sub_fuel]
+
+        if not fuel_statuses:
+            lines.append(f"⛽ *{station_name}* — нет данных")
+            continue
+
+        parts = []
+        for fs in fuel_statuses[:3]:
+            emoji = {"green": "🟢", "yellow": "🟡", "red": "🔴"}.get(fs.get("status", ""), "⚪")
+            parts.append(f"{emoji} {fs.get('fuel_type', '?')} {fs.get('availability_pct', 0):.0f}%")
+        lines.append(f"⛽ *{station_name}*\n   {' · '.join(parts)}")
+
+    lines.append("\n_Откройте Матрицу, чтобы занять очередь_ 👇")
+    await update.message.reply_text(
+        "\n".join(lines),
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("⛽ Открыть Матрицу", web_app=WebAppInfo(url=TMA_URL))
+        ]]),
+    )
+
+
 async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a message to all users who have chat records in the DB."""
     if not ADMIN_CHAT_ID or update.effective_chat.id != ADMIN_CHAT_ID:
@@ -2160,6 +2278,8 @@ def main() -> None:
     app.add_handler(CommandHandler("refer",         refer_cmd))
     app.add_handler(CommandHandler("price",         price_cmd))
     app.add_handler(CommandHandler("broadcast",     broadcast_cmd))
+    app.add_handler(CommandHandler("status",        status_cmd))
+    app.add_handler(CommandHandler("digest",        digest_cmd))
     app.add_handler(CallbackQueryHandler(vpn_callback,     pattern=r"^vpn_"))
     app.add_handler(CallbackQueryHandler(copy_ref_callback, pattern=r"^copy_ref_"))
     app.add_handler(CallbackQueryHandler(buystars_callback, pattern=r"^buystars_"))
@@ -2170,22 +2290,7 @@ def main() -> None:
 
     print("✅ Бот запущен (v6: VPN + /mystats + /refer + /broadcast + daily checkin).")
 
-    webhook_url = os.getenv("WEBHOOK_URL", "").rstrip("/")
-    if webhook_url:
-        # Production: webhook mode — Telegram POSTs updates to our server.
-        # Express proxies POST /telegram-webhook → localhost:8001.
-        # This eliminates 409 conflicts and works correctly on autoscale.
-        print(f"🔗 Webhook mode: {webhook_url}/telegram-webhook")
-        app.run_webhook(
-            listen="127.0.0.1",
-            port=8001,
-            url_path="/telegram-webhook",
-            webhook_url=f"{webhook_url}/telegram-webhook",
-            drop_pending_updates=True,
-        )
-    else:
-        # Development: polling mode (no WEBHOOK_URL set)
-        app.run_polling(drop_pending_updates=True)
+    app.run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":
