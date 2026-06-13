@@ -4,7 +4,8 @@ import { flipCard, submitTapScore } from "@/api/client";
 import { useUserStore } from "@/stores/useUserStore";
 import { useGameStore } from "@/stores/useGameStore";
 import { useToast } from "@/components/Toast";
-import type { FlipResult } from "@/types";
+import type { FlipResult, FlipCard } from "@/types";
+import { RARITY_COLORS } from "@/types";
 
 const TIER_COLORS: Record<string, string> = {
   "🚶 Пешеход":          "#6b7280",
@@ -16,39 +17,110 @@ const TIER_COLORS: Record<string, string> = {
   "👑 Владелец НПЗ":     "#db2777",
 };
 
+const RESULT_GLOW: Record<string, string> = {
+  mythic:    "#db2777",
+  legendary: "#f59e0b",
+  epic:      "#a855f7",
+  rare:      "#3b82f6",
+  cursed:    "#ef4444",
+  common:    "#6b7280",
+  blocked:   "#ef4444",
+};
+
 // ─── Card Flip Game ───────────────────────────────────────────────
 
-const RESULT_CONFIG: Record<string, { emoji: string; color: string; title: string }> = {
-  empty:   { emoji: "🛢️", color: "#6b7280", title: "Пустая цистерна" },
-  discount:{ emoji: "🎖️", color: "#eab308", title: "Приоритетный ордер" },
-  voucher: { emoji: "🏆", color: "#22c55e", title: "Внеочередной Талон!" },
-  blocked: { emoji: "⏰", color: "#ef4444", title: "Попытки исчерпаны" },
-};
+function CardTile({ card, delay }: { card: FlipCard; delay: number }) {
+  const [revealed, setRevealed] = useState(false);
+  const color = RARITY_COLORS[card.rarity] ?? "#6b7280";
+  const isPositive = card.xp >= 0;
+
+  useEffect(() => {
+    const t = setTimeout(() => setRevealed(true), delay);
+    return () => clearTimeout(t);
+  }, [delay]);
+
+  return (
+    <motion.div
+      initial={{ rotateY: 180, opacity: 0.3 }}
+      animate={revealed ? { rotateY: 0, opacity: 1 } : { rotateY: 180, opacity: 0.3 }}
+      transition={{ type: "spring", damping: 18, stiffness: 200 }}
+      style={{
+        background: revealed ? `${color}18` : "linear-gradient(135deg,#1e1e2a,#14141c)",
+        border: `1px solid ${revealed ? color + "55" : "#22222f"}`,
+        borderRadius: "12px",
+        padding: "0.55rem 0.35rem",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "0.25rem",
+        minHeight: "90px",
+        boxShadow: revealed ? `0 0 14px ${color}33` : "none",
+        transition: "box-shadow 0.4s",
+      }}
+    >
+      <span style={{ fontSize: "1.6rem", lineHeight: 1 }}>
+        {revealed ? card.emoji : "❓"}
+      </span>
+      {revealed && (
+        <>
+          <span style={{
+            fontSize: "0.58rem", color, fontWeight: 700, textAlign: "center",
+            lineHeight: 1.2, maxWidth: "90%",
+          }}>
+            {card.name}
+          </span>
+          <span style={{
+            fontSize: "0.65rem",
+            color: isPositive ? "#22c55e" : "#ef4444",
+            fontWeight: 800,
+            fontFamily: "'JetBrains Mono', monospace",
+          }}>
+            {isPositive ? "+" : ""}{card.xp.toLocaleString("ru")}
+          </span>
+          <span style={{
+            fontSize: "0.5rem", color,
+            background: `${color}22`,
+            borderRadius: "4px",
+            padding: "0.1rem 0.3rem",
+          }}>
+            {card.rarity}
+          </span>
+        </>
+      )}
+    </motion.div>
+  );
+}
 
 function FlipGame() {
   const { user, refresh } = useUserStore();
   const { setFlipResult, flipsRemaining, setFlipsRemaining } = useGameStore();
   const { add: toast } = useToast();
 
-  const [flipped, setFlipped] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<FlipResult | null>(null);
-  const [resultCard, setResultCard] = useState<number | null>(null);
+  const [played, setPlayed] = useState(false);
 
-  const handleFlip = async (idx: number) => {
-    if (!user || flipped.has(idx) || loading || flipsRemaining <= 0) return;
+  const hasAttempts = flipsRemaining > 0 && !played;
+  const glowColor = result ? RESULT_GLOW[result.result_type] ?? "#6b7280" : "#a855f7";
+
+  const handleDraw = async () => {
+    if (!user || loading || !hasAttempts) return;
     setLoading(true);
     try {
       const res = await flipCard(user.id);
-      const newFlipped = new Set(flipped);
-      newFlipped.add(idx);
-      setFlipped(newFlipped);
       setResult(res);
-      setResultCard(idx);
+      setPlayed(true);
       setFlipsRemaining(res.attempts_remaining);
       setFlipResult(res.result_type, res.attempts_remaining);
-      if (res.result_type !== "empty") {
-        toast(res.message, res.result_type === "blocked" ? "error" : "success");
+      const xp = res.total_xp_delta;
+      const sign = xp >= 0 ? "+" : "";
+      if (res.result_type === "mythic" || res.result_type === "legendary") {
+        toast(`🏆 ${res.message}`, "success");
+      } else if (res.result_type === "cursed") {
+        toast(`💀 ${sign}${xp.toLocaleString("ru")} XP`, "error");
+      } else {
+        toast(`🃏 Набор вскрыт: ${sign}${xp.toLocaleString("ru")} XP`, "success");
       }
       await refresh();
     } catch (e: unknown) {
@@ -58,98 +130,103 @@ function FlipGame() {
     }
   };
 
-  const cfg = result ? RESULT_CONFIG[result.result_type] ?? RESULT_CONFIG.empty : null;
-
   return (
     <div style={{ padding: "0 1rem 1.5rem" }}>
       <div style={{
-        background: "#14141c", border: "1px solid #22222f",
-        borderRadius: "16px", padding: "1rem",
+        background: "#14141c",
+        border: `1px solid ${result ? glowColor + "55" : "#22222f"}`,
+        borderRadius: "16px",
+        padding: "1rem",
+        boxShadow: result ? `0 0 24px ${glowColor}22` : "none",
+        transition: "border-color 0.5s, box-shadow 0.5s",
       }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.6rem" }}>
           <h3 style={{ margin: 0, color: "#e2e8f0", fontSize: "0.95rem", fontWeight: 700 }}>
             🃏 Бензиновое Таро...мда🤞
           </h3>
           <span style={{
-            background: flipsRemaining > 0 ? "#a855f722" : "#ef444422",
-            border: `1px solid ${flipsRemaining > 0 ? "#a855f744" : "#ef444444"}`,
-            color: flipsRemaining > 0 ? "#a855f7" : "#ef4444",
+            background: hasAttempts ? "#a855f722" : "#22222f",
+            border: `1px solid ${hasAttempts ? "#a855f744" : "#33333f"}`,
+            color: hasAttempts ? "#a855f7" : "#4b5563",
             borderRadius: "8px",
             padding: "0.2rem 0.5rem",
-            fontSize: "0.72rem",
+            fontSize: "0.7rem",
             fontWeight: 600,
           }}>
-            {flipsRemaining} попытка
+            {played ? "Сыграно" : "1 раз в сутки"}
           </span>
         </div>
-        <p style={{ color: "#6b7280", fontSize: "0.75rem", margin: "0 0 1rem" }}>
-          Переверните карту, чтобы узнать судьбу поставок. 1 попытка в сутки.
+
+        <p style={{ color: "#6b7280", fontSize: "0.73rem", margin: "0 0 0.75rem" }}>
+          Один бросок в сутки — 5 случайных карт из 200+. XP начисляется мгновенно.
         </p>
 
-        {/* 10 cards grid */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "0.4rem", marginBottom: "0.75rem" }}>
-          {Array.from({ length: 10 }, (_, i) => {
-            const isFlipped = flipped.has(i);
-            const isResult = resultCard === i;
-            const resCfg = isResult && result ? RESULT_CONFIG[result.result_type] : null;
-            return (
-              <motion.button
-                key={i}
-                whileTap={{ scale: 0.92 }}
-                animate={{ rotateY: isFlipped ? 180 : 0 }}
-                transition={{ type: "spring", damping: 15 }}
-                onClick={() => !isFlipped && handleFlip(i)}
-                disabled={isFlipped || flipsRemaining <= 0 || loading}
-                style={{
-                  aspectRatio: "3/4",
-                  background: isFlipped
-                    ? (resCfg ? `${resCfg.color}22` : "#0b0b0f")
-                    : "linear-gradient(135deg,#1e1e2a,#14141c)",
-                  border: `1px solid ${isFlipped && resCfg ? resCfg.color + "44" : "#22222f"}`,
-                  borderRadius: "10px",
-                  cursor: (!isFlipped && flipsRemaining > 0 && !loading) ? "pointer" : "default",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: isFlipped ? "1.5rem" : "1rem",
-                  transition: "background 0.3s",
-                }}
-              >
-                {isFlipped ? (resCfg?.emoji ?? "🛢️") : "❓"}
-              </motion.button>
-            );
-          })}
-        </div>
-
-        {/* Result banner */}
-        <AnimatePresence>
-          {result && cfg && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
+        {/* Card grid or result */}
+        {!result ? (
+          <div style={{ textAlign: "center", padding: "1.5rem 0" }}>
+            <motion.button
+              whileTap={{ scale: 0.93 }}
+              onClick={handleDraw}
+              disabled={!hasAttempts || loading}
               style={{
-                background: `${cfg.color}11`,
-                border: `1px solid ${cfg.color}44`,
+                background: (!hasAttempts || loading)
+                  ? "#22222f"
+                  : "linear-gradient(135deg,#a855f7,#db2777)",
+                color: (!hasAttempts || loading) ? "#4b5563" : "#fff",
+                border: "none",
+                borderRadius: "14px",
+                padding: "0.85rem 2.5rem",
+                fontSize: "0.95rem",
+                fontWeight: 700,
+                cursor: (!hasAttempts || loading) ? "not-allowed" : "pointer",
+                boxShadow: (!hasAttempts || loading) ? "none" : "0 0 20px #a855f755",
+              }}
+            >
+              {loading ? "🔀 Перемешиваю колоду…" : played ? "⏳ Завтра — новый розыгрыш" : "🃏 Вскрыть 5 карт"}
+            </motion.button>
+          </div>
+        ) : (
+          <>
+            {/* 5-card grid */}
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(5, 1fr)",
+              gap: "0.35rem",
+              marginBottom: "0.75rem",
+            }}>
+              {result.cards.map((card, i) => (
+                <CardTile key={i} card={card} delay={i * 200} />
+              ))}
+            </div>
+
+            {/* Result banner */}
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.2 }}
+              style={{
+                background: `${glowColor}11`,
+                border: `1px solid ${glowColor}44`,
                 borderRadius: "10px",
                 padding: "0.65rem",
                 textAlign: "center",
               }}
             >
-              <p style={{ margin: "0 0 0.2rem", color: cfg.color, fontWeight: 700, fontSize: "0.88rem" }}>
-                {cfg.emoji} {cfg.title}
+              <p style={{
+                margin: "0 0 0.2rem",
+                color: glowColor,
+                fontWeight: 700,
+                fontSize: "0.85rem",
+              }}>
+                {result.message}
               </p>
-              <p style={{ margin: 0, color: "#9ca3af", fontSize: "0.75rem" }}>{result.message}</p>
-              {result.reward && (
-                <p style={{
-                  margin: "0.4rem 0 0",
-                  fontFamily: "'JetBrains Mono', monospace",
-                  fontSize: "0.72rem", color: cfg.color,
-                  background: "#0b0b0f", borderRadius: "6px", padding: "0.3rem",
-                }}>
-                  {result.reward}
-                </p>
-              )}
+              <p style={{ margin: 0, color: "#9ca3af", fontSize: "0.7rem" }}>
+                Следующий розыгрыш — завтра после полуночи
+              </p>
             </motion.div>
-          )}
-        </AnimatePresence>
+          </>
+        )}
       </div>
     </div>
   );
@@ -194,6 +271,24 @@ function TapGame() {
     }, 1500);
   }, []);
 
+  const endGame = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (spawnRef.current) clearInterval(spawnRef.current);
+    setPhase("result");
+    setItems([]);
+    setTapScore(scoreRef.current);
+
+    if (user) {
+      submitTapScore(user.id, scoreRef.current, GAME_DURATION)
+        .then((res) => {
+          toast(`+${res.xp_earned} XP заработано!`, "success");
+          if (res.new_level) toast(`🏆 Новый уровень: ${res.level}!`, "success");
+          refresh();
+        })
+        .catch(() => {});
+    }
+  }, [user, setTapScore, toast, refresh]);
+
   const startGame = () => {
     scoreRef.current = 0;
     setScore(0);
@@ -213,24 +308,6 @@ function TapGame() {
 
     spawnRef.current = setInterval(spawnItem, 600);
   };
-
-  const endGame = useCallback(() => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (spawnRef.current) clearInterval(spawnRef.current);
-    setPhase("result");
-    setItems([]);
-    setTapScore(scoreRef.current);
-
-    if (user) {
-      submitTapScore(user.id, scoreRef.current, GAME_DURATION)
-        .then((res) => {
-          toast(`+${res.xp_earned} XP заработано!`, "success");
-          if (res.new_level) toast(`🏆 Новый уровень: ${res.level}!`, "success");
-          refresh();
-        })
-        .catch(() => {});
-    }
-  }, [user, setTapScore, toast, refresh]);
 
   const tapItem = (id: number, type: "pump" | "canister") => {
     setItems((prev) => prev.filter((i) => i.id !== id));

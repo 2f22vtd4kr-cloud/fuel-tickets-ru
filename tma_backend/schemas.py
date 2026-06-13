@@ -97,11 +97,20 @@ class PurchaseResultOut(BaseModel):
     transaction_id: Optional[str] = None
 
 
+class CardOut(BaseModel):
+    name: str
+    emoji: str
+    rarity: str
+    xp: int
+
+
 class FlipResultOut(BaseModel):
     result_type: str
     message: str
     reward: Optional[str] = None
     attempts_remaining: int
+    cards: List[CardOut] = []
+    total_xp_delta: int = 0
 
 
 class TapScoreIn(BaseModel):

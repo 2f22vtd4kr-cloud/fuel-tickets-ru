@@ -93,6 +93,34 @@ export const fetchUserSubscriptions = (userId: number) =>
 export const flipCard = (userId: number) =>
   req<FlipResult>(`/game/flip/${userId}`, { method: "POST" });
 
+export const createStarsInvoice = (
+  userId: number,
+  fuelType: string,
+  volume: number,
+  stationId: number,
+) =>
+  req<{ stars_amount: number; transaction_id: string; qr_hash: string }>(
+    "/catalog/stars-invoice",
+    {
+      method: "POST",
+      body: JSON.stringify({ user_id: userId, fuel_type: fuelType, volume, station_id: stationId }),
+    },
+  );
+
+export const createCryptoBotInvoice = (
+  userId: number,
+  fuelType: string,
+  volume: number,
+  stationId: number,
+) =>
+  req<{ checkout_url: string; transaction_id: string; qr_hash: string }>(
+    "/catalog/cryptobot-invoice",
+    {
+      method: "POST",
+      body: JSON.stringify({ user_id: userId, fuel_type: fuelType, volume, station_id: stationId }),
+    },
+  );
+
 export const submitTapScore = (
   userId: number,
   score: number,

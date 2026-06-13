@@ -13,11 +13,11 @@ from dotenv import load_dotenv
 from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup,
     KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, BotCommand,
-    InputFile, WebAppInfo,
+    InputFile, WebAppInfo, LabeledPrice,
 )
 from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler,
-    ContextTypes, MessageHandler, filters
+    ContextTypes, MessageHandler, PreCheckoutQueryHandler, filters
 )
 
 load_dotenv()
@@ -1740,6 +1740,48 @@ async def post_init(application: Application) -> None:
     logger.info("Фоновая задача очистки просроченных инвойсов запущена.")
 
 
+async def pre_checkout_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Always approve pre-checkout queries for Stars payments."""
+    query = update.pre_checkout_query
+    await query.answer(ok=True)
+
+
+async def successful_payment_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Issue a voucher after successful Stars payment."""
+    msg = update.message
+    if not msg or not msg.successful_payment:
+        return
+    payment = msg.successful_payment
+    chat_id = msg.chat_id
+    payload = payment.invoice_payload  # format: "stars_{fuel_type}_{volume}_{station_id}"
+    stars = payment.total_amount
+
+    try:
+        parts = payload.split("_")
+        fuel_type = parts[1] if len(parts) > 1 else "АИ-92"
+        volume = int(parts[2]) if len(parts) > 2 else 20
+    except Exception:
+        fuel_type = "АИ-92"
+        volume = 20
+
+    import secrets as _sec
+    qr = f"STARS-{_sec.token_hex(8).upper()}"
+    text = (
+        f"⭐ *Оплата {stars} Stars получена!*\n\n"
+        f"🛢 Топливо: {fuel_type}\n"
+        f"🔢 Объём: {volume} л\n\n"
+        f"📱 Ваш QR-ваучер:\n`{qr}`\n\n"
+        f"Предъявите код на кассе АЗС. Действителен 3 дня."
+    )
+    await msg.reply_text(text, parse_mode="Markdown")
+    if ADMIN_CHAT_ID:
+        await context.bot.send_message(
+            chat_id=ADMIN_CHAT_ID,
+            text=f"⭐ Stars оплата: {stars} Stars от chat_id={chat_id}\n{fuel_type} {volume}л\nQR: `{qr}`",
+            parse_mode="Markdown",
+        )
+
+
 def main() -> None:
     if not BOT_TOKEN:
         print("Ошибка: токен бота не задан.")
@@ -1759,6 +1801,8 @@ def main() -> None:
     app.add_handler(CommandHandler("subscriptions", subscriptions_cmd))
     app.add_handler(CallbackQueryHandler(menu_navigation))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    app.add_handler(PreCheckoutQueryHandler(pre_checkout_handler))
+    app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_handler))
 
     print("✅ Бот запущен (v5: госквота + платная доза + контролёр + /stats).")
     app.run_polling(drop_pending_updates=True)

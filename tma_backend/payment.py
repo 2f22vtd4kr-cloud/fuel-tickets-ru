@@ -1,8 +1,9 @@
 """
 Payment abstraction layer.
 
-MockPaymentProvider is always active and requires no external accounts.
-CryptoBotProvider activates when ENABLE_REAL_PAYMENTS=true and CRYPTO_BOT_TOKEN is set.
+MockPaymentProvider   — always active, no external calls.
+CryptoBotProvider     — real CryptoBot API (requires CRYPTO_BOT_TOKEN).
+StarsPaymentProvider  — Telegram Stars via bot (requires BOT_TOKEN).
 """
 
 import hashlib
@@ -10,12 +11,25 @@ import hmac
 import os
 import secrets
 import time
+import logging
+import asyncio
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional
 
+import httpx
+
+logger = logging.getLogger(__name__)
+
 SIGNING_SECRET = os.getenv("PAYMENT_SIGNING_SECRET", "tma_node_signing_key_dev_2026")
-ENABLE_REAL = os.getenv("ENABLE_REAL_PAYMENTS", "false").lower() == "true"
+CRYPTO_BOT_TOKEN = os.getenv("CRYPTO_BOT_TOKEN", "")
+CRYPTO_PAY_API = "https://pay.crypt.bot/api"
+
+FUEL_PRICES_RUB: dict[str, int] = {
+    "АИ-92": 47, "АИ-95": 52, "АИ-95+": 56,
+    "АИ-100": 68, "ДТ": 60, "ДТ+": 65, "Газ": 28,
+}
+USDT_RUB_RATE = 92.0
 
 
 @dataclass
@@ -24,6 +38,8 @@ class PaymentResult:
     transaction_id: str
     qr_hash: str
     checkout_url: Optional[str] = None
+    invoice_id: Optional[int] = None
+    stars_amount: Optional[int] = None
     error: Optional[str] = None
 
 
@@ -45,10 +61,7 @@ class PaymentProvider(ABC):
 
 
 class MockPaymentProvider(PaymentProvider):
-    """
-    Fully functional mock provider.
-    Generates real transaction hashes and QR passes with no external calls.
-    """
+    """Fully functional mock — no external calls."""
 
     def create_invoice(
         self,
@@ -63,10 +76,14 @@ class MockPaymentProvider(PaymentProvider):
 
 
 class CryptoBotProvider(PaymentProvider):
-    """Requires ENABLE_REAL_PAYMENTS=true and CRYPTO_BOT_TOKEN."""
+    """
+    Real CryptoBot invoice via https://pay.crypt.bot/api/createInvoice.
+    Requires CRYPTO_BOT_TOKEN secret.
+    """
 
-    def __init__(self):
-        self.token = os.getenv("CRYPTO_BOT_TOKEN", "")
+    def __init__(self) -> None:
+        self.token = CRYPTO_BOT_TOKEN
+        self.headers = {"Crypto-Pay-API-Token": self.token}
 
     def create_invoice(
         self,
@@ -75,19 +92,85 @@ class CryptoBotProvider(PaymentProvider):
         volume: int,
         price_rub: int,
     ) -> PaymentResult:
-        amount_usdt = round(price_rub / 92, 2)
-        tx_id = f"CB-{secrets.token_hex(10).upper()}"
+        amount_usdt = round(price_rub / USDT_RUB_RATE, 2)
         qr = generate_qr_hash(user_id, fuel_type, volume)
-        checkout_url = f"https://t.me/CryptoBot?start=invoice_{tx_id}"
+        description = f"Топливный ваучер {volume}л {fuel_type} — Топливный Узел"
+
+        try:
+            resp = httpx.post(
+                f"{CRYPTO_PAY_API}/createInvoice",
+                headers=self.headers,
+                json={
+                    "asset": "USDT",
+                    "amount": str(amount_usdt),
+                    "description": description,
+                    "payload": qr,
+                    "allow_comments": False,
+                    "allow_anonymous": False,
+                    "expires_in": 3600,
+                },
+                timeout=10,
+            )
+            data = resp.json()
+            if not data.get("ok"):
+                error_msg = data.get("error", {}).get("name", "CryptoBot error")
+                logger.error("CryptoBot createInvoice failed: %s", data)
+                tx_id = f"CB-ERR-{secrets.token_hex(6).upper()}"
+                return PaymentResult(
+                    ok=False, transaction_id=tx_id, qr_hash=qr,
+                    error=error_msg,
+                )
+            invoice = data["result"]
+            invoice_id = invoice.get("invoice_id", 0)
+            pay_url = invoice.get("pay_url", f"https://t.me/CryptoBot?start=invoice_{invoice_id}")
+            tx_id = f"CB-{invoice_id}"
+            return PaymentResult(
+                ok=True, transaction_id=tx_id, qr_hash=qr,
+                checkout_url=pay_url, invoice_id=invoice_id,
+            )
+        except Exception as exc:
+            logger.exception("CryptoBotProvider network error: %s", exc)
+            tx_id = f"CB-NET-{secrets.token_hex(6).upper()}"
+            return PaymentResult(
+                ok=False, transaction_id=tx_id, qr_hash=qr,
+                error=str(exc),
+            )
+
+
+class StarsPaymentProvider(PaymentProvider):
+    """
+    Creates a Telegram Stars invoice record.
+    The actual Stars invoice is sent by the bot; here we just compute
+    how many Stars are needed and return the metadata.
+    Stars price: 1 Star ≈ $0.02 USD ≈ 1.84 RUB (at ~92 RUB/USD).
+    We use ceil(price_rub / 1.84) stars, minimum 1.
+    """
+
+    STAR_RUB_RATE = 1.84  # 1 Star ≈ 1.84 RUB
+
+    def create_invoice(
+        self,
+        user_id: int,
+        fuel_type: str,
+        volume: int,
+        price_rub: int,
+    ) -> PaymentResult:
+        import math
+        stars = max(1, math.ceil(price_rub / self.STAR_RUB_RATE))
+        qr = generate_qr_hash(user_id, fuel_type, volume)
+        tx_id = f"STARS-{secrets.token_hex(8).upper()}"
         return PaymentResult(
             ok=True, transaction_id=tx_id, qr_hash=qr,
-            checkout_url=checkout_url,
+            stars_amount=stars,
         )
 
 
-def get_provider() -> PaymentProvider:
-    if ENABLE_REAL and os.getenv("CRYPTO_BOT_TOKEN"):
+def get_provider(method: str = "mock") -> PaymentProvider:
+    """Return the appropriate provider by method name."""
+    if method == "cryptobot" and CRYPTO_BOT_TOKEN:
         return CryptoBotProvider()
+    if method == "stars":
+        return StarsPaymentProvider()
     return MockPaymentProvider()
 
 

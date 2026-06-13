@@ -48,12 +48,31 @@ export interface PurchaseResult {
   transaction_id?: string;
 }
 
+export interface FlipCard {
+  name: string;
+  emoji: string;
+  rarity: string;
+  xp: number;
+}
+
 export interface FlipResult {
-  result_type: "empty" | "discount" | "voucher" | "blocked";
+  result_type: "common" | "rare" | "epic" | "legendary" | "mythic" | "cursed" | "blocked";
   message: string;
   reward?: string;
   attempts_remaining: number;
+  cards: FlipCard[];
+  total_xp_delta: number;
 }
+
+export const RARITY_COLORS: Record<string, string> = {
+  "Обычная":     "#6b7280",
+  "Необычная":   "#22c55e",
+  "Редкая":      "#3b82f6",
+  "Эпическая":   "#a855f7",
+  "Легендарная": "#f59e0b",
+  "Мифическая":  "#db2777",
+  "Проклятая":   "#ef4444",
+};
 
 export interface TapScoreResult {
   xp_earned: number;

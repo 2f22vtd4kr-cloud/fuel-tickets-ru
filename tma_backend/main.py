@@ -24,9 +24,10 @@ from tma_backend.models import (
     AnalyticsSnapshot, DailyLimitTracker, FuelStatus, GasStation,
     PurchaseHistory, StationReport, Subscription, User,
 )
+from tma_backend.cards import draw_cards, RARITY_COLORS
 from tma_backend.payment import provider
 from tma_backend.schemas import (
-    AnalyticsOut, FlipResultOut, GasStationOut, PurchaseIn,
+    AnalyticsOut, CardOut, FlipResultOut, GasStationOut, PurchaseIn,
     PurchaseResultOut, StationReportIn, SubscriptionIn, SubscriptionOut,
     SubscriptionStatusOut, TapScoreIn, TapScoreOut, UserCreateIn, UserOut,
 )
@@ -479,14 +480,16 @@ def purchase_voucher(body: PurchaseIn, db: Session = Depends(get_db)):
     price_per_l = FUEL_PRICES_RUB.get(body.fuel_type, 50)
     total_price = price_per_l * body.volume
 
-    result = provider.create_invoice(
+    from tma_backend.payment import get_provider
+    pay_provider = get_provider(body.payment_method)
+    result = pay_provider.create_invoice(
         user_id=body.user_id,
         fuel_type=body.fuel_type,
         volume=body.volume,
         price_rub=total_price,
     )
     if not result.ok:
-        raise HTTPException(500, detail="Ошибка платёжного шлюза")
+        raise HTTPException(500, detail=result.error or "Ошибка платёжного шлюза")
 
     purchase = PurchaseHistory(
         user_id=body.user_id,
@@ -546,6 +549,66 @@ def purchase_voucher(body: PurchaseIn, db: Session = Depends(get_db)):
             "created_at": purchase.created_at,
         },
     )
+
+
+@app.post("/api/catalog/stars-invoice")
+def create_stars_invoice(body: PurchaseIn, db: Session = Depends(get_db)):
+    """Return Stars count needed; actual payment handled by Telegram bot."""
+    station = db.query(GasStation).filter(GasStation.id == body.station_id).first()
+    if not station:
+        raise HTTPException(404, detail="Станция не найдена")
+    price_per_l = FUEL_PRICES_RUB.get(body.fuel_type, 50)
+    total_price = price_per_l * body.volume
+    from tma_backend.payment import get_provider
+    result = get_provider("stars").create_invoice(
+        user_id=body.user_id, fuel_type=body.fuel_type,
+        volume=body.volume, price_rub=total_price,
+    )
+    return {
+        "stars_amount": result.stars_amount,
+        "transaction_id": result.transaction_id,
+        "qr_hash": result.qr_hash,
+        "price_rub": total_price,
+    }
+
+
+@app.post("/api/catalog/cryptobot-invoice")
+def create_cryptobot_invoice(body: PurchaseIn, db: Session = Depends(get_db)):
+    """Create a real CryptoBot invoice and return the pay URL."""
+    station = db.query(GasStation).filter(GasStation.id == body.station_id).first()
+    if not station:
+        raise HTTPException(404, detail="Станция не найдена")
+    price_per_l = FUEL_PRICES_RUB.get(body.fuel_type, 50)
+    total_price = price_per_l * body.volume
+    from tma_backend.payment import get_provider
+    result = get_provider("cryptobot").create_invoice(
+        user_id=body.user_id, fuel_type=body.fuel_type,
+        volume=body.volume, price_rub=total_price,
+    )
+    if not result.ok:
+        raise HTTPException(502, detail=result.error or "CryptoBot error")
+
+    # Pre-record purchase as "pending" until webhook confirms
+    _get_or_create_user(db, body.user_id)
+    purchase = PurchaseHistory(
+        user_id=body.user_id,
+        fuel_type=body.fuel_type,
+        volume=body.volume,
+        price=total_price,
+        currency="USDT",
+        status="pending",
+        qr_hash=result.qr_hash,
+        station_name=station.name,
+        region=station.region,
+        expires_at=_now() + timedelta(hours=1),
+    )
+    db.add(purchase)
+    db.commit()
+    return {
+        "checkout_url": result.checkout_url,
+        "transaction_id": result.transaction_id,
+        "qr_hash": result.qr_hash,
+    }
 
 
 @app.get("/api/catalog/limits/{user_id}")
@@ -609,7 +672,8 @@ def get_vault(user_id: int, db: Session = Depends(get_db)):
 #  Games
 # ──────────────────────────────────────────────────────────────────
 
-MAX_FLIPS_PER_DAY = 1
+MAX_FLIPS_PER_DAY = 5
+
 
 @app.post("/api/game/flip/{user_id}", response_model=FlipResultOut)
 def flip_card(user_id: int, db: Session = Depends(get_db)):
@@ -632,59 +696,61 @@ def flip_card(user_id: int, db: Session = Depends(get_db)):
     if user.flip_attempts_today >= MAX_FLIPS_PER_DAY:
         return FlipResultOut(
             result_type="blocked",
-            message="Попытки исчерпаны. Возвращайтесь завтра за новым шансом!",
+            message="Все 5 карт открыты. Возвращайтесь завтра за новым набором!",
             reward=None,
             attempts_remaining=0,
+            cards=[],
+            total_xp_delta=0,
         )
 
-    user.flip_attempts_today += 1
+    # Draw 5 cards at once on first flip of the day; subsequent flips blocked
+    # Actually: one session = draw all 5 cards at once (one call opens all 5)
+    cards = draw_cards(5)
+    total_xp = sum(c.xp for c in cards)
+
+    user.flip_attempts_today = MAX_FLIPS_PER_DAY  # consume all attempts at once
     user.daily_games_played += 1
     user.last_game_timestamp = now
 
-    # 65% empty / 25% discount / 10% free voucher
-    roll = random.random()
-    if roll < 0.65:
-        result_type = "empty"
-        message = "🛢️ Пустая цистерна. Попробуйте завтра — удача переменчива!"
-        reward = None
-        user.xp += 2
-    elif roll < 0.90:
-        result_type = "discount"
-        discount_code = f"DISC-{secrets.token_hex(4).upper()}"
-        message = f"🎖️ Приоритетный ордер! Скидка 5% на следующую покупку."
-        reward = discount_code
-        user.xp += 15
-    else:
-        result_type = "voucher"
-        qr = f"FREE-{secrets.token_hex(6).upper()}"
-        # Issue a free 20L voucher bypassing daily limits
-        free_purchase = PurchaseHistory(
-            user_id=user_id,
-            fuel_type="АИ-92",
-            volume=20,
-            price=0,
-            currency="RUB",
-            status="active",
-            qr_hash=qr,
-            station_name="Любая АЗС сети",
-            region="Любой регион",
-            expires_at=now + timedelta(days=7),
-        )
-        db.add(free_purchase)
-        message = "🏆 Внеочередной Талон! Бесплатные 20 литров топлива без лимитов!"
-        reward = qr
-        user.xp += 50
-
+    old_xp = user.xp
+    user.xp = max(0, user.xp + total_xp)
     user.level = _xp_to_level(user.xp)
     db.commit()
 
-    attempts_remaining = max(0, MAX_FLIPS_PER_DAY - user.flip_attempts_today)
-    db.refresh(user)
+    best = max(cards, key=lambda c: c.xp)
+    has_mythic    = any(c.rarity == "Мифическая"  for c in cards)
+    has_legendary = any(c.rarity == "Легендарная" for c in cards)
+    has_epic      = any(c.rarity == "Эпическая"   for c in cards)
+    has_cursed    = any(c.rarity == "Проклятая"   for c in cards)
+    net_sign      = "+" if total_xp >= 0 else ""
+
+    if has_mythic:
+        result_type = "mythic"
+        message = f"🌐 МИФИЧЕСКАЯ КАРТА! Вы получили: {best.name}! {net_sign}{total_xp:,} XP"
+    elif has_legendary:
+        result_type = "legendary"
+        message = f"🏆 ЛЕГЕНДАРНАЯ! {best.name} у вас в руках! {net_sign}{total_xp:,} XP"
+    elif has_epic:
+        result_type = "epic"
+        message = f"💜 Эпический розыгрыш! {best.name} — {net_sign}{total_xp:,} XP"
+    elif has_cursed and total_xp < 0:
+        result_type = "cursed"
+        message = f"💀 Проклятая карта! {best.name} — {total_xp:,} XP"
+    elif total_xp >= 5000:
+        result_type = "rare"
+        message = f"💎 Редкая удача! {best.name} — {net_sign}{total_xp:,} XP"
+    else:
+        result_type = "common"
+        message = f"🃏 Набор вскрыт. Итог: {net_sign}{total_xp:,} XP"
+
+    attempts_remaining = 0
     return FlipResultOut(
         result_type=result_type,
         message=message,
-        reward=reward,
+        reward=None,
         attempts_remaining=attempts_remaining,
+        cards=[CardOut(name=c.name, emoji=c.emoji, rarity=c.rarity, xp=c.xp) for c in cards],
+        total_xp_delta=total_xp,
     )
 
 

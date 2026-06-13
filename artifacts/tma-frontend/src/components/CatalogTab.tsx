@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { purchaseVoucher, fetchLimits } from "@/api/client";
+import { purchaseVoucher, fetchLimits, createStarsInvoice, createCryptoBotInvoice } from "@/api/client";
 import { useUserStore } from "@/stores/useUserStore";
 import { useStationStore } from "@/stores/useStationStore";
 import { useVaultStore } from "@/stores/useVaultStore";
@@ -13,6 +13,9 @@ const FUEL_PRICES: Record<string, number> = {
   "АИ-100": 68, "ДТ": 60, "ДТ+": 65, "Газ": 28,
 };
 const VOLUMES = [20, 40, 60];
+const STAR_RUB_RATE = 1.84;
+
+type PayMethod = "mock" | "stars" | "cryptobot";
 
 function BlockOverlay({ reason, onClose }: { reason: string; onClose: () => void }) {
   return (
@@ -63,18 +66,52 @@ function BlockOverlay({ reason, onClose }: { reason: string; onClose: () => void
   );
 }
 
+function PaymentMethodSelector({ value, onChange }: { value: PayMethod; onChange: (m: PayMethod) => void }) {
+  const methods: { id: PayMethod; label: string; emoji: string; color: string }[] = [
+    { id: "mock",      label: "Тест",     emoji: "🧪", color: "#6b7280" },
+    { id: "stars",     label: "Stars",    emoji: "⭐", color: "#f59e0b" },
+    { id: "cryptobot", label: "Crypto",   emoji: "💎", color: "#3b82f6" },
+  ];
+  return (
+    <div style={{ display: "flex", gap: "0.4rem", marginBottom: "0.6rem" }}>
+      {methods.map((m) => (
+        <button
+          key={m.id}
+          onClick={() => onChange(m.id)}
+          style={{
+            flex: 1,
+            padding: "0.4rem 0.3rem",
+            border: `1px solid ${value === m.id ? m.color : "#22222f"}`,
+            borderRadius: "8px",
+            background: value === m.id ? `${m.color}22` : "#0b0b0f",
+            color: value === m.id ? m.color : "#6b7280",
+            fontSize: "0.72rem",
+            fontWeight: value === m.id ? 700 : 400,
+            cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: "0.25rem",
+          }}
+        >
+          {m.emoji} {m.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function FuelItem({
   fuelType,
   station,
   limits,
   userId,
+  payMethod,
   onBuy,
 }: {
   fuelType: string;
   station: GasStation;
   limits: LimitsMap | null;
   userId: number;
-  onBuy: (fuelType: string, volume: number) => Promise<void>;
+  payMethod: PayMethod;
+  onBuy: (fuelType: string, volume: number, payMethod: PayMethod) => Promise<void>;
 }) {
   const [volume, setVolume] = useState(20);
   const [buying, setBuying] = useState(false);
@@ -94,20 +131,24 @@ function FuelItem({
     ? "#22c55e"
     : "#eab308";
 
-  const doVolume = (delta: number) => {
-    const idx = VOLUMES.indexOf(volume);
-    const next = VOLUMES[Math.max(0, Math.min(VOLUMES.length - 1, idx + delta))];
-    if (next !== undefined) setVolume(next);
-  };
+  const starsAmount = Math.ceil(totalPrice / STAR_RUB_RATE);
 
   const handleBuy = async () => {
     if (buying || !withinLimit || !available) return;
     setBuying(true);
     try {
-      await onBuy(fuelType, volume);
+      await onBuy(fuelType, volume, payMethod);
     } finally {
       setBuying(false);
     }
+  };
+
+  const btnLabel = () => {
+    if (!available) return "Нет в наличии";
+    if (!withinLimit) return "Лимит исчерпан";
+    if (payMethod === "stars") return `⭐ ${starsAmount.toLocaleString("ru")} Stars`;
+    if (payMethod === "cryptobot") return `💎 ${(totalPrice / 92).toFixed(2)} USDT`;
+    return `⛽ ${totalPrice.toLocaleString("ru")} ₽`;
   };
 
   return (
@@ -141,7 +182,6 @@ function FuelItem({
         </span>
       </div>
 
-      {/* Limit info */}
       {limit && (
         <div style={{ marginBottom: "0.6rem" }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.2rem" }}>
@@ -161,7 +201,6 @@ function FuelItem({
         </div>
       )}
 
-      {/* Volume selector */}
       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.6rem" }}>
         {VOLUMES.map((v) => (
           <button
@@ -186,12 +225,11 @@ function FuelItem({
       </div>
 
       {!withinLimit && (
-        <p style={{ color: "#eab308", fontSize: "0.72rem", margin: "0 0 0.5rem", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+        <p style={{ color: "#eab308", fontSize: "0.72rem", margin: "0 0 0.5rem" }}>
           ⚠️ Превышен суточный лимит отпуска для данного региона.
         </p>
       )}
 
-      {/* Buy button */}
       <button
         disabled={buying || !withinLimit || !available}
         onClick={handleBuy}
@@ -208,22 +246,16 @@ function FuelItem({
           display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem",
         }}
       >
-        {buying ? (
-          <span style={{ animation: "spin 1s linear infinite", display: "inline-block" }}>⟳</span>
-        ) : !available ? (
-          "Нет в наличии"
-        ) : !withinLimit ? (
-          "Лимит исчерпан"
-        ) : (
-          <>⛽ Купить ваучер — {totalPrice.toLocaleString("ru")} ₽</>
-        )}
+        {buying
+          ? <span style={{ animation: "spin 1s linear infinite", display: "inline-block" }}>⟳</span>
+          : btnLabel()
+        }
       </button>
     </motion.div>
   );
 }
 
 interface CatalogTabProps {
-  /** Station to pre-select (from deep-link startParam) */
   initialStationId?: number;
 }
 
@@ -234,23 +266,17 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
   const { add: toast } = useToast();
 
   const [selectedStation, setSelectedStation] = useState<GasStation | null>(null);
+  const [limits, setLimits] = useState<LimitsMap | null>(null);
+  const [blockReason, setBlockReason] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [payMethod, setPayMethod] = useState<PayMethod>("mock");
 
-  // Honor deep-link pre-selection once stations are available
   useEffect(() => {
     if (initialStationId && stations.length > 0 && !selectedStation) {
       const found = stations.find((s) => s.id === initialStationId) ?? null;
       if (found) setSelectedStation(found);
     }
   }, [initialStationId, stations, selectedStation]);
-  const [limits, setLimits] = useState<LimitsMap | null>(null);
-  const [blockReason, setBlockReason] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-
-  const filteredStations = stations.filter((s) =>
-    s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.region.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.network.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   useEffect(() => {
     if (!user || !selectedStation) return;
@@ -259,8 +285,44 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
       .catch(() => {});
   }, [user, selectedStation]);
 
-  const handleBuy = async (fuelType: string, volume: number) => {
+  const filteredStations = stations.filter((s) =>
+    s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    s.region.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    s.network.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleBuy = async (fuelType: string, volume: number, method: PayMethod) => {
     if (!user || !selectedStation) return;
+
+    if (method === "stars") {
+      try {
+        const inv = await createStarsInvoice(user.id, fuelType, volume, selectedStation.id);
+        const tg = (window as unknown as { Telegram?: { WebApp?: { openInvoice?: (url: string) => void } } }).Telegram?.WebApp;
+        if (tg?.openInvoice) {
+          toast(`⭐ Оплата: ${inv.stars_amount} Stars`, "success");
+        } else {
+          toast(`⭐ Требуется ${inv.stars_amount} Stars (открой через Telegram)`, "success");
+        }
+      } catch (e: unknown) {
+        toast(String(e), "error");
+      }
+      return;
+    }
+
+    if (method === "cryptobot") {
+      try {
+        const inv = await createCryptoBotInvoice(user.id, fuelType, volume, selectedStation.id);
+        if (inv.checkout_url) {
+          window.open(inv.checkout_url, "_blank");
+          toast("💎 Оплата через CryptoBot открыта", "success");
+        }
+      } catch (e: unknown) {
+        toast(String(e), "error");
+      }
+      return;
+    }
+
+    // Default mock purchase
     try {
       const result = await purchaseVoucher(user.id, fuelType, volume, selectedStation.id);
       if (result.blocked) {
@@ -270,7 +332,6 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
       if (result.purchase) {
         addPurchase(result.purchase);
         toast(`✓ Ваучер получен! QR: ${result.purchase.qr_hash.slice(0, 12)}…`, "success");
-        // refresh limits
         fetchLimits(user.id, selectedStation.zone_type).then(setLimits).catch(() => {});
       }
     } catch (e: unknown) {
@@ -292,7 +353,6 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
         )}
       </AnimatePresence>
 
-      {/* Header */}
       <div style={{ padding: "1rem 1rem 0.5rem" }}>
         <h2 style={{ margin: "0 0 0.2rem", color: "#e2e8f0", fontSize: "1.1rem", fontWeight: 700 }}>
           ⛽ Каталог топлива
@@ -302,7 +362,6 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
         </p>
       </div>
 
-      {/* Search */}
       <div style={{ padding: "0.5rem 1rem" }}>
         <input
           value={searchQuery}
@@ -319,7 +378,6 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
       </div>
 
       {!selectedStation ? (
-        /* Station list */
         <div style={{ padding: "0 1rem" }}>
           {filteredStations.slice(0, 50).map((s) => {
             const hasFuel = s.fuel_statuses.some((f) => f.availability_pct > 0);
@@ -371,7 +429,6 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
           })}
         </div>
       ) : (
-        /* Fuel catalog for selected station */
         <div style={{ padding: "0 1rem" }}>
           <button
             onClick={() => { setSelectedStation(null); setLimits(null); }}
@@ -400,6 +457,49 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
             </p>
           </div>
 
+          {/* Payment method selector */}
+          <div style={{ marginBottom: "0.25rem" }}>
+            <p style={{ color: "#6b7280", fontSize: "0.68rem", margin: "0 0 0.35rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              Способ оплаты
+            </p>
+            <PaymentMethodSelector value={payMethod} onChange={setPayMethod} />
+          </div>
+
+          {payMethod === "stars" && (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{
+                background: "#f59e0b11",
+                border: "1px solid #f59e0b33",
+                borderRadius: "10px",
+                padding: "0.5rem 0.75rem",
+                marginBottom: "0.75rem",
+                fontSize: "0.72rem",
+                color: "#f59e0b",
+              }}
+            >
+              ⭐ Оплата через Telegram Stars — нажмите кнопку, откроется платёж в Telegram
+            </motion.div>
+          )}
+          {payMethod === "cryptobot" && (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{
+                background: "#3b82f611",
+                border: "1px solid #3b82f633",
+                borderRadius: "10px",
+                padding: "0.5rem 0.75rem",
+                marginBottom: "0.75rem",
+                fontSize: "0.72rem",
+                color: "#3b82f6",
+              }}
+            >
+              💎 Оплата USDT через @CryptoBot — откроется в новой вкладке
+            </motion.div>
+          )}
+
           {selectedStation.fuel_statuses.length === 0 ? (
             <p style={{ color: "#6b7280", textAlign: "center", padding: "2rem 0" }}>
               Нет данных по топливу на этой АЗС
@@ -412,6 +512,7 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
                 station={selectedStation}
                 limits={limits}
                 userId={user.id}
+                payMethod={payMethod}
                 onBuy={handleBuy}
               />
             ))
