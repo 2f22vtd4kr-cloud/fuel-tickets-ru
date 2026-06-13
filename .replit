@@ -2,7 +2,7 @@ modules = ["nodejs-20", "python-3.12", "web"]
 
 [deployment]
 router = "application"
-deploymentTarget = "cloudrun"
+deploymentTarget = "vm"
 run = ["python", "main.py"]
 build = ["bash", "-c", "pnpm --filter @workspace/tma-frontend run build"]
 
@@ -116,6 +116,9 @@ externalPort = 3001
 [userenv]
 
 [userenv.shared]
+
+[userenv.production]
+TMA_PORT = "8080"
 
 [nix]
 channel = "stable-25_05"

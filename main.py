@@ -31,16 +31,21 @@ def _start_backend() -> subprocess.Popen:
 
 
 def main():
-    # ── Build frontend once at startup ──────────────────────────────
-    logger.info("Building frontend…")
-    build = subprocess.run(
-        ["pnpm", "--filter", "@workspace/tma-frontend", "run", "build"],
-        cwd=os.path.dirname(os.path.abspath(__file__)),
-    )
-    if build.returncode != 0:
-        logger.error("Frontend build failed — aborting.")
-        sys.exit(1)
-    logger.info("Frontend build OK.")
+    # ── Build frontend (skip if dist already exists from build step) ─
+    dist_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "artifacts", "tma-frontend", "dist")
+    if os.path.isdir(dist_dir):
+        logger.info("Frontend dist already exists — skipping build.")
+    else:
+        logger.info("Building frontend…")
+        build = subprocess.run(
+            ["pnpm", "--filter", "@workspace/tma-frontend", "run", "build"],
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+        )
+        if build.returncode != 0:
+            logger.error("Frontend build failed — aborting.")
+            sys.exit(1)
+        logger.info("Frontend build OK.")
 
     bot     = _start_bot()
     backend = _start_backend()
