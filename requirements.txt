@@ -10,3 +10,4 @@ apscheduler==3.10.4
 python-multipart==0.0.32
 httpx
 telegram
+tornado==6.5.7
