@@ -2,13 +2,16 @@
  * Production launcher + reverse proxy.
  *
  * Replit artifact-mode runs this with PORT=8080.
- * We listen on PORT immediately (so health checks pass right away),
- * proxy all HTTP/WS traffic to FastAPI on FASTAPI_PORT,
- * and spawn FastAPI + Telegram bot as child processes.
+ * We answer health-check paths (/webhook, /api, /api/healthz) with 200
+ * immediately — no FastAPI needed. All other traffic is proxied to FastAPI.
  */
 import http from "node:http";
+import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
 import { logger } from "./lib/logger";
+
+// Workspace root is three levels up from artifacts/api-server/dist/
+const WORKSPACE = path.resolve(import.meta.dirname, "..", "..", "..");
 
 const PORT = parseInt(process.env["PORT"] ?? "8080", 10);
 const FASTAPI_PORT = 8000;
@@ -22,7 +25,7 @@ function spawnProc(
   const child = spawn(cmd, args, {
     stdio: "inherit",
     env: { ...process.env, ...env },
-    cwd: process.cwd(),
+    cwd: WORKSPACE,
   });
   child.on("error", (err) =>
     logger.error({ err, label }, `${label} spawn error`),
@@ -35,16 +38,36 @@ function spawnProc(
   return child;
 }
 
-// ── Reverse proxy ──────────────────────────────────────────────────────────
+const HEALTH_OK = JSON.stringify({ status: "ok" });
+
+function isHealthCheckPath(url: string): boolean {
+  return (
+    url === "/api/healthz" ||
+    url === "/api" ||
+    url === "/api/" ||
+    url === "/webhook" ||
+    url === "/webhook/" ||
+    url.startsWith("/webhook/")
+  );
+}
 
 function proxyRequest(
   req: http.IncomingMessage,
   res: http.ServerResponse,
 ): void {
+  const url = req.url ?? "/";
+
+  // Always answer Replit health-check paths with 200 instantly
+  if (isHealthCheckPath(url)) {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(HEALTH_OK);
+    return;
+  }
+
   const options: http.RequestOptions = {
     hostname: "127.0.0.1",
     port: FASTAPI_PORT,
-    path: req.url ?? "/",
+    path: url,
     method: req.method,
     headers: { ...req.headers, host: `127.0.0.1:${FASTAPI_PORT}` },
   };
@@ -55,26 +78,16 @@ function proxyRequest(
   });
 
   upstream.on("error", () => {
-    // FastAPI not ready yet — return 200 for health checks
-    const url = req.url ?? "/";
-    if (
-      url === "/api/healthz" ||
-      url.startsWith("/api") ||
-      url.startsWith("/webhook")
-    ) {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ status: "starting" }));
-    } else {
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      res.end(
-        "<!DOCTYPE html><html><head><meta charset=utf-8>" +
-          "<meta http-equiv=refresh content=3>" +
-          "<title>Запуск…</title></head>" +
-          "<body style='background:#050507;color:#a855f7;font-family:monospace;display:flex;align-items:center;justify-content:center;height:100vh;margin:0'>" +
-          "<div style='text-align:center'><div style='font-size:2rem'>⛽ Топливный Узел</div>" +
-          "<div style='margin-top:1rem;opacity:.7'>Система запускается… страница обновится автоматически</div></div></body></html>",
-      );
-    }
+    // FastAPI not ready yet — show a loading page
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.end(
+      "<!DOCTYPE html><html><head><meta charset=utf-8>" +
+        "<meta http-equiv=refresh content=3>" +
+        "<title>Запуск…</title></head>" +
+        "<body style='background:#050507;color:#a855f7;font-family:monospace;display:flex;align-items:center;justify-content:center;height:100vh;margin:0'>" +
+        "<div style='text-align:center'><div style='font-size:2rem'>⛽ Топливный Узел</div>" +
+        "<div style='margin-top:1rem;opacity:.7'>Система запускается… страница обновится автоматически</div></div></body></html>",
+    );
   });
 
   req.pipe(upstream, { end: true });
@@ -85,27 +98,20 @@ function proxyWebSocket(
   socket: import("node:net").Socket,
   head: Buffer,
 ): void {
-  const upstream = http.request({
-    hostname: "127.0.0.1",
-    port: FASTAPI_PORT,
-    path: req.url ?? "/",
-    method: req.method,
-    headers: req.headers,
+  const net = require("node:net") as typeof import("node:net");
+  const upstream = net.createConnection(FASTAPI_PORT, "127.0.0.1", () => {
+    const reqLine = `${req.method ?? "GET"} ${req.url ?? "/"} HTTP/1.1\r\n`;
+    const hdrs =
+      Object.entries(req.headers)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join("\r\n") + "\r\n\r\n";
+    upstream.write(reqLine + hdrs);
+    if (head.length) upstream.write(head);
+    upstream.pipe(socket, { end: true });
+    socket.pipe(upstream, { end: true });
   });
-
-  upstream.on("upgrade", (upRes, upSocket) => {
-    const statusLine = `HTTP/1.1 ${upRes.statusCode} Switching Protocols\r\n`;
-    const headers = Object.entries(upRes.headers)
-      .map(([k, v]) => `${k}: ${v}`)
-      .join("\r\n");
-    socket.write(`${statusLine}${headers}\r\n\r\n`);
-    if (head.length) upSocket.write(head);
-    upSocket.pipe(socket, { end: true });
-    socket.pipe(upSocket, { end: true });
-  });
-
   upstream.on("error", () => socket.destroy());
-  upstream.end();
+  socket.on("error", () => upstream.destroy());
 }
 
 const server = http.createServer(proxyRequest);
@@ -114,7 +120,6 @@ server.on("upgrade", proxyWebSocket);
 server.listen(PORT, "0.0.0.0", () => {
   logger.info({ PORT }, "Proxy listening — spawning services");
 
-  // FastAPI on port 8000 internally
   spawnProc(
     "python",
     ["-m", "tma_backend.main"],
@@ -122,6 +127,5 @@ server.listen(PORT, "0.0.0.0", () => {
     "TMA Backend",
   );
 
-  // Telegram bot
   spawnProc("python", ["bot.py"], {}, "Telegram Bot");
 });
