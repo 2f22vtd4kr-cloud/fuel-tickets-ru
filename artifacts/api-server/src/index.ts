@@ -93,6 +93,28 @@ function proxyToFastAPI(req: http.IncomingMessage, res: http.ServerResponse): vo
   req.pipe(upstream, { end: true });
 }
 
+const BOT_WEBHOOK_PORT = 8001;
+
+// ── Proxy to local bot webhook server ────────────────────────────────────────
+function proxyToBot(req: http.IncomingMessage, res: http.ServerResponse): void {
+  const options: http.RequestOptions = {
+    hostname: "127.0.0.1",
+    port: BOT_WEBHOOK_PORT,
+    path: req.url ?? "/",
+    method: req.method,
+    headers: { ...req.headers, host: `127.0.0.1:${BOT_WEBHOOK_PORT}` },
+  };
+  const upstream = http.request(options, (upRes) => {
+    res.writeHead(upRes.statusCode ?? 200, upRes.headers);
+    upRes.pipe(res, { end: true });
+  });
+  upstream.on("error", () => {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ ok: true }));
+  });
+  req.pipe(upstream, { end: true });
+}
+
 // ── Request router ────────────────────────────────────────────────────────────
 function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
   const url = req.url ?? "/";
@@ -101,6 +123,12 @@ function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): voi
   if (url === "/api/healthz" || url === "/webhook" || url === "/api" || url === "/api/") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ status: "ok" }));
+    return;
+  }
+
+  // Telegram webhook — proxy to bot's local webhook server (port 8001)
+  if (url === "/telegram-webhook" || url.startsWith("/telegram-webhook/")) {
+    proxyToBot(req, res);
     return;
   }
 

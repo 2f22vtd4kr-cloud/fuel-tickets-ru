@@ -123,6 +123,7 @@ externalPort = 8099
 
 [userenv.production]
 TMA_PORT = "8080"
+WEBHOOK_URL = "https://fuel-tickets-ru--alioshavelychko.replit.app"
 
 [nix]
 channel = "stable-25_05"

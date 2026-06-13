@@ -2169,7 +2169,23 @@ def main() -> None:
     app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_handler))
 
     print("✅ Бот запущен (v6: VPN + /mystats + /refer + /broadcast + daily checkin).")
-    app.run_polling(drop_pending_updates=True)
+
+    webhook_url = os.getenv("WEBHOOK_URL", "").rstrip("/")
+    if webhook_url:
+        # Production: webhook mode — Telegram POSTs updates to our server.
+        # Express proxies POST /telegram-webhook → localhost:8001.
+        # This eliminates 409 conflicts and works correctly on autoscale.
+        print(f"🔗 Webhook mode: {webhook_url}/telegram-webhook")
+        app.run_webhook(
+            listen="127.0.0.1",
+            port=8001,
+            url_path="/telegram-webhook",
+            webhook_url=f"{webhook_url}/telegram-webhook",
+            drop_pending_updates=True,
+        )
+    else:
+        # Development: polling mode (no WEBHOOK_URL set)
+        app.run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":
