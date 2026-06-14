@@ -164,7 +164,7 @@ export interface SubscriptionStatus {
   subscription_id?: number;
 }
 
-export type TabId = "map" | "analytics" | "catalog" | "vault" | "reserve";
+export type TabId = "map" | "analytics" | "catalog" | "vault" | "reserve" | "empire";
 
 export const FUEL_LABELS: Record<string, string> = {
   "АИ-92": "АИ-92",

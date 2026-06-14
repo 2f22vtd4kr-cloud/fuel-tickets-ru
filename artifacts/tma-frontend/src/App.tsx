@@ -22,6 +22,7 @@ import { AnalyticsTab } from "@/components/AnalyticsTab";
 import { CatalogTab } from "@/components/CatalogTab";
 import { VaultTab } from "@/components/VaultTab";
 import { ReserveTab } from "@/components/ReserveTab";
+import { EmpireGame } from "@/components/EmpireGame";
 import { VpnModal } from "@/components/VpnModal";
 import { MarketTicker } from "@/components/MarketTicker";
 import { IntroSplash } from "@/components/IntroSplash";
@@ -238,7 +239,7 @@ export default function App() {
     }
   };
 
-  const tabOrder: TabId[] = ["map", "analytics", "catalog", "vault", "reserve"];
+  const tabOrder: TabId[] = ["map", "analytics", "catalog", "vault", "reserve", "empire"];
   const tabIndexRef = useRef(0);
   const prevTabIndex = tabIndexRef.current;
   const curTabIndex = tabOrder.indexOf(activeTab);
@@ -382,6 +383,7 @@ export default function App() {
               {activeTab === "catalog" && <CatalogTab initialStationId={initialStationId} />}
               {activeTab === "vault" && <VaultTab initialPurchaseId={initialPurchaseId} />}
               {activeTab === "reserve" && <ReserveTab />}
+              {activeTab === "empire" && <EmpireGame />}
             </motion.div>
           )}
         </AnimatePresence>

@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { impact } from "@/lib/haptic";
 import type { TabId } from "@/types";
-import { Map, BarChart2, ShoppingCart, Lock, Sparkles } from "lucide-react";
+import { Map, BarChart2, ShoppingCart, Lock, Sparkles, Crown } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 interface Props {
@@ -12,11 +12,12 @@ interface Props {
 }
 
 const TABS: { id: TabId; Icon: LucideIcon; label: string }[] = [
-  { id: "map",       Icon: Map,          label: "Карта"   },
-  { id: "analytics", Icon: BarChart2,    label: "Данные"  },
-  { id: "catalog",   Icon: ShoppingCart, label: "Каталог" },
-  { id: "vault",     Icon: Lock,         label: "Сейф"    },
-  { id: "reserve",   Icon: Sparkles,     label: "Луна-парк" },
+  { id: "map",       Icon: Map,          label: "Карта"    },
+  { id: "analytics", Icon: BarChart2,    label: "Данные"   },
+  { id: "catalog",   Icon: ShoppingCart, label: "Каталог"  },
+  { id: "vault",     Icon: Lock,         label: "Сейф"     },
+  { id: "reserve",   Icon: Sparkles,     label: "Луна-парк"},
+  { id: "empire",    Icon: Crown,        label: "Империя"  },
 ];
 
 export function BottomNav({ active, onChange, visible = true, badges = {} }: Props) {
