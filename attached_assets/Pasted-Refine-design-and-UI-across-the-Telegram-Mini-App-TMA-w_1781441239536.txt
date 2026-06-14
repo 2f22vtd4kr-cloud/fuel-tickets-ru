@@ -1,0 +1,40 @@
+Refine design and UI across the Telegram Mini App (TMA), with special focus on the bottom navigation bar and overall visual hierarchy.
+
+Key requirements:
+
+1. **Bottom Navigation Bar (`BottomNav.tsx`)**:
+   - Add clear, relevant emojis to each tab for better visual recognition (Russian users love emojis).
+     - Fuel / Главная → ⛽ or 🔥
+     - Map → 🗺️ or 📍
+     - Catalog / Prices → 📋 or 💰
+     - Vault / My Vouchers → 🔐 or 🎟️
+     - Reserve / Favorites → ⭐ or ❤️
+     - Analytics (if visible) → 📊 
+   - Make icons + labels vertically centered, with nice active state (bolder color, scale effect, or underline).
+   - Increase touch target size (min 48-56px height).
+   - Use a subtle shadow or border-top to separate from content.
+   - Ensure it works well in dark mode (Telegram default).
+
+2. **Overall Design & Spacing Polish**:
+   - Maintain the refined top LIVE ticker spacing we requested earlier.
+   - Improve card design: add subtle shadows, better border-radius (12-16px), hover/active states.
+   - Consistent color scheme — use Telegram's theme colors where possible (`--tg-theme-bg-color`, `--tg-theme-button-color`, etc.).
+   - Add more breathing room between sections (use Tailwind gap-4, gap-6, p-4/p-6).
+   - Make Station cards more attractive: larger fuel type badges, clearer price display with % change in green/red.
+   - Improve typography: bolder headings, better line-height.
+
+3. **Global UI Improvements**:
+   - Ensure full dark mode compatibility.
+   - Add smooth transitions (0.2s) for tab switches and button presses.
+   - Make sure the mini-app respects Telegram's safe areas (top + bottom).
+   - Polish buttons: larger "Купить" / "Pay with Stars" buttons with emoji (⭐).
+   - Add subtle loading states and better empty states.
+
+4. **Implementation**:
+   - Update `BottomNav.tsx`, `index.css`, `App.tsx`, and any tab components (`CatalogTab.tsx`, `MapTab.tsx`, etc.).
+   - Use emoji directly in JSX or as icons.
+   - Test in real Telegram Mini App after changes.
+
+After updates:
+- Redeploy the frontend so the preview link works again.
+- Summary of changes, especially the new bottom nav emojis and improved spacing.

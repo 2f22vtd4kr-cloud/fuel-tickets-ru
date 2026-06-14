@@ -1,0 +1,43 @@
+Implement Telegram Stars payments properly as a real (production) payment method throughout the entire project. Currently, Stars seem to be in test mode and not routing real payments to the owner. Fix everywhere: bot.py, TMA backend if needed, any frontend/TS code, handlers, etc. Make it the primary or additional seamless payment option alongside Crypto Pay.
+
+Key requirements from Telegram docs (https://core.telegram.org/bots/payments-stars):
+
+1. **Bot Configuration**:
+   - Use real Bot API (no test environment).
+   - For `send_invoice` / `create_invoice_link`: set `currency="XTR"`, provide `prices` as list of LabeledPrice (amount in Stars, e.g., 100-5000 depending on product).
+   - No provider_token needed for Stars (or use empty/"").
+
+2. **Handlers in bot.py (python-telegram-bot)**:
+   - Keep/enhance `PreCheckoutQueryHandler` → always `answer(ok=True)` for Stars.
+   - Enhance `SuccessfulPaymentHandler` (successful_payment):
+     - Parse `invoice_payload` (e.g., format like "fuel_paid_{fuel_type}_{plate}_{order_id}").
+     - On success: issue the corresponding voucher (call issue_paid_voucher or similar), mark pending payment as completed, notify user with QR/details, notify admin.
+     - Handle different products: fuel vouchers (PAID_PRODUCTS), VPN plans, etc.
+     - Store successful Stars transactions (add to DB if needed, e.g., transaction_id, stars_amount, timestamp).
+
+3. **UI/Entry Points**:
+   - Add prominent "Pay with ⭐ Telegram Stars" buttons everywhere payments are offered (paid quota, VPN, /buystars, TMA purchase flows).
+   - Use `create_invoice_link` for web/TMA integration if needed (returns a direct payment URL).
+   - In main menu, paid_quota flow, vpn_cmd, etc., offer Stars as default/fast option.
+   - Update help_cmd and rules to mention Stars.
+
+4. **Payload & Flow Consistency**:
+   - Standardize payload: e.g., "stars_fuel_{fuel_type}_{plate_hash}_{uuid}" or similar for easy parsing.
+   - For TMA (tma_backend): ensure frontend can trigger bot invoices or use WebApp payment flows.
+   - Support refunds via `refundStarPayment` if needed (add admin command).
+
+5. **Testing & Production**:
+   - Remove any `test` env flags.
+   - Add logging for payment events.
+   - Handle errors gracefully (e.g., failed pre-checkout).
+   - For real Stars: users buy via Telegram (Apple/Google), bot receives real XTR. Withdraw proceeds via Telegram (crypto or other).
+
+6. **Everywhere**:
+   - Search/replace all payment-related code.
+   - Update pending_payments DB table if needed for Stars-specific fields.
+   - Ensure compatibility with existing Crypto Pay fallback.
+   - Test full flow: user selects product → invoice → pay Stars → successful handler issues voucher.
+
+Update requirements.txt if any extra deps needed. Restart bot after changes. Provide summary of changes and test commands like /buystars or paid_quota flow.
+
+Reference examples: official docs, aiogram/PTB Stars tutorials.

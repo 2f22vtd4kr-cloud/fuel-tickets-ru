@@ -1,0 +1,37 @@
+Refine and improve all TMA (Telegram Mini App) CSS spacing, padding, and layout rules — with special focus on the Fuel mini app.
+
+Current issues from screenshot:
+- The top "LIVE" price ticker / running line is overlapping with content below it.
+- Bottom navigation elements (Фильтры button etc.) feel too close or cramped.
+- General need for better breathing room and consistent spacing.
+
+Tasks:
+
+1. **Global TMA Spacing Rules**:
+   - Define or update consistent spacing variables / Tailwind config (padding, margins, gaps).
+   - Add proper top padding to the main content container to account for Telegram Mini App header + the LIVE ticker.
+   - Use `safe-area-inset-top` and Telegram-specific classes (tg-header, etc.) to prevent overlaps on all devices.
+
+2. **Specific Fixes for Fuel Page / LIVE Ticker**:
+   - Make the LIVE ticker a fixed/sticky top bar with adequate height.
+   - Increase the top margin/padding of the content area directly below the ticker (at least 16-24px or more).
+   - Ensure the purple "Фильтры" button and any other top-level elements sit comfortably below the ticker without overlap.
+   - Add proper bottom padding to the main content so it doesn't clash with Telegram's bottom navigation bar.
+
+3. **General UI Polish**:
+   - Review and standardize spacing across all screens: cards, buttons, headers, lists.
+   - Improve vertical rhythm — use consistent values (e.g., 8px, 12px, 16px, 20px, 24px).
+   - Fix any z-index issues between ticker, header, and content.
+   - Ensure the layout respects Telegram Mini App constraints (no safe-area violations).
+
+4. **Implementation**:
+   - Update main CSS/Tailwind files, global styles, and any Fuel-specific components.
+   - Prefer Tailwind utility classes where possible, or add custom CSS rules if needed.
+   - Add media queries or Telegram-specific adjustments if the app behaves differently in desktop vs mobile.
+
+After changes:
+- Test thoroughly in Telegram Mini App (both mobile and desktop versions).
+- Ensure no overlapping elements anywhere.
+- The LIVE ticker should feel like a clean header, with clear separation from the rest of the UI.
+
+Provide a summary of the CSS changes made and any new utility classes introduced.

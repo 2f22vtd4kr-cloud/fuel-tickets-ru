@@ -52,7 +52,22 @@
   --radius-md:     14px;
   --radius-lg:     20px;
   --nav-height:    60px;
+  --ticker-height: 40px;
 }
+
+/* ── Light mode overrides ────────────────────────────────────────── */
+body.light {
+  --bg:            #f4f4f8;
+  --bg-card:       rgba(255, 255, 255, 0.92);
+  --bg-deep:       #e8e8f0;
+  --bg-glass:      rgba(255, 255, 255, 0.7);
+  --border:        rgba(0, 0, 0, 0.09);
+  --border-bright: rgba(168, 85, 247, 0.4);
+  --text:          #1a1a2e;
+  --text-muted:    #475569;
+  --text-dim:      #94a3b8;
+}
+body.light { background: var(--bg); color: var(--text); }
 
 /* ── Base ────────────────────────────────────────────────────────── */
 html, body {

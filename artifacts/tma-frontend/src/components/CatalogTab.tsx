@@ -300,27 +300,39 @@ function FuelItem({
         </p>
       )}
 
-      <button
+      <motion.button
         disabled={buying || !withinLimit || !available}
         onClick={handleBuy}
+        whileTap={(!withinLimit || !available) ? undefined : { scale: 0.97 }}
+        animate={(!withinLimit || !available || buying) ? {} : {
+          boxShadow: [
+            "0 0 16px rgba(168,85,247,0.35), 0 4px 16px rgba(219,39,119,0.2)",
+            "0 0 28px rgba(168,85,247,0.55), 0 4px 20px rgba(219,39,119,0.35)",
+            "0 0 16px rgba(168,85,247,0.35), 0 4px 16px rgba(219,39,119,0.2)",
+          ],
+        }}
+        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
         style={{
           width: "100%",
-          padding: "0.65rem",
+          padding: "0.95rem 1rem",
           background: (!withinLimit || !available)
-            ? "#22222f"
+            ? "#1a1a2a"
             : "linear-gradient(135deg,#a855f7,#db2777)",
-          color: (!withinLimit || !available) ? "#4b5563" : "#fff",
-          border: "none", borderRadius: "10px",
-          fontSize: "0.85rem", fontWeight: 600,
+          color: (!withinLimit || !available) ? "#374151" : "#fff",
+          border: (!withinLimit || !available) ? "1px solid #22222f" : "none",
+          borderRadius: "14px",
+          fontSize: "0.97rem", fontWeight: 800,
           cursor: (!withinLimit || !available || buying) ? "not-allowed" : "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
+          letterSpacing: (!withinLimit || !available) ? "0" : "0.02em",
+          transition: "background 0.3s",
         }}
       >
         {buying
           ? <span style={{ animation: "spin 1s linear infinite", display: "inline-block" }}>⟳</span>
-          : btnLabel()
+          : <>{available && withinLimit && <span>⛽</span>}{btnLabel()}</>
         }
-      </button>
+      </motion.button>
     </motion.div>
   );
 }

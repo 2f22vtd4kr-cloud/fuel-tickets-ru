@@ -3,15 +3,17 @@
  *
  * Responsibilities:
  *  - Intro splash screen on first launch
+ *  - Onboarding tour for new users (after splash)
  *  - Initialize Telegram WebApp SDK (ready, expand, theme colours)
  *  - Parse deep-link startParam → navigate to correct tab + pre-select entity
  *  - Manage Telegram BackButton (shows when leaving the default map tab)
  *  - Keep MapTab always mounted (visibility toggle) to preserve Leaflet state
  *  - Fetch baseline data (user profile, station list) on boot
  *  - Admin panel (long-press header or ?admin=1 param)
+ *  - Dark / Light mode toggle (persisted, overrides Telegram theme)
  */
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ToastContainer } from "@/components/Toast";
 import { BottomNav } from "@/components/BottomNav";
@@ -24,10 +26,12 @@ import { VpnModal } from "@/components/VpnModal";
 import { MarketTicker } from "@/components/MarketTicker";
 import { IntroSplash } from "@/components/IntroSplash";
 import { AdminPanel } from "@/components/AdminPanel";
+import { OnboardingTour } from "@/components/OnboardingTour";
 import { useUserStore } from "@/stores/useUserStore";
 import { useStationStore } from "@/stores/useStationStore";
 import { useMapStore } from "@/stores/useMapStore";
 import { usePriceStore } from "@/stores/usePriceStore";
+import { useThemeStore } from "@/stores/useThemeStore";
 import { parseStartParam } from "@/lib/deeplink";
 import { select as hapticSelect } from "@/lib/haptic";
 import type { TabId } from "@/types";
@@ -47,6 +51,7 @@ interface TelegramWebApp {
   close: () => void;
   setHeaderColor: (color: string) => void;
   setBackgroundColor: (color: string) => void;
+  colorScheme?: "light" | "dark";
   initDataUnsafe?: {
     user?: { id: number; username?: string; first_name?: string; last_name?: string };
     start_param?: string;
@@ -76,12 +81,18 @@ interface TelegramWebApp {
     button_color?: string;
     button_text_color?: string;
   };
+  onEvent?: (eventType: string, cb: () => void) => void;
+  offEvent?: (eventType: string, cb: () => void) => void;
 }
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 const DEFAULT_TAB: TabId = "map";
 const SPLASH_KEY = "tma-splash-seen-v2";
+const ONBOARDING_KEY = "tma-onboarding-v1";
+
+// Ticker height as a number — must match MarketTicker's height
+const TICKER_H = 40;
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>(DEFAULT_TAB);
@@ -91,6 +102,7 @@ export default function App() {
   const [showVpn, setShowVpn] = useState(false);
   const [vpnTroubleshooter, setVpnTroubleshooter] = useState(false);
   const [showSplash, setShowSplash] = useState(() => !localStorage.getItem(SPLASH_KEY));
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const vpnSuggested = useRef(false);
   const adminPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -98,6 +110,12 @@ export default function App() {
   const { init: initUser } = useUserStore();
   const { fetch: fetchStations, stations } = useStationStore();
   const { selectStation } = useMapStore();
+  const { isDark, toggle: toggleTheme, setDark } = useThemeStore();
+
+  // ── Apply body theme class ──────────────────────────────────────
+  useEffect(() => {
+    document.body.className = isDark ? "" : "light";
+  }, [isDark]);
 
   const crisisCount = stations.reduce((n, s) => {
     const avg = s.fuel_statuses.length
@@ -126,6 +144,18 @@ export default function App() {
       tg.ready();
       tg.expand();
 
+      // Sync theme with Telegram's colour scheme on first load
+      if (tg.colorScheme) {
+        setDark(tg.colorScheme === "dark");
+      }
+
+      // Listen for theme changes from Telegram
+      const themeHandler = () => {
+        const scheme = window.Telegram?.WebApp?.colorScheme;
+        if (scheme) setDark(scheme === "dark");
+      };
+      tg.onEvent?.("themeChanged", themeHandler);
+
       try {
         tg.setHeaderColor("#050507");
         tg.setBackgroundColor("#050507");
@@ -134,9 +164,18 @@ export default function App() {
       }
 
       try { tg.MainButton.hide(); } catch {}
-    }
 
-    // ── Parse deep-link startParam ──────────────────────────────
+      return () => {
+        tg.offEvent?.("themeChanged", themeHandler);
+      };
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Deep-link + user init ───────────────────────────────────────
+  useEffect(() => {
+    const tg = window.Telegram?.WebApp;
+
     const startParam = tg?.initDataUnsafe?.start_param;
     const deepLink = parseStartParam(startParam);
 
@@ -151,16 +190,13 @@ export default function App() {
       setInitialPurchaseId(deepLink.purchaseId);
     }
 
-    // ── Admin panel via URL param ───────────────────────────────
     if (new URLSearchParams(window.location.search).get("admin") === "1") {
       setShowAdmin(true);
     }
 
-    // ── User + stations ─────────────────────────────────────────
     const tgUser = tg?.initDataUnsafe?.user;
     initUser(tgUser?.id ?? 0, tgUser?.username ?? tgUser?.first_name ?? undefined);
 
-    // Detect slow/failed loads and suggest VPN after 8 seconds
     const vpnTimer = setTimeout(() => {
       if (!vpnSuggested.current) {
         vpnSuggested.current = true;
@@ -207,17 +243,25 @@ export default function App() {
     if (!navVisible) setNavVisible(true);
   };
 
-  // ── Splash done ─────────────────────────────────────────────────
+  // ── Splash done → show onboarding for first-timers ──────────────
   const handleSplashDone = () => {
     localStorage.setItem(SPLASH_KEY, "1");
     setShowSplash(false);
+    if (!localStorage.getItem(ONBOARDING_KEY)) {
+      setShowOnboarding(true);
+    }
+  };
+
+  const handleOnboardingDone = () => {
+    localStorage.setItem(ONBOARDING_KEY, "1");
+    setShowOnboarding(false);
   };
 
   // ── Admin panel long-press on ticker ───────────────────────────
   const handleTickerPressStart = () => {
     adminPressTimer.current = setTimeout(() => {
       setShowAdmin(true);
-    }, 3000); // 3-second long press
+    }, 3000);
   };
   const handleTickerPressEnd = () => {
     if (adminPressTimer.current) {
@@ -226,6 +270,14 @@ export default function App() {
     }
   };
 
+  // Tab slide direction: right for forward, left for back
+  const tabOrder: TabId[] = ["map", "analytics", "catalog", "vault", "reserve"];
+  const tabIndexRef = useRef(0);
+  const prevTabIndex = tabIndexRef.current;
+  const curTabIndex = tabOrder.indexOf(activeTab);
+  const slideDir = curTabIndex >= prevTabIndex ? 1 : -1;
+  tabIndexRef.current = curTabIndex;
+
   return (
     <ErrorBoundary>
       <ToastContainer />
@@ -233,6 +285,13 @@ export default function App() {
       {/* Intro Splash */}
       <AnimatePresence>
         {showSplash && <IntroSplash onDone={handleSplashDone} />}
+      </AnimatePresence>
+
+      {/* Onboarding Tour — shown once after first splash */}
+      <AnimatePresence>
+        {showOnboarding && !showSplash && (
+          <OnboardingTour onDone={handleOnboardingDone} />
+        )}
       </AnimatePresence>
 
       {/* Admin Panel */}
@@ -254,26 +313,52 @@ export default function App() {
         onClick={() => { setVpnTroubleshooter(false); setShowVpn(true); }}
         title="VPN-доступ"
         style={{
-          position: "fixed", bottom: "72px", left: "12px",
+          position: "fixed", bottom: "74px", left: "12px",
           zIndex: 9500,
-          width: "40px", height: "40px",
+          width: "38px", height: "38px",
           borderRadius: "50%",
           background: "linear-gradient(135deg,#a855f7,#db2777)",
           border: "none",
           boxShadow: "0 0 14px #a855f755",
           cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: "1.1rem",
+          fontSize: "1rem",
         }}
       >
         🔒
       </button>
 
-      {/* Crisis floating badge — shows when many stations are in crisis */}
+      {/* Dark/Light mode toggle */}
+      <button
+        onClick={toggleTheme}
+        title={isDark ? "Светлая тема" : "Тёмная тема"}
+        style={{
+          position: "fixed",
+          top: `${TICKER_H + 8}px`,
+          right: "12px",
+          zIndex: 9500,
+          width: "34px", height: "34px",
+          borderRadius: "50%",
+          background: isDark
+            ? "rgba(20,20,30,0.9)"
+            : "rgba(255,255,255,0.9)",
+          border: "1px solid rgba(168,85,247,0.35)",
+          boxShadow: "0 2px 12px rgba(0,0,0,0.4)",
+          cursor: "pointer",
+          backdropFilter: "blur(8px)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: "1rem",
+          transition: "background 0.3s, box-shadow 0.3s",
+        }}
+      >
+        {isDark ? "☀️" : "🌙"}
+      </button>
+
+      {/* Crisis floating badge */}
       {crisisCount >= 5 && (
         <div
           style={{
-            position: "fixed", top: "34px", right: "10px",
+            position: "fixed", top: `${TICKER_H + 8}px`, right: "56px",
             zIndex: 9700,
             background: "linear-gradient(135deg,#1a0606,#200a0a)",
             border: "1px solid #ef444455",
@@ -291,8 +376,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Live market ticker — always visible, fixed strip
-          Long-press 3s to open admin panel */}
+      {/* Live market ticker — always visible, fixed strip */}
       <div
         style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 9800 }}
         onMouseDown={handleTickerPressStart}
@@ -303,12 +387,7 @@ export default function App() {
         <MarketTicker />
       </div>
 
-      {/*
-        Content area:
-        · MapTab is ALWAYS in the DOM — unmounting resets Leaflet viewport.
-        · All other tabs use conditional rendering.
-      */}
-      {/* Global ambient dot-grid background — subtle cyberpunk grid */}
+      {/* Ambient dot-grid background */}
       <div
         aria-hidden
         style={{
@@ -320,12 +399,18 @@ export default function App() {
         }}
       />
 
+      {/*
+        Content area:
+        · MapTab is ALWAYS in the DOM — unmounting resets Leaflet viewport.
+        · All other tabs use AnimatePresence for smooth slide transitions.
+        · paddingTop accounts for ticker height (40px) + 8px buffer.
+      */}
       <div
         style={{
           flex: 1,
           position: "relative",
           overflow: "hidden",
-          paddingTop: "28px",
+          paddingTop: `${TICKER_H + 8}px`,
           paddingBottom: navVisible ? "60px" : "0px",
           transition: "padding-bottom 0.3s",
           zIndex: 1,
@@ -339,26 +424,32 @@ export default function App() {
           onNavToggle={() => setNavVisible((v) => !v)}
         />
 
-        {activeTab === "analytics" && (
-          <div style={{ position: "absolute", inset: 0, overflowY: "auto" }}>
-            <AnalyticsTab onNavigate={handleTabChange} />
-          </div>
-        )}
-        {activeTab === "catalog" && (
-          <div style={{ position: "absolute", inset: 0, overflowY: "auto" }}>
-            <CatalogTab initialStationId={initialStationId} />
-          </div>
-        )}
-        {activeTab === "vault" && (
-          <div style={{ position: "absolute", inset: 0, overflowY: "auto" }}>
-            <VaultTab initialPurchaseId={initialPurchaseId} />
-          </div>
-        )}
-        {activeTab === "reserve" && (
-          <div style={{ position: "absolute", inset: 0, overflowY: "auto" }}>
-            <ReserveTab />
-          </div>
-        )}
+        {/* Non-map tabs — animated slide in/out */}
+        <AnimatePresence mode="wait" initial={false}>
+          {activeTab !== "map" && (
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, x: slideDir * 24 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: slideDir * -16 }}
+              transition={{ duration: 0.22, ease: [0.25, 0.46, 0.45, 0.94] }}
+              style={{ position: "absolute", inset: 0, overflowY: "auto" }}
+            >
+              {activeTab === "analytics" && (
+                <AnalyticsTab onNavigate={handleTabChange} />
+              )}
+              {activeTab === "catalog" && (
+                <CatalogTab initialStationId={initialStationId} />
+              )}
+              {activeTab === "vault" && (
+                <VaultTab initialPurchaseId={initialPurchaseId} />
+              )}
+              {activeTab === "reserve" && (
+                <ReserveTab />
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <BottomNav
