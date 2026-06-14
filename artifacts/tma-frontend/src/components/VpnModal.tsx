@@ -118,17 +118,54 @@ export function VpnModal({ onClose, isTroubleshooter = false }: Props) {
       .finally(() => setChecked(true));
   }, [user]);
 
+  const pollForSession = (uid: number, attempts = 0) => {
+    fetchVpnStatus(uid)
+      .then((s) => {
+        if (s.has_active && s.session) {
+          setActiveSession(s.session);
+          toast("✅ VPN активирован!", "success");
+        } else if (attempts < 10) {
+          setTimeout(() => pollForSession(uid, attempts + 1), 1500);
+        } else {
+          toast("VPN активируется — обновите страницу через несколько секунд", "success");
+        }
+      })
+      .catch(() => {
+        if (attempts < 6) setTimeout(() => pollForSession(uid, attempts + 1), 2000);
+      });
+  };
+
   const handleBuy = async (planId: string) => {
     if (!user) return;
     setLoading(planId);
     try {
       if (payMethod === "stars") {
         const inv = await buyVpnStars(user.id, user.id, planId);
-        const tg = (window as unknown as { Telegram?: { WebApp?: { openInvoice?: (url: string, cb?: (s: string) => void) => void } } }).Telegram?.WebApp;
-        if (tg?.openInvoice && inv.stars_amount) {
+        if (!inv.checkout_url) {
+          toast("Не удалось создать счёт — попробуйте ещё раз", "error");
+          return;
+        }
+        const tg = (window as unknown as {
+          Telegram?: { WebApp?: { openInvoice?: (url: string, cb: (status: string) => void) => void } }
+        }).Telegram?.WebApp;
+        if (tg?.openInvoice) {
           toast(`⭐ Открываю оплату ${inv.stars_amount} Stars…`, "success");
+          setLoading(null);
+          tg.openInvoice(inv.checkout_url, (status: string) => {
+            if (status === "paid") {
+              toast("⭐ Оплата прошла! Активирую VPN…", "success");
+              setTimeout(() => pollForSession(user.id), 1200);
+            } else if (status === "cancelled") {
+              toast("Оплата отменена", "error");
+            } else if (status === "failed") {
+              toast("Ошибка оплаты. Попробуйте ещё раз.", "error");
+            }
+          });
+          return;
         } else {
-          toast(`⭐ Требуется ${inv.stars_amount ?? "?"} Stars — откройте через Telegram`, "success");
+          // Fallback: open link in browser (outside Telegram context)
+          window.open(inv.checkout_url, "_blank");
+          toast(`⭐ Счёт открыт — оплатите ${inv.stars_amount} Stars в Telegram`, "success");
         }
       } else {
         const inv = await buyVpnCrypto(user.id, user.id, planId);
@@ -137,8 +174,6 @@ export function VpnModal({ onClose, isTroubleshooter = false }: Props) {
           toast("💎 Оплата через CryptoBot открыта", "success");
         }
       }
-      const updated = await fetchVpnStatus(user.id);
-      if (updated.has_active && updated.session) setActiveSession(updated.session);
     } catch (e: unknown) {
       toast(String(e), "error");
     } finally {

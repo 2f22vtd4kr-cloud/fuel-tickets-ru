@@ -1831,37 +1831,115 @@ def vpn_status(user_id: int, db: Session = Depends(get_db)):
 
 @app.post("/api/vpn/buy-stars", response_model=VpnInvoiceOut)
 def vpn_buy_stars(body: VpnBuyIn, db: Session = Depends(get_db)):
+    """
+    Returns a real Telegram Stars invoice link.
+    VPN session is NOT created here — it is created by /internal/activate-vpn-stars
+    after the bot receives the successful_payment callback from Telegram.
+    """
     plan = VPN_PLANS.get(body.plan_id)
     if not plan:
         raise HTTPException(400, detail="Неверный план")
+
     stars = _stars_for_rub(plan["price_rub"])
+    import secrets as _sec
+    tx_id = f"VPN-STARS-PENDING-{_sec.token_hex(6).upper()}"
+
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    if not bot_token:
+        raise HTTPException(503, detail="Бот не настроен — TELEGRAM_BOT_TOKEN отсутствует")
+
+    # Payload parsed by bot's successful_payment_handler: vpn_{plan_id}_{user_id}
+    payload = f"vpn_{body.plan_id}_{body.user_id}"
+    try:
+        resp = httpx.post(
+            f"https://api.telegram.org/bot{bot_token}/createInvoiceLink",
+            json={
+                "title": f"VPN {plan['name']}",
+                "description": (
+                    f"Защищённый VPN-канал на {plan['duration_minutes']} минут. "
+                    f"WireGuard-ключ выдаётся мгновенно после оплаты."
+                ),
+                "payload": payload,
+                "currency": "XTR",
+                "prices": [{"label": f"VPN {plan['duration_minutes']} мин", "amount": stars}],
+            },
+            timeout=10,
+        )
+        data = resp.json()
+        if not data.get("ok"):
+            desc = data.get("description", "Telegram API error")
+            logger.error("createInvoiceLink failed for VPN: %s", data)
+            raise HTTPException(502, detail=desc)
+        checkout_url: str = data["result"]
+        logger.info("VPN Stars invoice created: plan=%s user=%d stars=%d", body.plan_id, body.user_id, stars)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("VPN Stars invoice creation failed: %s", exc)
+        raise HTTPException(502, detail=str(exc))
+
+    return VpnInvoiceOut(
+        stars_amount=stars,
+        checkout_url=checkout_url,
+        transaction_id=tx_id,
+        plan_name=plan["name"],
+        duration_minutes=plan["duration_minutes"],
+    )
+
+
+@app.post("/internal/activate-vpn-stars")
+def activate_vpn_stars(body: dict, db: Session = Depends(get_db)):
+    """
+    Called by the Telegram bot after a successful Stars payment with vpn_ payload.
+    Creates the VPN session and triggers the activation notification.
+    Protected by INTERNAL_API_SECRET.
+    """
+    if body.get("internal_secret") != INTERNAL_API_SECRET:
+        raise HTTPException(403, detail="Forbidden")
+
+    plan_id = body.get("plan_id", "sprint")
+    user_id = int(body.get("user_id", 0))
+    telegram_chat_id = int(body.get("telegram_chat_id", user_id))
+    stars = int(body.get("stars_amount", 0))
+
+    plan = VPN_PLANS.get(plan_id)
+    if not plan:
+        raise HTTPException(400, detail="Неверный план")
+
     config_key = _vpn_config_key()
-    _get_or_create_user(db, body.user_id)
+    _get_or_create_user(db, user_id)
+
     sess = VpnSession(
-        user_id=body.user_id,
-        telegram_chat_id=body.telegram_chat_id,
-        plan_id=body.plan_id,
+        user_id=user_id,
+        telegram_chat_id=telegram_chat_id,
+        plan_id=plan_id,
         plan_name=plan["name"],
         duration_minutes=plan["duration_minutes"],
         price_rub=plan["price_rub"],
         payment_method="stars",
+        transaction_id=f"VPN-STARS-{stars}",
         config_key=config_key,
         is_active=True,
         expires_at=_now() + timedelta(minutes=plan["duration_minutes"]),
     )
     db.add(sess)
     db.commit()
+    db.refresh(sess)
     _notify_vpn_activated(sess)
-    user = db.query(User).filter(User.id == body.user_id).first()
+
+    user = db.query(User).filter(User.id == user_id).first()
     if user:
         _check_achievements(user, db)
         db.commit()
-    return VpnInvoiceOut(
-        stars_amount=stars,
-        transaction_id=f"VPN-STARS-{sess.id}",
-        plan_name=plan["name"],
-        duration_minutes=plan["duration_minutes"],
-    )
+
+    logger.info("VPN activated via Stars: plan=%s user=%d stars=%d key=%s", plan_id, user_id, stars, config_key)
+    return {
+        "ok": True,
+        "config_key": config_key,
+        "plan_name": plan["name"],
+        "duration_minutes": plan["duration_minutes"],
+        "expires_at": sess.expires_at.isoformat(),
+    }
 
 
 @app.post("/api/vpn/buy-crypto", response_model=VpnInvoiceOut)

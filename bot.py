@@ -2807,7 +2807,63 @@ async def successful_payment_handler(update: Update, context: ContextTypes.DEFAU
     stars = payment.total_amount
 
     is_tma = payload.startswith("tma_")
+    is_vpn = payload.startswith("vpn_")
     qr = None
+
+    # ── VPN Stars payment ─────────────────────────────────────────────
+    if is_vpn:
+        # vpn_{plan_id}_{user_id}
+        parts = payload.split("_", 2)
+        vpn_plan_id = parts[1] if len(parts) > 1 else "sprint"
+        vpn_user_id = int(parts[2]) if len(parts) > 2 else chat_id
+        config_key = None
+        plan_name = vpn_plan_id
+        duration_minutes = 0
+        try:
+            async with aiohttp.ClientSession() as http_sess:
+                async with http_sess.post(
+                    f"{_TMA_BACKEND_URL}/internal/activate-vpn-stars",
+                    json={
+                        "user_id": vpn_user_id,
+                        "telegram_chat_id": chat_id,
+                        "plan_id": vpn_plan_id,
+                        "stars_amount": stars,
+                        "internal_secret": _INTERNAL_API_SECRET,
+                    },
+                    timeout=aiohttp.ClientTimeout(total=8),
+                ) as resp:
+                    data = await resp.json()
+                    if data.get("ok"):
+                        config_key = data.get("config_key")
+                        plan_name = data.get("plan_name", vpn_plan_id)
+                        duration_minutes = data.get("duration_minutes", 0)
+                    else:
+                        logger.warning("activate-vpn-stars returned error: %s", data)
+        except Exception as exc:
+            logger.warning("Failed to activate VPN in backend: %s", exc)
+        if config_key:
+            vpn_text = (
+                f"⭐ *Оплата {stars} Stars принята!*\n\n"
+                f"🔒 *VPN активирован* — {plan_name}\n"
+                f"⏱ Длительность: {duration_minutes} мин\n\n"
+                f"🔑 *Ваш WireGuard/Outline ключ:*\n`{config_key}`\n\n"
+                f"Вставьте ключ в приложение WireGuard или Outline. "
+                f"Соединение отключится автоматически."
+            )
+        else:
+            vpn_text = (
+                f"⭐ *Оплата {stars} Stars принята!*\n\n"
+                f"🔒 VPN активируется... Откройте мини-приложение, ключ появится там."
+            )
+        await msg.reply_text(vpn_text, parse_mode="Markdown")
+        if ADMIN_CHAT_ID:
+            await context.bot.send_message(
+                chat_id=ADMIN_CHAT_ID,
+                text=f"⭐ VPN Stars: {stars}⭐ от chat_id={chat_id}\nПлан: {plan_name}\nКлюч: `{config_key or 'error'}`",
+                parse_mode="Markdown",
+            )
+        return
+    # ── /VPN Stars payment ────────────────────────────────────────────
 
     try:
         if is_tma:
