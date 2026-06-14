@@ -222,6 +222,39 @@ function fmtTime(sec: number): string {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
+// ── Card theme helper ─────────────────────────────────────────────────────────
+
+const CARD_THEMES: Record<number, { topBg: string; banner: string; bannerText: string; border: string; parch: string }> = {
+  1: {
+    topBg:      "linear-gradient(160deg, #3e7a28 0%, #2a5518 60%, #1b3a0e 100%)",
+    banner:     "linear-gradient(135deg, #c49a12 0%, #d4aa18 50%, #b88a0e 100%)",
+    bannerText: "#3a1e00",
+    border:     "#8a6c10",
+    parch:      "linear-gradient(180deg, #fffbef 0%, #f7edce 100%)",
+  },
+  2: {
+    topBg:      "linear-gradient(160deg, #1d5c9e 0%, #144480 60%, #0c2e5a 100%)",
+    banner:     "linear-gradient(135deg, #1e66b8 0%, #2878d0 50%, #185298 100%)",
+    bannerText: "#ffffff",
+    border:     "#144a9a",
+    parch:      "linear-gradient(180deg, #f0f5ff 0%, #dce8fa 100%)",
+  },
+  3: {
+    topBg:      "linear-gradient(160deg, #5b2494 0%, #3e1570 60%, #280d4c 100%)",
+    banner:     "linear-gradient(135deg, #7c3aed 0%, #8b5cf6 50%, #6d28d9 100%)",
+    bannerText: "#ffffff",
+    border:     "#5b21b6",
+    parch:      "linear-gradient(180deg, #f5f0ff 0%, #ede5ff 100%)",
+  },
+  4: {
+    topBg:      "linear-gradient(160deg, #92580c 0%, #6e3f08 60%, #4a2804 100%)",
+    banner:     "linear-gradient(135deg, #d97706 0%, #f59e0b 50%, #b45309 100%)",
+    bannerText: "#3a1e00",
+    border:     "#a35208",
+    parch:      "linear-gradient(180deg, #fffbeb 0%, #fef0cc 100%)",
+  },
+};
+
 // ── Building detail sheet ─────────────────────────────────────────────────────
 
 function BuildingDetailSheet({
@@ -231,6 +264,7 @@ function BuildingDetailSheet({
   onClose: () => void; onUpgrade: () => void; loading: boolean;
 }) {
   const stage = STAGES.find((s) => s.stage === def.stage)!;
+  const theme = CARD_THEMES[def.stage];
   const currentRate = productionPerHour(def, level, prestige);
   const nextRate = productionPerHour(def, level + 1, prestige);
   const cost = upgradeCost(def, level);
@@ -245,7 +279,7 @@ function BuildingDetailSheet({
       onClick={onClose}
       style={{
         position: "fixed", inset: 0,
-        background: "rgba(0,0,0,0.55)",
+        background: "rgba(0,0,0,0.6)",
         zIndex: 800,
         display: "flex", alignItems: "flex-end", justifyContent: "center",
       }}
@@ -257,77 +291,138 @@ function BuildingDetailSheet({
         transition={{ type: "spring", stiffness: 340, damping: 30 }}
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: "#fff",
+          background: theme.parch,
           borderRadius: "28px 28px 0 0",
-          padding: "20px 20px 36px",
           width: "100%",
           maxWidth: "480px",
-          boxShadow: "0 -8px 40px rgba(0,0,0,0.15)",
+          overflow: "hidden",
+          boxShadow: "0 -8px 48px rgba(0,0,0,0.4), 0 -2px 0 rgba(255,255,255,0.08)",
+          border: `2px solid ${theme.border}`,
+          borderBottom: "none",
         }}
       >
         {/* Drag handle */}
-        <div style={{ width: 40, height: 4, background: "#e5e7eb", borderRadius: 99, margin: "0 auto 20px" }} />
+        <div style={{ width: 36, height: 4, background: "rgba(255,255,255,0.35)", borderRadius: 99, margin: "10px auto 0" }} />
 
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "20px" }}>
+        {/* Card illustrated top area */}
+        <div style={{
+          background: theme.topBg,
+          padding: "16px 20px 20px",
+          position: "relative",
+          display: "flex", alignItems: "center", gap: "16px",
+        }}>
+          {/* Terrain dot texture */}
           <div style={{
-            width: 56, height: 56,
-            background: `linear-gradient(135deg, ${stage.light}, ${stage.color}22)`,
+            position: "absolute", inset: 0, pointerEvents: "none",
+            backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px)",
+            backgroundSize: "12px 12px",
+          }} />
+          {/* Active glow */}
+          {level > 0 && (
+            <motion.div
+              animate={{ opacity: [0.4, 0.1, 0.4] }}
+              transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+              style={{
+                position: "absolute", inset: 0, pointerEvents: "none",
+                background: `radial-gradient(ellipse at 50% 80%, ${stage.color}55 0%, transparent 65%)`,
+              }}
+            />
+          )}
+          {/* Large emoji */}
+          <div style={{
+            width: 72, height: 72, flexShrink: 0,
+            background: "rgba(0,0,0,0.25)",
             borderRadius: "16px",
+            border: "2px solid rgba(255,255,255,0.18)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: "2rem", border: `2px solid ${stage.color}44`,
+            fontSize: "2.6rem",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.15)",
+            zIndex: 1,
           }}>
             {buildingEmoji(def, level)}
           </div>
-          <div>
-            <div style={{ fontWeight: 900, fontSize: "1.05rem", color: "#1c1917" }}>{def.name}</div>
-            <div style={{ fontSize: "0.72rem", color: stage.color, fontWeight: 700, marginTop: "2px" }}>{stage.label} · {def.desc}</div>
+          <div style={{ zIndex: 1 }}>
+            <div style={{ fontWeight: 900, fontSize: "1.15rem", color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}>
+              {def.name}
+            </div>
+            <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.8)", fontWeight: 600, marginTop: "3px" }}>
+              {stage.label} · {def.desc}
+            </div>
             {level > 0 && (
-              <div style={{ fontSize: "0.68rem", color: "#6b7280", marginTop: "2px" }}>Уровень {level}</div>
+              <div style={{
+                marginTop: "6px", display: "inline-flex", alignItems: "center", gap: "4px",
+                background: "rgba(0,0,0,0.3)", borderRadius: "8px", padding: "2px 10px",
+                border: "1px solid rgba(255,255,255,0.15)",
+              }}>
+                <span style={{ fontSize: "0.6rem", color: "rgba(255,255,255,0.7)", fontWeight: 600 }}>УРОВЕНЬ</span>
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.8rem", color: "#fff", fontWeight: 900 }}>{level}</span>
+              </div>
             )}
           </div>
         </div>
 
-        {/* Stats grid */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "20px" }}>
-          {[
-            { label: "Производство/ч", value: level > 0 ? `${fmtCoins(currentRate)}` : "—", color: "#10b981" },
-            { label: "После улучшения", value: `+${fmtCoins(nextRate - currentRate)}/ч`, color: stage.color },
-            { label: "Цена улучшения", value: `${fmtCoins(cost)} XP`, color: canAfford ? "#7c3aed" : "#ef4444" },
-            { label: "Вложено XP", value: totalXpInvested > 0 ? fmtCoins(totalXpInvested) : "—", color: "#6b7280" },
-          ].map((item) => (
-            <div key={item.label} style={{
-              background: "#f9fafb", borderRadius: "14px", padding: "12px",
-              border: "1px solid #f3f4f6",
-            }}>
-              <div style={{ fontSize: "0.58rem", color: "#9ca3af", fontWeight: 600, marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                {item.label}
-              </div>
-              <div style={{ fontWeight: 800, fontSize: "0.9rem", color: item.color, fontFamily: "'JetBrains Mono', monospace" }}>
-                {item.value}
-              </div>
-            </div>
-          ))}
+        {/* Name banner */}
+        <div style={{
+          background: theme.banner,
+          padding: "7px 20px",
+          textAlign: "center",
+          borderTop: "1px solid rgba(255,255,255,0.15)",
+          borderBottom: `2px solid ${theme.border}`,
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.15)",
+        }}>
+          <div style={{ fontSize: "0.62rem", color: theme.bannerText, fontWeight: 700, opacity: 0.8, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+            {stage.label.replace(/[^ ]+ /, "")} · Строение
+          </div>
         </div>
 
-        {/* Upgrade button */}
-        <motion.button
-          whileTap={{ scale: 0.97 }}
-          onClick={onUpgrade}
-          disabled={!canAfford || loading}
-          style={{
-            width: "100%",
-            padding: "14px",
-            background: canAfford ? `linear-gradient(135deg, ${stage.color}, ${stage.color}cc)` : "#f3f4f6",
-            color: canAfford ? "#fff" : "#9ca3af",
-            border: "none", borderRadius: "16px",
-            fontWeight: 800, fontSize: "0.95rem",
-            cursor: canAfford && !loading ? "pointer" : "not-allowed",
-            boxShadow: canAfford ? `0 4px 20px ${stage.color}44` : "none",
-          }}
-        >
-          {loading ? "Строим..." : level === 0 ? `Построить · ${fmtCoins(cost)} XP` : `Улучшить до ур.${level + 1} · ${fmtCoins(cost)} XP`}
-        </motion.button>
+        {/* Card body — parchment */}
+        <div style={{ padding: "16px 20px 32px" }}>
+          {/* Stats grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "16px" }}>
+            {[
+              { label: "Производство/ч", value: level > 0 ? `${fmtCoins(currentRate)}` : "—", color: "#15803d", bg: "#f0fdf4", border: "#bbf7d0" },
+              { label: "После улучшения", value: `+${fmtCoins(nextRate - currentRate)}/ч`, color: stage.color, bg: stage.light, border: `${stage.color}44` },
+              { label: "Цена улучшения", value: `${fmtCoins(cost)} XP`, color: canAfford ? "#6d28d9" : "#dc2626", bg: canAfford ? "#f5f3ff" : "#fef2f2", border: canAfford ? "#ddd6fe" : "#fecaca" },
+              { label: "Вложено XP", value: totalXpInvested > 0 ? fmtCoins(totalXpInvested) : "—", color: "#92400e", bg: "#fffbeb", border: "#fde68a" },
+            ].map((item) => (
+              <div key={item.label} style={{
+                background: item.bg, borderRadius: "12px", padding: "10px 12px",
+                border: `1.5px solid ${item.border}`,
+                boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+              }}>
+                <div style={{ fontSize: "0.55rem", color: "#6b7280", fontWeight: 700, marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  {item.label}
+                </div>
+                <div style={{ fontWeight: 900, fontSize: "0.9rem", color: item.color, fontFamily: "'JetBrains Mono', monospace" }}>
+                  {item.value}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Upgrade button */}
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={onUpgrade}
+            disabled={!canAfford || loading}
+            style={{
+              width: "100%",
+              padding: "14px",
+              background: canAfford
+                ? `linear-gradient(135deg, ${stage.color} 0%, ${stage.color}dd 100%)`
+                : "linear-gradient(135deg, #9ca3af, #6b7280)",
+              color: "#fff",
+              border: canAfford ? `2px solid rgba(255,255,255,0.2)` : "2px solid rgba(0,0,0,0.1)",
+              borderRadius: "14px",
+              fontWeight: 900, fontSize: "0.92rem",
+              cursor: canAfford && !loading ? "pointer" : "not-allowed",
+              boxShadow: canAfford ? `0 4px 20px ${stage.color}55, inset 0 1px 0 rgba(255,255,255,0.2)` : "none",
+              letterSpacing: "0.01em",
+            }}
+          >
+            {loading ? "Строим..." : level === 0 ? `🏗️ Построить · ${fmtCoins(cost)} XP` : `⬆️ Улучшить до ур.${level + 1} · ${fmtCoins(cost)} XP`}
+          </motion.button>
+        </div>
       </motion.div>
     </motion.div>
   );
@@ -356,120 +451,172 @@ function BuildingCard({
   const cost = upgradeCost(def, level);
   const canAfford = availableXp >= cost;
   const stage = STAGES.find((s) => s.stage === def.stage)!;
-  const levelColors = ["#10b981","#3b82f6","#8b5cf6","#f59e0b","#ef4444"];
-  const borderColor = level === 0 ? "#e5e7eb" : levelColors[Math.min(Math.floor(level / 5), 4)];
+  const theme = CARD_THEMES[def.stage];
 
   return (
     <motion.div
-      whileTap={{ scale: 0.97 }}
+      whileTap={{ scale: 0.95 }}
       style={{
-        background: "#ffffff",
-        borderRadius: "16px",
-        border: `2px solid ${borderColor}`,
-        padding: "12px 10px",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: "6px",
-        position: "relative",
-        boxShadow: level > 0
-          ? `0 2px 12px ${borderColor}33, 0 1px 4px rgba(0,0,0,0.06)`
-          : "0 1px 4px rgba(0,0,0,0.06)",
-        minHeight: "148px",
+        borderRadius: "12px",
+        border: `2px solid ${theme.border}`,
         overflow: "hidden",
+        boxShadow: level > 0
+          ? `0 4px 14px rgba(0,0,0,0.28), 0 1px 4px rgba(0,0,0,0.18)`
+          : `0 2px 8px rgba(0,0,0,0.18)`,
+        opacity: level === 0 && !canAfford ? 0.72 : 1,
+        position: "relative",
       }}
     >
-      {/* Pulse ring for active buildings */}
-      {level > 0 && (
-        <motion.div
-          animate={{ scale: [1, 1.6, 1], opacity: [0.35, 0, 0.35] }}
-          transition={{ repeat: Infinity, duration: 3.5 + def.stage * 0.4, ease: "easeInOut" }}
-          style={{
-            position: "absolute",
-            inset: -4,
-            borderRadius: "20px",
-            border: `2px solid ${stage.color}`,
-            pointerEvents: "none",
-          }}
-        />
-      )}
-      {/* Info button */}
-      <button
-        onClick={(e) => { e.stopPropagation(); onInfo(); }}
+      {/* ── Illustrated top area ── */}
+      <div
+        onClick={onInfo}
         style={{
-          position: "absolute", top: "6px", left: "6px",
-          background: "rgba(0,0,0,0.06)", border: "none",
-          borderRadius: "99px", width: 20, height: 20,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          cursor: "pointer", fontSize: "0.6rem", color: "#6b7280", fontWeight: 700,
-          zIndex: 1,
+          background: theme.topBg,
+          padding: "12px 6px 8px",
+          display: "flex", flexDirection: "column", alignItems: "center",
+          position: "relative",
+          minHeight: "76px",
+          cursor: "pointer",
         }}
       >
-        ℹ
-      </button>
-      {level > 0 && (
+        {/* Terrain dot texture */}
         <div style={{
-          position: "absolute", top: "8px", right: "8px",
-          background: stage.color, color: "#fff",
-          borderRadius: "99px", padding: "1px 7px",
-          fontSize: "0.6rem", fontWeight: 700,
-        }}>
-          Ур.{level}
-        </div>
-      )}
-      <div style={{ fontSize: "2rem", lineHeight: 1 }}>{buildingEmoji(def, level)}</div>
-      <div style={{ fontWeight: 700, fontSize: "0.72rem", color: "#1c1917", textAlign: "center", lineHeight: 1.2 }}>
-        {def.name}
-      </div>
-      {level > 0 && (
-        <div style={{ fontSize: "0.62rem", color: "#6b7280", fontWeight: 500 }}>
-          +{fmtCoins(rate)}/ч
-        </div>
-      )}
-      <button
-        onClick={onUpgrade}
-        disabled={!canAfford || loading}
-        style={{
-          marginTop: "auto",
-          width: "100%",
-          padding: "6px 4px",
-          background: canAfford ? `linear-gradient(135deg, ${stage.color}, ${stage.color}cc)` : "#f3f4f6",
-          color: canAfford ? "#fff" : "#9ca3af",
-          border: "none",
-          borderRadius: "10px",
-          fontSize: "0.62rem",
-          fontWeight: 700,
-          cursor: canAfford && !loading ? "pointer" : "not-allowed",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "3px",
-        }}
-      >
-        {loading ? "..." : (
-          <>
-            {level === 0 ? "Построить" : "Улучшить"}
-            <span style={{ opacity: 0.85 }}>· {fmtCoins(cost)} XP</span>
-          </>
-        )}
-      </button>
+          position: "absolute", inset: 0, pointerEvents: "none",
+          backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.055) 1px, transparent 1px)",
+          backgroundSize: "9px 9px",
+        }} />
 
-      {/* XP affordability progress bar */}
-      {!canAfford && (
-        <div style={{
-          position: "absolute", bottom: 0, left: 0, right: 0, height: "3px",
-          background: "#f3f4f6", borderRadius: "0 0 14px 14px", overflow: "hidden",
-        }}>
+        {/* Active shimmer */}
+        {level > 0 && (
           <motion.div
-            animate={{ width: `${Math.min((availableXp / cost) * 100, 100)}%` }}
-            transition={{ duration: 0.6, ease: "easeOut" }}
+            animate={{ opacity: [0.5, 0.1, 0.5] }}
+            transition={{ repeat: Infinity, duration: 3 + def.stage * 0.5, ease: "easeInOut" }}
             style={{
-              height: "100%",
-              background: availableXp / cost > 0.66 ? "#10b981" : availableXp / cost > 0.33 ? "#f59e0b" : "#ef4444",
+              position: "absolute", inset: 0, pointerEvents: "none",
+              background: `radial-gradient(ellipse at 50% 90%, ${stage.color}50 0%, transparent 65%)`,
             }}
           />
+        )}
+
+        {/* Level badge — top right */}
+        {level > 0 && (
+          <div style={{
+            position: "absolute", top: 4, right: 4,
+            background: "rgba(0,0,0,0.45)",
+            border: "1px solid rgba(255,255,255,0.22)",
+            borderRadius: "5px", padding: "1px 5px",
+            fontSize: "0.52rem", fontWeight: 900,
+            color: "#fff", fontFamily: "'JetBrains Mono', monospace",
+            zIndex: 2,
+          }}>
+            {level}
+          </div>
+        )}
+
+        {/* Building emoji */}
+        <div style={{
+          fontSize: level === 0 ? "1.7rem" : "2.1rem",
+          lineHeight: 1,
+          filter: level === 0
+            ? "grayscale(50%) brightness(0.8)"
+            : "drop-shadow(0 3px 5px rgba(0,0,0,0.5))",
+          zIndex: 1,
+          marginBottom: level > 0 ? "2px" : 0,
+        }}>
+          {buildingEmoji(def, level)}
         </div>
-      )}
+
+        {/* Income rate pill */}
+        {level > 0 && (
+          <div style={{
+            fontSize: "0.48rem", fontWeight: 800,
+            color: "#d1fae5",
+            fontFamily: "'JetBrains Mono', monospace",
+            background: "rgba(0,0,0,0.32)",
+            borderRadius: "4px", padding: "1px 5px",
+            border: "1px solid rgba(255,255,255,0.12)",
+            zIndex: 1,
+          }}>
+            +{fmtCoins(rate)}/ч
+          </div>
+        )}
+      </div>
+
+      {/* ── Name banner ── */}
+      <div style={{
+        background: theme.banner,
+        padding: "4px 4px",
+        textAlign: "center",
+        borderTop: "1px solid rgba(255,255,255,0.18)",
+        borderBottom: `1.5px solid ${theme.border}`,
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -1px 0 rgba(0,0,0,0.12)",
+      }}>
+        <div style={{
+          fontWeight: 900, fontSize: "0.58rem",
+          color: theme.bannerText,
+          lineHeight: 1.2,
+          letterSpacing: "0.01em",
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }}>
+          {def.name}
+        </div>
+      </div>
+
+      {/* ── Parchment action area ── */}
+      <div style={{
+        background: theme.parch,
+        padding: "6px 5px 7px",
+      }}>
+        {/* Build / upgrade button */}
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={onUpgrade}
+          disabled={!canAfford || loading}
+          style={{
+            width: "100%",
+            padding: "5px 2px",
+            background: canAfford
+              ? `linear-gradient(135deg, ${stage.color} 0%, ${stage.color}cc 100%)`
+              : "linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)",
+            color: "#fff",
+            border: canAfford
+              ? "1.5px solid rgba(255,255,255,0.22)"
+              : "1.5px solid rgba(0,0,0,0.08)",
+            borderRadius: "7px",
+            fontSize: "0.5rem",
+            fontWeight: 800,
+            cursor: canAfford && !loading ? "pointer" : "not-allowed",
+            boxShadow: canAfford ? `0 2px 8px ${stage.color}55` : "none",
+            letterSpacing: "0.01em",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: "2px",
+          }}
+        >
+          {loading ? "..." : (
+            <>
+              <span>{level === 0 ? "🏗️" : "⬆️"}</span>
+              <span>{fmtCoins(cost)}XP</span>
+            </>
+          )}
+        </motion.button>
+
+        {/* XP progress bar */}
+        {!canAfford && (
+          <div style={{
+            marginTop: "4px", height: "3px",
+            background: "rgba(0,0,0,0.1)", borderRadius: "99px", overflow: "hidden",
+          }}>
+            <motion.div
+              animate={{ width: `${Math.min((availableXp / cost) * 100, 100)}%` }}
+              transition={{ duration: 0.6, ease: "easeOut" }}
+              style={{
+                height: "100%", borderRadius: "99px",
+                background: availableXp / cost > 0.66 ? "#10b981"
+                  : availableXp / cost > 0.33 ? "#f59e0b" : "#ef4444",
+              }}
+            />
+          </div>
+        )}
+      </div>
     </motion.div>
   );
 }
