@@ -308,3 +308,12 @@ export const claimEmpireDailyReward = (userId: number) =>
   req<EmpireDailyResult>(`/empire/${userId}/daily-reward`, { method: "POST" });
 export const fetchEmpireLeaderboard = () =>
   req<{ entries: EmpireLeaderboardEntry[] }>("/empire/leaderboard");
+export interface EmpirePrestigeResult {
+  ok: boolean;
+  prestige_count: number;
+  bonus_coins: number;
+  new_balance: number;
+  multiplier: number;
+}
+export const prestigeEmpire = (userId: number) =>
+  req<EmpirePrestigeResult>(`/empire/${userId}/prestige`, { method: "POST" });

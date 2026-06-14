@@ -5,8 +5,10 @@ import {
   buildEmpireBuilding,
   claimEmpireDailyReward,
   fetchEmpireLeaderboard,
+  prestigeEmpire,
   type EmpireState,
   type EmpireLeaderboardEntry,
+  type EmpirePrestigeResult,
 } from "@/api/client";
 
 interface EmpireStore {
@@ -21,6 +23,7 @@ interface EmpireStore {
   claimDailyReward: (userId: number) => Promise<{ day: number; coins: number }>;
   fetchLeaderboard: () => Promise<void>;
   tickCoins: (deltaCoins: number) => void;
+  prestige: (userId: number) => Promise<EmpirePrestigeResult>;
 }
 
 interface EmpireBuildResult {
@@ -107,5 +110,26 @@ export const useEmpireStore = create<EmpireStore>((set, get) => ({
 
   tickCoins: (deltaCoins) => {
     set((s) => ({ localCoins: s.localCoins + deltaCoins }));
+  },
+
+  prestige: async (userId) => {
+    const result = await prestigeEmpire(userId);
+    set((s) => ({
+      data: s.data
+        ? {
+            ...s.data,
+            buildings: {},
+            empire_level: 1,
+            coins: result.new_balance,
+            prestige_count: result.prestige_count,
+            xp_spent: 0,
+            available_xp: s.data.available_xp + (s.data.xp_spent ?? 0),
+            income_per_hour: 0,
+            pending_coins: 0,
+          }
+        : s.data,
+      localCoins: 0,
+    }));
+    return result;
   },
 }));

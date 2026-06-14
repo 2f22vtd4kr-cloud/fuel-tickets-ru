@@ -3252,6 +3252,30 @@ def empire_daily_reward(user_id: int, db: Session = Depends(get_db)):
     return {"ok": True, "day": day, "coins": coins, "message": f"День {day}: +{coins:,} монет"}
 
 
+@app.post("/api/empire/{user_id}/prestige")
+def empire_prestige(user_id: int, db: Session = Depends(get_db)):
+    emp = _get_or_create_empire(db, user_id)
+    buildings = json.loads(emp.buildings_json or "{}")
+    lvl = _empire_level(buildings)
+    if lvl < 20:
+        raise HTTPException(400, f"Нужен уровень Империи 20+. Сейчас: {lvl}")
+    new_prestige = (emp.prestige_count or 0) + 1
+    bonus_coins = 10000 * new_prestige
+    emp.buildings_json = "{}"
+    emp.xp_spent = 0
+    emp.prestige_count = new_prestige
+    emp.coins = (emp.coins or 0) + bonus_coins
+    emp.last_collected_at = datetime.now(timezone.utc)
+    db.commit()
+    return {
+        "ok": True,
+        "prestige_count": new_prestige,
+        "bonus_coins": bonus_coins,
+        "new_balance": round(emp.coins, 2),
+        "multiplier": round(1 + 0.25 * new_prestige, 2),
+    }
+
+
 FRONTEND_DIST = os.path.join(
     os.path.dirname(__file__), "..", "artifacts", "tma-frontend", "dist"
 )
