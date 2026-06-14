@@ -130,16 +130,24 @@ def _run_migrations() -> None:
                 logger.debug("Migration skipped (column likely exists): %s", _e)
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
+def _blocking_startup() -> None:
+    """Run all blocking DB init work in a thread so uvicorn binds immediately."""
     init_db()
     _run_migrations()
     db = SessionLocal()
     try:
         seed_db(db)
         _fix_water_stations(db)
+        _seed_news_events(db)
     finally:
         db.close()
+    logger.info("Blocking startup complete.")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    loop = asyncio.get_event_loop()
+    startup_task = loop.run_in_executor(None, _blocking_startup)
 
     scheduler.add_job(simulate_availability_shifts, "interval", minutes=30, jitter=60)
     scheduler.add_job(remove_expired_reports, "interval", minutes=10, jitter=30)
@@ -153,12 +161,12 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(expire_vpn_sessions, "interval", minutes=1, jitter=15)
     scheduler.add_job(fluctuate_prices, "interval", minutes=15, jitter=60)
     scheduler.add_job(generate_news_from_availability, "interval", hours=2, jitter=60)
-    _seed_news_events(db)
     scheduler.start()
-    logger.info("Топливный Узел API запущен.")
+    logger.info("Топливный Узел API запущен (DB init running in background).")
 
     yield
 
+    await startup_task
     scheduler.shutdown()
 
 
