@@ -469,7 +469,7 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
           onClick={onNavToggle}
           style={{
             position: "absolute",
-            bottom: navVisible ? "4.5rem" : "0.75rem",
+            bottom: navVisible ? "calc(env(safe-area-inset-bottom, 0px) + 5.25rem)" : "calc(env(safe-area-inset-bottom, 0px) + 0.75rem)",
             right: "0.75rem",
             zIndex: 1000,
             background: "rgba(20,20,28,0.92)",

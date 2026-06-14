@@ -285,7 +285,7 @@ export default function App() {
         onClick={() => { setVpnTroubleshooter(false); setShowVpn(true); }}
         title="VPN-доступ"
         style={{
-          position: "fixed", bottom: "74px", left: "12px",
+          position: "fixed", bottom: "calc(env(safe-area-inset-bottom, 0px) + 82px)", left: "12px",
           zIndex: 9500,
           width: "38px", height: "38px",
           borderRadius: "50%",
