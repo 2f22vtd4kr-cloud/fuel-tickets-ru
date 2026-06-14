@@ -11,3 +11,14 @@ apscheduler==3.10.4
 python-multipart==0.0.32
 httpx
 telegram
+aiohttp
+apscheduler
+fastapi
+httpx
+pillow
+python-dotenv
+python-multipart
+python-telegram-bot
+qrcode[pil]
+sqlalchemy
+uvicorn[standard]
