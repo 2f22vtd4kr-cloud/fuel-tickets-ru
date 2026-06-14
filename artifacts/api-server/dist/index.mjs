@@ -4483,8 +4483,7 @@ function handleRequest(req, res) {
     return;
   }
   if (!serveStatic(url, res)) {
-    res.writeHead(404);
-    res.end("Not found");
+    proxyToFastAPI(req, res);
   }
 }
 function handleUpgrade(req, socket, head) {

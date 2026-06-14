@@ -72,6 +72,7 @@ def is_seeded(db: Session) -> bool:
 def seed_db(db: Session) -> None:
     """Seed 220+ gas stations with realistic fuel availability data."""
     from tma_backend.seed_stations import generate_stations
+    from sqlalchemy import insert as sa_insert
 
     if is_seeded(db):
         logger.info("Database already seeded — skipping.")
@@ -82,29 +83,51 @@ def seed_db(db: Session) -> None:
 
     now = datetime.now(timezone.utc)
 
-    for s in stations_data:
-        station = GasStation(
-            region=s["region"],
-            zone_type=s["zone_type"],
-            name=s["name"],
-            address=s["address"],
-            lat=s["lat"],
-            lng=s["lng"],
-            network=s["network"],
-            queue_cars=s["queue_cars"],
-        )
-        db.add(station)
-        db.flush()
+    # Bulk-insert all stations in one round-trip, get IDs back via RETURNING.
+    # Falls back to individual flushes for SQLite (no RETURNING support in older drivers).
+    try:
+        stmt = sa_insert(GasStation).returning(GasStation.id)
+        rows = db.execute(stmt, [
+            dict(
+                region=s["region"],
+                zone_type=s["zone_type"],
+                name=s["name"],
+                address=s["address"],
+                lat=s["lat"],
+                lng=s["lng"],
+                network=s["network"],
+                queue_cars=s["queue_cars"],
+            )
+            for s in stations_data
+        ])
+        station_ids = [r[0] for r in rows]
+    except Exception:
+        # SQLite fallback: flush one at a time
+        station_ids = []
+        for s in stations_data:
+            station = GasStation(
+                region=s["region"], zone_type=s["zone_type"],
+                name=s["name"], address=s["address"],
+                lat=s["lat"], lng=s["lng"],
+                network=s["network"], queue_cars=s["queue_cars"],
+            )
+            db.add(station)
+            db.flush()
+            station_ids.append(station.id)
 
+    # Bulk-insert all fuel statuses in one round-trip.
+    fuel_rows = []
+    for sid, s in zip(station_ids, stations_data):
         for fs_data in s["fuel_statuses"]:
-            fs = FuelStatus(
-                station_id=station.id,
+            fuel_rows.append(dict(
+                station_id=sid,
                 fuel_type=fs_data["fuel_type"],
                 status=fs_data["status"],
                 availability_pct=fs_data["availability_pct"],
                 last_updated=now,
-            )
-            db.add(fs)
+            ))
+    if fuel_rows:
+        db.execute(sa_insert(FuelStatus), fuel_rows)
 
     db.commit()
     logger.info("Seeding complete.")

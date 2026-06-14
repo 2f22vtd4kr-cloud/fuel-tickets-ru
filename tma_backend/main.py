@@ -121,6 +121,10 @@ def _run_migrations() -> None:
         "ALTER TABLE vpn_sessions ADD COLUMN IF NOT EXISTS warned_expiry BOOLEAN NOT NULL DEFAULT FALSE",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS checkin_streak INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_checkin_date TIMESTAMPTZ",
+        # Indices for bulk StationReport lookup in /api/stations
+        "CREATE INDEX IF NOT EXISTS ix_station_report_station_id ON station_reports (station_id)",
+        "CREATE INDEX IF NOT EXISTS ix_station_report_expires_at ON station_reports (expires_at)",
+        "CREATE INDEX IF NOT EXISTS ix_station_report_created_at ON station_reports (created_at)",
     ]
     with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
         for stmt in ddl_statements:
@@ -725,16 +729,32 @@ def send_morning_digest():
         if not by_chat:
             return
 
+        # Pre-load all needed stations in one query
+        all_sub_station_ids = {s.station_id for s in subs}
+        station_map: dict[int, GasStation] = {
+            st.id: st
+            for st in db.query(GasStation).filter(GasStation.id.in_(all_sub_station_ids)).all()
+        }
+        # Pre-load all fuel statuses for those stations in one query
+        all_fuel: list[FuelStatus] = (
+            db.query(FuelStatus)
+            .filter(FuelStatus.station_id.in_(all_sub_station_ids))
+            .all()
+        )
+        fuel_by_station: dict[int, list[FuelStatus]] = {}
+        for fs in all_fuel:
+            fuel_by_station.setdefault(fs.station_id, []).append(fs)
+
         for chat_id, user_subs in by_chat.items():
             lines = ["☀️ *Утренний дайджест — Матрица Снабжения*\n"]
             for sub in user_subs[:8]:  # cap at 8 stations per digest
-                station = db.query(GasStation).filter(GasStation.id == sub.station_id).first()
+                station = station_map.get(sub.station_id)
                 if not station:
                     continue
-                fuel_q = db.query(FuelStatus).filter(FuelStatus.station_id == sub.station_id)
-                if sub.fuel_type:
-                    fuel_q = fuel_q.filter(FuelStatus.fuel_type == sub.fuel_type)
-                statuses = fuel_q.all()
+                statuses = [
+                    fs for fs in fuel_by_station.get(sub.station_id, [])
+                    if not sub.fuel_type or fs.fuel_type == sub.fuel_type
+                ]
                 if not statuses:
                     continue
 
@@ -1170,9 +1190,40 @@ def list_stations(
         )
     stations = q.all()
 
+    # Bulk-load all relevant crowd reports in ONE query instead of N×M queries.
+    now = _now()
+    cutoff = now - timedelta(hours=1, minutes=30)
+    station_ids = [s.id for s in stations]
+    if station_ids:
+        raw_reports = (
+            db.query(StationReport)
+            .filter(
+                StationReport.station_id.in_(station_ids),
+                StationReport.expires_at > now,
+                StationReport.created_at > cutoff,
+            )
+            .all()
+        )
+    else:
+        raw_reports = []
+
+    # Group reports by station_id for O(1) lookup.
+    from collections import defaultdict
+    reports_by_station: dict[int, list] = defaultdict(list)
+    for r in raw_reports:
+        reports_by_station[r.station_id].append(r)
+
+    def _avail_fast(station_id: int, base_pct: int) -> int:
+        reps = reports_by_station.get(station_id, [])
+        if not reps:
+            return base_pct
+        pos = sum(1 for r in reps if r.vote_type == "available")
+        neg = sum(1 for r in reps if r.vote_type == "unavailable")
+        return max(0, min(100, base_pct + (pos - neg) * 10))
+
     result = []
     for s in stations:
-        s_dict = {
+        result.append({
             "id": s.id, "region": s.region, "zone_type": s.zone_type,
             "name": s.name, "address": s.address,
             "lat": s.lat, "lng": s.lng,
@@ -1181,15 +1232,12 @@ def list_stations(
                 {
                     "fuel_type": fs.fuel_type,
                     "status": fs.status,
-                    "availability_pct": _effective_availability(
-                        db, s.id, fs.fuel_type, fs.availability_pct
-                    ),
+                    "availability_pct": _avail_fast(s.id, fs.availability_pct),
                     "last_updated": fs.last_updated,
                 }
                 for fs in s.fuel_statuses
             ],
-        }
-        result.append(s_dict)
+        })
     return result
 
 
@@ -2104,9 +2152,17 @@ def delete_subscription(subscription_id: int, user_id: int,
 def get_user_subscriptions(user_id: int, db: Session = Depends(get_db)):
     """List all active subscriptions for a user (used by bot /subscriptions command)."""
     subs = db.query(Subscription).filter(Subscription.user_id == user_id).all()
+    if subs:
+        sub_station_ids = {s.station_id for s in subs}
+        station_map = {
+            st.id: st
+            for st in db.query(GasStation).filter(GasStation.id.in_(sub_station_ids)).all()
+        }
+    else:
+        station_map = {}
     result = []
     for sub in subs:
-        station = db.query(GasStation).filter(GasStation.id == sub.station_id).first()
+        station = station_map.get(sub.station_id)
         result.append({
             "id": sub.id,
             "user_id": sub.user_id,
@@ -2139,6 +2195,9 @@ def get_analytics(db: Session = Depends(get_db)):
     statuses = db.query(FuelStatus).all()
     stations = db.query(GasStation).all()
 
+    # Build a lookup dict so we never query GasStation per FuelStatus.
+    station_by_id = {s.id: s for s in stations}
+
     # Regional supply
     regional_supply: dict = {}
     for s in stations:
@@ -2148,7 +2207,7 @@ def get_analytics(db: Session = Depends(get_db)):
         regional_supply[s.region]["count"] += 1
 
     for fs in statuses:
-        st = db.query(GasStation).filter(GasStation.id == fs.station_id).first()
+        st = station_by_id.get(fs.station_id)
         if st and st.region in regional_supply:
             regional_supply[st.region][fs.status] += 1
             regional_supply[st.region]["avg_pct"] += fs.availability_pct
@@ -2357,13 +2416,20 @@ def generate_news_from_availability():
         CRITICAL_THRESHOLD = 20.0  # % below which a region triggers a news event
         GOOD_THRESHOLD = 75.0      # % above which a positive news event is generated
 
-        # Aggregate avg availability per region
+        # Aggregate avg availability per region — use one bulk FuelStatus query
+        # instead of lazy-loading st.fuel_statuses per station (N+1).
         region_stats: dict[str, list[float]] = {}
-        stations = db.query(GasStation).all()
-        for st in stations:
-            avail_vals = [fs.availability_pct for fs in st.fuel_statuses]
+        station_region: dict[int, str] = {
+            st.id: st.region
+            for st in db.query(GasStation.id, GasStation.region).all()
+        }
+        fs_by_station: dict[int, list[float]] = {}
+        for fs in db.query(FuelStatus.station_id, FuelStatus.availability_pct).all():
+            fs_by_station.setdefault(fs.station_id, []).append(fs.availability_pct)
+        for st_id, region in station_region.items():
+            avail_vals = fs_by_station.get(st_id, [])
             if avail_vals:
-                region_stats.setdefault(st.region, []).append(
+                region_stats.setdefault(region, []).append(
                     sum(avail_vals) / len(avail_vals)
                 )
 

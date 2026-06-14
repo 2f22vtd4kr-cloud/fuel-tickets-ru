@@ -138,10 +138,10 @@ function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): voi
     return;
   }
 
-  // Static files → serve directly from dist
+  // Static files → serve directly from dist; fall back to FastAPI (which mounts
+  // the frontend via StaticFiles) so the SPA loads even if local dist is absent.
   if (!serveStatic(url, res)) {
-    res.writeHead(404);
-    res.end("Not found");
+    proxyToFastAPI(req, res);
   }
 }
 

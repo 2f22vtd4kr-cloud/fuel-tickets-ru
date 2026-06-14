@@ -112,11 +112,11 @@ class StationReport(Base):
     __tablename__ = "station_reports"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    station_id = Column(Integer, ForeignKey("gas_stations.id"), nullable=False)
+    station_id = Column(Integer, ForeignKey("gas_stations.id"), nullable=False, index=True)
     user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
     vote_type = Column(String, nullable=False)
-    created_at = Column(DateTime(timezone=True), default=_now)
-    expires_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=_now, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
 
     station = relationship("GasStation", back_populates="reports")
     user = relationship("User", back_populates="reports")
