@@ -2783,26 +2783,75 @@ async def pre_checkout_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.answer(ok=True)
 
 
+_INTERNAL_API_SECRET = os.getenv("INTERNAL_API_SECRET", "tma_internal_dev_2026")
+_TMA_BACKEND_URL = os.getenv("TMA_BACKEND_URL", "http://localhost:8000")
+
+
 async def successful_payment_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Issue a voucher after successful Stars payment."""
+    """
+    Issue a voucher after successful Stars payment.
+
+    Payload formats:
+      - Bot purchases:  stars_{fuel_type}_{volume}_{station_id}
+      - TMA purchases:  tma_{user_id}_{fuel_type}_{volume}_{station_id}
+
+    TMA purchases are also recorded in the FastAPI DB via /internal/record-stars-purchase
+    so they appear in the user's Vault.
+    """
     msg = update.message
     if not msg or not msg.successful_payment:
         return
     payment = msg.successful_payment
     chat_id = msg.chat_id
-    payload = payment.invoice_payload  # format: "stars_{fuel_type}_{volume}_{station_id}"
+    payload = payment.invoice_payload
     stars = payment.total_amount
 
+    is_tma = payload.startswith("tma_")
+    qr = None
+
     try:
-        parts = payload.split("_")
-        fuel_type = parts[1] if len(parts) > 1 else "АИ-92"
-        volume = int(parts[2]) if len(parts) > 2 else 20
+        if is_tma:
+            # tma_{user_id}_{fuel_type}_{volume}_{station_id}
+            parts = payload.split("_", 4)
+            tma_user_id = int(parts[1]) if len(parts) > 1 else 0
+            fuel_type = parts[2] if len(parts) > 2 else "АИ-92"
+            volume = int(parts[3]) if len(parts) > 3 else 20
+            station_id = int(parts[4]) if len(parts) > 4 else 0
+            price_rub = stars  # approximate, Stars ≈ 1.84 RUB each; exact calc in backend
+
+            # Call TMA backend to record purchase and get QR hash
+            try:
+                async with aiohttp.ClientSession() as sess:
+                    async with sess.post(
+                        f"{_TMA_BACKEND_URL}/internal/record-stars-purchase",
+                        json={
+                            "user_id": tma_user_id,
+                            "fuel_type": fuel_type,
+                            "volume": volume,
+                            "station_id": station_id,
+                            "price_rub": price_rub,
+                            "stars_amount": stars,
+                            "internal_secret": _INTERNAL_API_SECRET,
+                        },
+                        timeout=aiohttp.ClientTimeout(total=8),
+                    ) as resp:
+                        data = await resp.json()
+                        qr = data.get("qr_hash")
+            except Exception as exc:
+                logger.warning("Failed to record TMA Stars purchase in backend: %s", exc)
+        else:
+            # Bot purchase: stars_{fuel_type}_{volume}_{station_id}
+            parts = payload.split("_")
+            fuel_type = parts[1] if len(parts) > 1 else "АИ-92"
+            volume = int(parts[2]) if len(parts) > 2 else 20
     except Exception:
         fuel_type = "АИ-92"
         volume = 20
 
-    import secrets as _sec
-    qr = f"STARS-{_sec.token_hex(8).upper()}"
+    if qr is None:
+        import secrets as _sec
+        qr = f"STARS-{_sec.token_hex(8).upper()}"
+
     text = (
         f"⭐ *Оплата {stars} Stars получена!*\n\n"
         f"🛢 Топливо: {fuel_type}\n"
@@ -2812,9 +2861,10 @@ async def successful_payment_handler(update: Update, context: ContextTypes.DEFAU
     )
     await msg.reply_text(text, parse_mode="Markdown")
     if ADMIN_CHAT_ID:
+        src = "TMA" if is_tma else "Bot"
         await context.bot.send_message(
             chat_id=ADMIN_CHAT_ID,
-            text=f"⭐ Stars оплата: {stars} Stars от chat_id={chat_id}\n{fuel_type} {volume}л\nQR: `{qr}`",
+            text=f"⭐ Stars [{src}]: {stars}⭐ от chat_id={chat_id}\n{fuel_type} {volume}л\nQR: `{qr}`",
             parse_mode="Markdown",
         )
 

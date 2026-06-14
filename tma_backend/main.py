@@ -37,11 +37,13 @@ from tma_backend.payment import provider
 from tma_backend.schemas import (
     AnalyticsOut, CardOut, CheckinOut, FlipResultOut, GasStationOut,
     LeaderboardEntry, LeaderboardOut, PurchaseIn, PurchaseResultOut,
-    ReferralOut, ReferralUseIn, ReferralUseOut,
+    ReferralOut, ReferralUseIn, ReferralUseOut, StarsPurchaseIn,
     StationReportIn, SubscriptionIn, SubscriptionOut,
     SubscriptionStatusOut, TapScoreIn, TapScoreOut, UserCreateIn, UserOut,
     VpnBuyIn, VpnInvoiceOut, VpnSessionOut, VpnStatusOut,
 )
+
+INTERNAL_API_SECRET = os.getenv("INTERNAL_API_SECRET", "tma_internal_dev_2026")
 from tma_backend.seed_regions import DAILY_LIMITS, FUEL_PRICES_RUB, XP_TIERS
 
 logging.basicConfig(level=logging.INFO,
@@ -1474,7 +1476,12 @@ def purchase_voucher(body: PurchaseIn, db: Session = Depends(get_db)):
 
 @app.post("/api/catalog/stars-invoice")
 def create_stars_invoice(body: PurchaseIn, db: Session = Depends(get_db)):
-    """Return Stars count needed; actual payment handled by Telegram bot."""
+    """
+    Create a real Telegram Stars invoice link via createInvoiceLink Bot API.
+    Returns invoice_link — the frontend passes it to Telegram.WebApp.openInvoice().
+    After the user pays, Telegram fires successful_payment to the bot, which
+    then calls /internal/record-stars-purchase to persist the purchase.
+    """
     station = db.query(GasStation).filter(GasStation.id == body.station_id).first()
     if not station:
         raise HTTPException(404, detail="Станция не найдена")
@@ -1483,12 +1490,14 @@ def create_stars_invoice(body: PurchaseIn, db: Session = Depends(get_db)):
     from tma_backend.payment import get_provider
     result = get_provider("stars").create_invoice(
         user_id=body.user_id, fuel_type=body.fuel_type,
-        volume=body.volume, price_rub=total_price,
+        volume=body.volume, price_rub=total_price, station_id=body.station_id,
     )
+    if not result.ok:
+        raise HTTPException(500, detail=result.error or "Ошибка создания инвойса Stars")
     return {
         "stars_amount": result.stars_amount,
+        "invoice_link": result.checkout_url,
         "transaction_id": result.transaction_id,
-        "qr_hash": result.qr_hash,
         "price_rub": total_price,
     }
 
@@ -1530,6 +1539,72 @@ def create_cryptobot_invoice(body: PurchaseIn, db: Session = Depends(get_db)):
         "transaction_id": result.transaction_id,
         "qr_hash": result.qr_hash,
     }
+
+
+@app.post("/internal/record-stars-purchase")
+def record_stars_purchase(body: StarsPurchaseIn, db: Session = Depends(get_db)):
+    """
+    Called by Telegram bot after a successful Stars payment (successful_payment update).
+    Persists the purchase to TMA DB so it appears in the user's Vault.
+    Protected by a shared INTERNAL_API_SECRET known only to bot.py and this backend.
+    """
+    if body.internal_secret != INTERNAL_API_SECRET:
+        raise HTTPException(403, detail="Forbidden")
+
+    from tma_backend.payment import generate_qr_hash
+
+    station = db.query(GasStation).filter(GasStation.id == body.station_id).first()
+    station_name = station.name if station else "АЗС"
+    region = station.region if station else "Севастополь"
+
+    user = _get_or_create_user(db, body.user_id)
+
+    qr = generate_qr_hash(body.user_id, body.fuel_type, body.volume)
+    purchase = PurchaseHistory(
+        user_id=body.user_id,
+        fuel_type=body.fuel_type,
+        volume=body.volume,
+        price=body.price_rub,
+        currency="XTR",
+        status="active",
+        qr_hash=qr,
+        station_name=station_name,
+        region=region,
+        expires_at=_now() + timedelta(days=3),
+    )
+    db.add(purchase)
+
+    tomorrow = _now().replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+    tracker = (
+        db.query(DailyLimitTracker)
+        .filter(
+            DailyLimitTracker.user_id == body.user_id,
+            DailyLimitTracker.fuel_type == body.fuel_type,
+            DailyLimitTracker.reset_at > _now(),
+        )
+        .first()
+    )
+    if tracker:
+        tracker.total_volume_bought += body.volume
+    else:
+        db.add(DailyLimitTracker(
+            user_id=body.user_id,
+            fuel_type=body.fuel_type,
+            total_volume_bought=body.volume,
+            reset_at=tomorrow,
+        ))
+
+    old_level = user.level
+    user.xp += 20
+    user.level = _xp_to_level(user.xp)
+    _notify_levelup(user, old_level)
+
+    db.commit()
+    logger.info(
+        "Stars purchase recorded: user=%d, %dл %s, station=%s, qr=%s",
+        body.user_id, body.volume, body.fuel_type, station_name, qr,
+    )
+    return {"ok": True, "qr_hash": qr}
 
 
 @app.get("/api/catalog/limits/{user_id}")

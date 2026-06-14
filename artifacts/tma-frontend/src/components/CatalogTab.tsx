@@ -546,12 +546,26 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
     try {
       if (method === "stars") {
         const inv = await createStarsInvoice(user.id, fuelType, volume, selectedStation.id);
-        notify("success");
-        const tg = (window as unknown as { Telegram?: { WebApp?: { openInvoice?: (url: string) => void } } }).Telegram?.WebApp;
-        if (tg?.openInvoice) {
-          toast(`⭐ Оплата: ${inv.stars_amount} Stars`, "success");
+        type TgWebApp = { openInvoice?: (url: string, cb: (status: string) => void) => void };
+        const tg = (window as unknown as { Telegram?: { WebApp?: TgWebApp } }).Telegram?.WebApp;
+        if (tg?.openInvoice && inv.invoice_link) {
+          tg.openInvoice(inv.invoice_link, (status: string) => {
+            if (status === "paid") {
+              notify("success");
+              toast(`⭐ Оплата ${inv.stars_amount} Stars принята! Ваучер отправлен в чат.`, "success");
+            } else if (status === "cancelled") {
+              notify("error");
+              toast("Оплата отменена.", "error");
+            } else {
+              notify("error");
+              toast(`Ошибка оплаты: ${status}`, "error");
+            }
+          });
+        } else if (inv.invoice_link) {
+          window.open(inv.invoice_link, "_blank");
+          toast(`⭐ Счёт на ${inv.stars_amount} Stars открыт.`, "success");
         } else {
-          toast(`⭐ Требуется ${inv.stars_amount} Stars (открой через Telegram)`, "success");
+          toast(`⭐ Требуется ${inv.stars_amount} Stars — откройте через Telegram.`, "success");
         }
       } else if (method === "cryptobot") {
         const inv = await createCryptoBotInvoice(user.id, fuelType, volume, selectedStation.id);

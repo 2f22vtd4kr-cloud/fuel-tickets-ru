@@ -274,3 +274,14 @@ class ReferralUseOut(BaseModel):
     ok: bool
     message: str
     xp_awarded: int = 0
+
+
+class StarsPurchaseIn(BaseModel):
+    """Posted by Telegram bot to /internal/record-stars-purchase after successful_payment."""
+    user_id: int
+    fuel_type: str
+    volume: int
+    station_id: int
+    price_rub: int
+    stars_amount: int
+    internal_secret: str

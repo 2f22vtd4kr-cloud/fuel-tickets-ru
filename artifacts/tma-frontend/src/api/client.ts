@@ -99,12 +99,14 @@ export const flipCard = (userId: number) =>
   req<FlipResult>(`/game/flip/${userId}`, { method: "POST" });
 
 export const createStarsInvoice = (
+  // Returns invoice_link (Telegram invoice URL) when TELEGRAM_BOT_TOKEN is set.
+  // Frontend must call Telegram.WebApp.openInvoice(invoice_link, callback).
   userId: number,
   fuelType: string,
   volume: number,
   stationId: number,
 ) =>
-  req<{ stars_amount: number; transaction_id: string; qr_hash: string }>(
+  req<{ stars_amount: number; transaction_id: string; qr_hash: string; invoice_link: string | null }>(
     "/catalog/stars-invoice",
     {
       method: "POST",

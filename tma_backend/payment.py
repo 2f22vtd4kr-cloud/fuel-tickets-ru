@@ -63,6 +63,7 @@ class PaymentProvider(ABC):
         fuel_type: str,
         volume: int,
         price_rub: int,
+        station_id: int = 0,
     ) -> PaymentResult: ...
 
 
@@ -75,6 +76,7 @@ class MockPaymentProvider(PaymentProvider):
         fuel_type: str,
         volume: int,
         price_rub: int,
+        station_id: int = 0,
     ) -> PaymentResult:
         tx_id = f"MOCK-{secrets.token_hex(10).upper()}"
         qr = generate_qr_hash(user_id, fuel_type, volume)
@@ -97,6 +99,7 @@ class CryptoBotProvider(PaymentProvider):
         fuel_type: str,
         volume: int,
         price_rub: int,
+        station_id: int = 0,
     ) -> PaymentResult:
         amount_usdt = round(price_rub / USDT_RUB_RATE, 2)
         qr = generate_qr_hash(user_id, fuel_type, volume)
@@ -145,11 +148,12 @@ class CryptoBotProvider(PaymentProvider):
 
 class StarsPaymentProvider(PaymentProvider):
     """
-    Creates a Telegram Stars invoice record.
-    The actual Stars invoice is sent by the bot; here we just compute
-    how many Stars are needed and return the metadata.
+    Creates a real Telegram Stars invoice link via the createInvoiceLink Bot API.
+    The frontend calls Telegram.WebApp.openInvoice(link, callback) with the returned link.
+    After the user pays, Telegram sends successful_payment to the bot, which then
+    records the purchase in the TMA database.
     Stars price: 1 Star ≈ $0.02 USD ≈ 1.84 RUB (at ~92 RUB/USD).
-    We use ceil(price_rub / 1.84) stars, minimum 1.
+    Falls back to metadata-only if TELEGRAM_BOT_TOKEN is not set.
     """
 
     STAR_RUB_RATE = 1.84  # 1 Star ≈ 1.84 RUB
@@ -160,15 +164,62 @@ class StarsPaymentProvider(PaymentProvider):
         fuel_type: str,
         volume: int,
         price_rub: int,
+        station_id: int = 0,
     ) -> PaymentResult:
         import math
         stars = max(1, math.ceil(price_rub / self.STAR_RUB_RATE))
         qr = generate_qr_hash(user_id, fuel_type, volume)
         tx_id = f"STARS-{secrets.token_hex(8).upper()}"
-        return PaymentResult(
-            ok=True, transaction_id=tx_id, qr_hash=qr,
-            stars_amount=stars,
-        )
+
+        bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+        if not bot_token:
+            logger.warning(
+                "TELEGRAM_BOT_TOKEN not set — Stars invoice link cannot be created; "
+                "returning metadata only (no real payment will occur)"
+            )
+            return PaymentResult(ok=True, transaction_id=tx_id, qr_hash=qr, stars_amount=stars)
+
+        # Payload parsed by successful_payment_handler in bot.py:
+        # tma_{user_id}_{fuel_type}_{volume}_{station_id}
+        payload = f"tma_{user_id}_{fuel_type}_{volume}_{station_id}"
+
+        try:
+            resp = httpx.post(
+                f"https://api.telegram.org/bot{bot_token}/createInvoiceLink",
+                json={
+                    "title": f"Ваучер {fuel_type} {volume}л",
+                    "description": (
+                        f"Предоплаченный топливный ваучер: {volume} л {fuel_type}. "
+                        f"Действителен на всех АЗС Матрицы Снабжения. "
+                        f"Стоимость: ~{price_rub} ₽"
+                    ),
+                    "payload": payload,
+                    "currency": "XTR",
+                    "prices": [{"label": f"{fuel_type} {volume}л", "amount": stars}],
+                },
+                timeout=10,
+            )
+            data = resp.json()
+            if data.get("ok"):
+                link: str = data["result"]
+                logger.info("Stars invoice link created: stars=%d, station=%d, user=%d", stars, station_id, user_id)
+                return PaymentResult(
+                    ok=True, transaction_id=tx_id, qr_hash=qr,
+                    stars_amount=stars, checkout_url=link,
+                )
+            else:
+                desc = data.get("description", "Telegram API error")
+                logger.error("createInvoiceLink failed: %s", data)
+                return PaymentResult(
+                    ok=False, transaction_id=tx_id, qr_hash=qr,
+                    stars_amount=stars, error=desc,
+                )
+        except Exception as exc:
+            logger.exception("StarsPaymentProvider network error: %s", exc)
+            return PaymentResult(
+                ok=False, transaction_id=tx_id, qr_hash=qr,
+                stars_amount=stars, error=str(exc),
+            )
 
 
 def get_provider(method: str = PAYMENT_METHOD) -> PaymentProvider:
