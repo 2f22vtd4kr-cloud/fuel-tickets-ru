@@ -708,41 +708,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 f"ID: `{user.id}`",
             ))
 
-    # Fetch live system stats for the welcome message
-    _sys_stats_line = ""
-    try:
-        async with aiohttp.ClientSession() as _sess:
-            async with _sess.get("http://localhost:8000/api/stats", timeout=aiohttp.ClientTimeout(total=3)) as _r:
-                if _r.status == 200:
-                    _sd = await _r.json()
-                    _sb = _sd.get("station_breakdown", {})
-                    _sys_stats_line = (
-                        f"\n📡 Состояние матрицы: "
-                        f"🟢{_sb.get('green',0)} · 🟡{_sb.get('yellow',0)} · 🔴{_sb.get('red',0)}"
-                        f" из {_sd.get('total_stations','?')} АЗС\n"
-                    )
-    except Exception:
-        pass
-
-    first = user.first_name if user else "Оператор"
-    await update.message.reply_text(
-        "⬡ *ТОПЛИВНЫЙ УЗЕЛ · МАТРИЦА СНАБЖЕНИЯ*\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "🔌 `СИСТЕМА_ОНЛАЙН` · Севастополь / Крым\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"Идентификация: *{first}*\n"
-        f"{_sys_stats_line}\n"
-        "🛢 *Доступные функции:*\n"
-        "• 📍 Карта АЗС с наличием топлива в реальном времени\n"
-        "• 🎫 Выдача цифровых ваучеров ГСМ (20–60 л)\n"
-        "• 📊 Аналитика по регионам и трендам\n"
-        "• 🎮 Бонусная система и ежедневные розыгрыши\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "_Официальный канал учёта и распределения ГСМ_\n"
-        "_Департамент цифрового развития · г. Севастополь_",
-        parse_mode="Markdown",
-        reply_markup=main_menu_markup()
-    )
+    pass
 
 
 async def admin_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

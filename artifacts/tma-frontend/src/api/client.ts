@@ -254,3 +254,57 @@ export interface Achievement {
 }
 export const fetchAchievements = (userId: number) =>
   req<{ achievements: Achievement[] }>(`/achievements/${userId}`);
+
+// Empire idle game
+export interface EmpireState {
+  empire_level: number;
+  coins: number;
+  available_xp: number;
+  xp_spent: number;
+  buildings: Record<string, number>;
+  prestige_count: number;
+  pending_coins: number;
+  income_per_hour: number;
+  daily_reward_day: number;
+  daily_reward_available: boolean;
+  next_daily_reward_in: number | null;
+}
+export interface EmpireCollectResult {
+  ok: boolean;
+  collected: number;
+  new_balance: number;
+}
+export interface EmpireBuildResult {
+  ok: boolean;
+  new_level: number;
+  xp_cost: number;
+  available_xp: number;
+  empire_level: number;
+}
+export interface EmpireDailyResult {
+  ok: boolean;
+  day: number;
+  coins: number;
+  message: string;
+}
+export interface EmpireLeaderboardEntry {
+  rank: number;
+  user_id: number;
+  username: string | null;
+  empire_level: number;
+  coins: number;
+  prestige_count: number;
+}
+export const fetchEmpire = (userId: number) =>
+  req<EmpireState>(`/empire/${userId}`);
+export const collectEmpireCoins = (userId: number) =>
+  req<EmpireCollectResult>(`/empire/${userId}/collect`, { method: "POST" });
+export const buildEmpireBuilding = (userId: number, buildingType: string) =>
+  req<EmpireBuildResult>(`/empire/${userId}/build`, {
+    method: "POST",
+    body: JSON.stringify({ building_type: buildingType }),
+  });
+export const claimEmpireDailyReward = (userId: number) =>
+  req<EmpireDailyResult>(`/empire/${userId}/daily-reward`, { method: "POST" });
+export const fetchEmpireLeaderboard = () =>
+  req<{ entries: EmpireLeaderboardEntry[] }>("/empire/leaderboard");

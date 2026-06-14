@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { flipCard, submitTapScore, dailyCheckin, fetchLeaderboard, fetchReferral, useReferralCode } from "@/api/client";
+import { EmpireGame } from "@/components/EmpireGame";
 import { impact, notify } from "@/lib/haptic";
 import { useUserStore } from "@/stores/useUserStore";
 import { useGameStore } from "@/stores/useGameStore";
@@ -1311,11 +1312,13 @@ function OperatorConsole() {
   );
 }
 
-// ─── Fortune Tab ──────────────────────────────────────────────────
+// ─── Luna Park Tab ────────────────────────────────────────────────
 
 export function ReserveTab() {
   return (
     <div style={{ height: "100%", overflowY: "auto", paddingBottom: "5rem" }}>
+      <EmpireGame />
+      <div style={{ height: "1px", background: "rgba(255,255,255,0.06)", margin: "0 16px 20px" }} />
       <OperatorConsole />
       <div style={{ height: "0.75rem" }} />
       <DailyCheckin />

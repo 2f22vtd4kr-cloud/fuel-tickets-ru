@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 
 from tma_backend.database import SessionLocal, get_db, init_db, seed_db, _generate_snapshot
 from tma_backend.models import (
-    RegionFavorite,
+    Empire, RegionFavorite,
     AnalyticsSnapshot, DailyLimitTracker, FuelStatus, GasStation,
     PurchaseHistory, ReferralCode, StationReport, Subscription, User,
     UserAchievement, UserCheckin, VpnSession,
@@ -3067,6 +3067,189 @@ async def admin_reseed_db(db: Session = Depends(get_db)):
     """Re-run the seeder to refresh station data."""
     seed_db(db)
     return {"ok": True, "message": "Reseed complete"}
+
+
+# ── Empire idle game ─────────────────────────────────────────────────────────
+
+_EMPIRE_BUILDINGS: dict = {
+    "hut":              {"base_rate": 10,  "base_xp": 50,   "unlock": 1},
+    "farm":             {"base_rate": 15,  "base_xp": 80,   "unlock": 1},
+    "market":           {"base_rate": 20,  "base_xp": 120,  "unlock": 1},
+    "windmill":         {"base_rate": 12,  "base_xp": 90,   "unlock": 1},
+    "bakery":           {"base_rate": 35,  "base_xp": 300,  "unlock": 10},
+    "blacksmith":       {"base_rate": 40,  "base_xp": 400,  "unlock": 11},
+    "warehouse":        {"base_rate": 30,  "base_xp": 350,  "unlock": 12},
+    "townhall":         {"base_rate": 50,  "base_xp": 500,  "unlock": 13},
+    "apartments":       {"base_rate": 80,  "base_xp": 1000, "unlock": 25},
+    "mall":             {"base_rate": 100, "base_xp": 1200, "unlock": 26},
+    "factory":          {"base_rate": 120, "base_xp": 1500, "unlock": 27},
+    "bank":             {"base_rate": 150, "base_xp": 2000, "unlock": 28},
+    "skyscraper":       {"base_rate": 300, "base_xp": 5000, "unlock": 50},
+    "airport":          {"base_rate": 350, "base_xp": 6000, "unlock": 51},
+    "techcampus":       {"base_rate": 400, "base_xp": 7000, "unlock": 52},
+    "financial_center": {"base_rate": 500, "base_xp": 8000, "unlock": 53},
+}
+
+_DAILY_REWARDS = [500, 1000, 2000, 1500, 3000, 2500, 10000]
+
+
+def _empire_level(buildings: dict) -> int:
+    return max(1, 1 + sum(buildings.values()) // 5)
+
+
+def _empire_income(buildings: dict, prestige: int) -> float:
+    mult = 1.0 + 0.25 * prestige
+    total = 0.0
+    for btype, lvl in buildings.items():
+        if lvl > 0 and btype in _EMPIRE_BUILDINGS:
+            total += _EMPIRE_BUILDINGS[btype]["base_rate"] * (lvl ** 1.5)
+    return total * mult
+
+
+def _get_or_create_empire(db: Session, user_id: int) -> Empire:
+    emp = db.query(Empire).filter(Empire.user_id == user_id).first()
+    if not emp:
+        emp = Empire(user_id=user_id)
+        db.add(emp)
+        db.commit()
+        db.refresh(emp)
+    return emp
+
+
+class EmpireBuildIn(BaseModel):
+    building_type: str
+
+
+@app.get("/api/empire/leaderboard")
+def empire_leaderboard(db: Session = Depends(get_db)):
+    empires = db.query(Empire).all()
+    entries = []
+    for emp in empires:
+        buildings = json.loads(emp.buildings_json or "{}")
+        lvl = _empire_level(buildings)
+        user = db.query(User).filter(User.id == emp.user_id).first()
+        entries.append({
+            "user_id": emp.user_id,
+            "username": user.username if user else None,
+            "empire_level": lvl,
+            "coins": round(emp.coins or 0),
+            "prestige_count": emp.prestige_count or 0,
+        })
+    entries.sort(key=lambda x: (x["empire_level"], x["coins"]), reverse=True)
+    for i, e in enumerate(entries[:20]):
+        e["rank"] = i + 1
+    return {"entries": entries[:20]}
+
+
+@app.get("/api/empire/{user_id}")
+def get_empire(user_id: int, db: Session = Depends(get_db)):
+    emp = _get_or_create_empire(db, user_id)
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(404, "User not found")
+    buildings = json.loads(emp.buildings_json or "{}")
+    now = datetime.now(timezone.utc)
+    last = (emp.last_collected_at or emp.created_at or now)
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=timezone.utc)
+    elapsed_h = min((now - last).total_seconds() / 3600, 24.0)
+    income_h = _empire_income(buildings, emp.prestige_count or 0)
+    pending = elapsed_h * income_h
+    avail_xp = max(0, user.xp - (emp.xp_spent or 0))
+    daily_ok = False
+    next_in: Optional[int] = None
+    if emp.last_daily_reward_at is None:
+        daily_ok = True
+    else:
+        ldr = emp.last_daily_reward_at
+        if ldr.tzinfo is None:
+            ldr = ldr.replace(tzinfo=timezone.utc)
+        delta = (now - ldr).total_seconds()
+        if delta >= 86400:
+            daily_ok = True
+        else:
+            next_in = int(86400 - delta)
+    return {
+        "empire_level": _empire_level(buildings),
+        "coins": round(emp.coins or 0, 2),
+        "available_xp": avail_xp,
+        "xp_spent": emp.xp_spent or 0,
+        "buildings": buildings,
+        "prestige_count": emp.prestige_count or 0,
+        "pending_coins": round(pending, 2),
+        "income_per_hour": round(income_h, 2),
+        "daily_reward_day": emp.daily_reward_day or 0,
+        "daily_reward_available": daily_ok,
+        "next_daily_reward_in": next_in,
+    }
+
+
+@app.post("/api/empire/{user_id}/collect")
+def collect_empire(user_id: int, db: Session = Depends(get_db)):
+    emp = _get_or_create_empire(db, user_id)
+    buildings = json.loads(emp.buildings_json or "{}")
+    now = datetime.now(timezone.utc)
+    last = (emp.last_collected_at or emp.created_at or now)
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=timezone.utc)
+    elapsed_h = min((now - last).total_seconds() / 3600, 24.0)
+    earned = elapsed_h * _empire_income(buildings, emp.prestige_count or 0)
+    emp.coins = (emp.coins or 0) + earned
+    emp.last_collected_at = now
+    db.commit()
+    return {"ok": True, "collected": round(earned, 2), "new_balance": round(emp.coins, 2)}
+
+
+@app.post("/api/empire/{user_id}/build")
+def build_empire(user_id: int, body: EmpireBuildIn, db: Session = Depends(get_db)):
+    emp = _get_or_create_empire(db, user_id)
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(404, "User not found")
+    btype = body.building_type
+    if btype not in _EMPIRE_BUILDINGS:
+        raise HTTPException(400, "Unknown building type")
+    buildings = json.loads(emp.buildings_json or "{}")
+    elv = _empire_level(buildings)
+    bdef = _EMPIRE_BUILDINGS[btype]
+    if elv < bdef["unlock"]:
+        raise HTTPException(400, f"Requires empire level {bdef['unlock']}")
+    cur = buildings.get(btype, 0)
+    nxt = cur + 1
+    cost = int(bdef["base_xp"] * (nxt ** 1.5))
+    avail = max(0, user.xp - (emp.xp_spent or 0))
+    if avail < cost:
+        raise HTTPException(400, f"Not enough XP. Need {cost}, have {avail}")
+    buildings[btype] = nxt
+    emp.buildings_json = json.dumps(buildings)
+    emp.xp_spent = (emp.xp_spent or 0) + cost
+    db.commit()
+    return {
+        "ok": True,
+        "new_level": nxt,
+        "xp_cost": cost,
+        "available_xp": max(0, user.xp - emp.xp_spent),
+        "empire_level": _empire_level(buildings),
+    }
+
+
+@app.post("/api/empire/{user_id}/daily-reward")
+def empire_daily_reward(user_id: int, db: Session = Depends(get_db)):
+    emp = _get_or_create_empire(db, user_id)
+    now = datetime.now(timezone.utc)
+    if emp.last_daily_reward_at is not None:
+        ldr = emp.last_daily_reward_at
+        if ldr.tzinfo is None:
+            ldr = ldr.replace(tzinfo=timezone.utc)
+        if (now - ldr).total_seconds() < 86400:
+            raise HTTPException(400, "Daily reward not ready yet")
+    day = ((emp.daily_reward_day or 0) % 7) + 1
+    coins = _DAILY_REWARDS[day - 1]
+    emp.coins = (emp.coins or 0) + coins
+    emp.daily_reward_day = day
+    emp.last_daily_reward_at = now
+    db.commit()
+    return {"ok": True, "day": day, "coins": coins, "message": f"День {day}: +{coins:,} монет"}
 
 
 FRONTEND_DIST = os.path.join(

@@ -287,6 +287,22 @@ class RssCacheEntry(Base):
     last_item_count = Column(Integer, default=0)
 
 
+class Empire(Base):
+    """Idle empire game state per user."""
+    __tablename__ = "empires"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, unique=True, nullable=False, index=True)
+    coins = Column(Float, default=0.0)
+    xp_spent = Column(Integer, default=0)
+    buildings_json = Column(Text, default="{}")
+    prestige_count = Column(Integer, default=0)
+    daily_reward_day = Column(Integer, default=0)
+    last_daily_reward_at = Column(DateTime(timezone=True), nullable=True)
+    last_collected_at = Column(DateTime(timezone=True), default=_now)
+    created_at = Column(DateTime(timezone=True), default=_now)
+
+
 class RegionFavorite(Base):
     """User-starred region for monitoring in Мой Сейф."""
     __tablename__ = "region_favorites"

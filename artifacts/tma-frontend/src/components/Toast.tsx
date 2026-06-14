@@ -59,9 +59,9 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: () => void }) 
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: -20, scale: 0.92, x: "-50%" }}
-      animate={{ opacity: 1, y: 0, scale: 1, x: "-50%" }}
-      exit={{ opacity: 0, y: -12, scale: 0.92, x: "-50%" }}
+      initial={{ opacity: 0, y: -16, scale: 0.92 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -12, scale: 0.92 }}
       transition={{ type: "spring", damping: 22, stiffness: 340 }}
       onClick={onRemove}
       style={{
@@ -127,14 +127,16 @@ export function ToastContainer() {
   return (
     <div style={{
       position: "fixed",
-      top: "50%",
+      top: "calc(env(safe-area-inset-top, 0px) + 56px)",
       left: "50%",
+      transform: "translateX(-50%)",
       zIndex: 9999,
       display: "flex", flexDirection: "column",
       alignItems: "center",
       gap: "0.45rem",
       pointerEvents: "none",
-      transform: "translate(-50%, -50%)",
+      width: "max-content",
+      maxWidth: "92vw",
     }}>
       <AnimatePresence mode="popLayout">
         {toasts.map((t) => (

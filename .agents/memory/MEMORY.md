@@ -5,3 +5,5 @@
 - [Region favorites client-side](region-favorites.md) — stored via Zustand persist (localStorage "tma-region-favorites"); no backend needed for UI.
 - [Water zone fix at startup](water-zone-fix.md) — _fix_water_stations() runs at every startup, moves in-water coords to region center ±0.07°; idempotent.
 - [Port conflict on backend restart](port-conflict.md) — run `fuser -k 8000/tcp` before restarting TMA Backend if it fails to bind port 8000.
+- [FastAPI route ordering](fastapi-route-ordering.md) — literal routes (e.g. /api/empire/leaderboard) must be declared BEFORE parameterized routes (/api/empire/{user_id}) or FastAPI will try to parse the literal as the param type and return 422.
+- [useToast API](usetoa-api.md) — useToast().add(message: string, type?: "success"|"error"|"info"|"warning") — NOT add({ type, message }). Message is first arg, type is second.

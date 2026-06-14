@@ -16,7 +16,7 @@ const TABS: { id: TabId; Icon: LucideIcon; label: string }[] = [
   { id: "analytics", Icon: BarChart2,    label: "Данные"  },
   { id: "catalog",   Icon: ShoppingCart, label: "Каталог" },
   { id: "vault",     Icon: Lock,         label: "Сейф"    },
-  { id: "reserve",   Icon: Sparkles,     label: "Фортуна" },
+  { id: "reserve",   Icon: Sparkles,     label: "Луна-парк" },
 ];
 
 export function BottomNav({ active, onChange, visible = true, badges = {} }: Props) {

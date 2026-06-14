@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, useMap, useMapEvents, Rectangle, Tooltip } fro
 import MarkerClusterGroup from "react-leaflet-cluster";
 import { Marker, Popup } from "react-leaflet";
 import L from "leaflet";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useDragControls } from "framer-motion";
 import type { GasStation } from "@/types";
 import { STATUS_COLORS } from "@/types";
 import { useStationStore } from "@/stores/useStationStore";
@@ -174,6 +174,7 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
     useMapStore();
   const [showFilters, setShowFilters] = useState(false);
   const [showHeatmap, setShowHeatmap] = useState(true);
+  const dragControls = useDragControls();
 
   // Per-region availability stats for heatmap
   const regionStats = REGION_BOUNDS.map((rb) => {
@@ -583,6 +584,14 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
+            drag="y"
+            dragControls={dragControls}
+            dragListener={false}
+            dragConstraints={{ top: 0 }}
+            dragElastic={{ top: 0, bottom: 0.4 }}
+            onDragEnd={(_, info) => {
+              if (info.offset.y > 80 || info.velocity.y > 500) selectStation(null);
+            }}
             style={{
               position: "absolute",
               bottom: "0",
@@ -604,8 +613,11 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
               position: "relative",
             }}>
               {/* Drag handle */}
-              <div style={{ display: "flex", justifyContent: "center", paddingTop: "14px", paddingBottom: "2px", flexShrink: 0 }}>
-                <div style={{ width: "64px", height: "4px", background: "rgba(255,255,255,0.1)", borderRadius: "99px" }} />
+              <div
+                onPointerDown={(e) => dragControls.start(e)}
+                style={{ display: "flex", justifyContent: "center", paddingTop: "14px", paddingBottom: "2px", flexShrink: 0, cursor: "grab", touchAction: "none" }}
+              >
+                <div style={{ width: "64px", height: "4px", background: "rgba(255,255,255,0.18)", borderRadius: "99px" }} />
               </div>
 
               {/* Inner top glow */}
