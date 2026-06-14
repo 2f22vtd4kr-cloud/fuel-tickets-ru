@@ -400,6 +400,186 @@ function AvailabilityBar({ region, data, rank }: { region: string; data: Regiona
   );
 }
 
+// ── Deep Market Analysis ──────────────────────────────────────────
+function MarketAnalysis({ regions, data }: { regions: Record<string, RegionalSupply>; data: Analytics | null }) {
+  const prices = usePriceStore((s) => s.prices);
+
+  const allRegions = Object.values(regions);
+  if (!allRegions.length) return null;
+
+  const criticalCount = allRegions.filter(r => r.avg_pct < 25).length;
+  const lowCount = allRegions.filter(r => r.avg_pct >= 25 && r.avg_pct < 60).length;
+  const normalCount = allRegions.filter(r => r.avg_pct >= 60).length;
+  const total = allRegions.length;
+
+  // Market pressure 0–100
+  const pressure = Math.round(((criticalCount * 3 + lowCount * 1) / (total * 3)) * 100);
+  const pressureColor = pressure < 25 ? "#22c55e" : pressure < 55 ? "#eab308" : "#ef4444";
+  const pressureLabel = pressure < 25 ? "НИЗКОЕ" : pressure < 55 ? "УМЕРЕННОЕ" : "КРИТИЧЕСКОЕ";
+
+  // Fuel type price pressure (avg multiplier)
+  const FUELS = ["АИ-92", "АИ-95", "ДТ", "Газ"];
+  const fuelPressure = FUELS.map(fuel => {
+    const mults = Object.values(prices)
+      .map(r => (r as Record<string, { multiplier?: number }>)[fuel]?.multiplier ?? 1)
+      .filter(m => m > 0);
+    const avg = mults.length ? mults.reduce((a, b) => a + b, 0) / mults.length : 1;
+    return { fuel, pressure: Math.round((avg - 1) * 100) };
+  }).sort((a, b) => b.pressure - a.pressure);
+
+  // Top worst regions
+  const sorted = Object.entries(regions).sort((a, b) => a[1].avg_pct - b[1].avg_pct);
+  const worst3 = sorted.slice(0, 3);
+  const best3 = sorted.slice(-3).reverse();
+
+  // Price spread (max − min avg price for АИ-92)
+  const ai92prices = Object.values(prices)
+    .map(r => (r as Record<string, { effective?: number }>)["АИ-92"]?.effective ?? 0)
+    .filter(p => p > 0);
+  const spread = ai92prices.length > 1
+    ? Math.round(Math.max(...ai92prices) - Math.min(...ai92prices))
+    : 0;
+
+  const healthScore = Math.max(0, Math.min(100, Math.round(
+    (data?.availability_index ?? 50) - pressure * 0.4
+  )));
+  const healthColor = healthScore >= 65 ? "#22c55e" : healthScore >= 35 ? "#eab308" : "#ef4444";
+  const healthLabel = healthScore >= 65 ? "СТАБИЛЬНО" : healthScore >= 35 ? "НАПРЯЖЁННО" : "КРИЗИС";
+
+  return (
+    <div style={{ padding: "0 1rem 1rem" }}>
+      <div style={{
+        background: "linear-gradient(160deg,#0a0a14,#0d0a1a)",
+        border: "1px solid #a855f722",
+        borderRadius: "16px",
+        padding: "0.9rem",
+        position: "relative",
+        overflow: "hidden",
+      }}>
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#a855f7,#db2777,transparent)" }} />
+        <div style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: 0.018, backgroundImage: "linear-gradient(#a855f7 1px, transparent 1px), linear-gradient(90deg, #a855f7 1px, transparent 1px)", backgroundSize: "20px 20px" }} />
+
+        {/* Header */}
+        <div style={{ marginBottom: "0.75rem" }}>
+          <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.12rem" }}>АНАЛИТИКА_РЫНКА · ГЛУБОКИЙ_АНАЛИЗ</div>
+          <p style={{ margin: 0, color: "#e2e8f0", fontSize: "0.88rem", fontWeight: 800 }}>📈 Анализ топливного рынка</p>
+        </div>
+
+        {/* Health + Pressure row */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem", marginBottom: "0.65rem" }}>
+          <div style={{ background: `${healthColor}0d`, border: `1px solid ${healthColor}33`, borderRadius: "12px", padding: "0.65rem 0.75rem" }}>
+            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.4rem", letterSpacing: "0.1em", marginBottom: "0.1rem" }}>ЗДОРОВЬЕ_СЕТИ</div>
+            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: healthColor, fontSize: "1.6rem", fontWeight: 800, lineHeight: 1 }}>{healthScore}</div>
+            <div style={{ marginTop: "0.2rem" }}>
+              <div style={{ height: "4px", background: "#0b0b0f", borderRadius: "2px", overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${healthScore}%`, background: `linear-gradient(90deg, ${healthColor}88, ${healthColor})`, transition: "width 1s" }} />
+              </div>
+            </div>
+            <div style={{ color: healthColor, fontSize: "0.58rem", fontWeight: 700, marginTop: "0.2rem", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.06em" }}>{healthLabel}</div>
+          </div>
+          <div style={{ background: `${pressureColor}0d`, border: `1px solid ${pressureColor}33`, borderRadius: "12px", padding: "0.65rem 0.75rem" }}>
+            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.4rem", letterSpacing: "0.1em", marginBottom: "0.1rem" }}>ДАВЛЕНИЕ_РЫНКА</div>
+            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: pressureColor, fontSize: "1.6rem", fontWeight: 800, lineHeight: 1 }}>{pressure}%</div>
+            <div style={{ marginTop: "0.2rem" }}>
+              <div style={{ height: "4px", background: "#0b0b0f", borderRadius: "2px", overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${pressure}%`, background: `linear-gradient(90deg, ${pressureColor}88, ${pressureColor})`, transition: "width 1s" }} />
+              </div>
+            </div>
+            <div style={{ color: pressureColor, fontSize: "0.58rem", fontWeight: 700, marginTop: "0.2rem", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.06em" }}>{pressureLabel}</div>
+          </div>
+        </div>
+
+        {/* Region breakdown mini bar */}
+        <div style={{ marginBottom: "0.65rem" }}>
+          <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.4rem", letterSpacing: "0.1em", marginBottom: "0.25rem" }}>РАСПРЕДЕЛЕНИЕ_РЕГИОНОВ · {total} ЗОН</div>
+          <div style={{ height: "10px", borderRadius: "5px", overflow: "hidden", background: "#050507", display: "flex", gap: "2px" }}>
+            {normalCount > 0 && <div style={{ width: `${(normalCount / total) * 100}%`, background: "linear-gradient(90deg,#16a34a,#22c55e)", transition: "width 1s" }} />}
+            {lowCount > 0 && <div style={{ width: `${(lowCount / total) * 100}%`, background: "linear-gradient(90deg,#ca8a04,#eab308)", transition: "width 1s" }} />}
+            {criticalCount > 0 && <div style={{ width: `${(criticalCount / total) * 100}%`, background: "linear-gradient(90deg,#dc2626,#ef4444)", transition: "width 1s" }} />}
+          </div>
+          <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.3rem" }}>
+            <span style={{ color: "#22c55e99", fontSize: "0.58rem", fontFamily: "'JetBrains Mono',monospace" }}>■ {normalCount} норма</span>
+            <span style={{ color: "#eab30899", fontSize: "0.58rem", fontFamily: "'JetBrains Mono',monospace" }}>■ {lowCount} мало</span>
+            <span style={{ color: "#ef444499", fontSize: "0.58rem", fontFamily: "'JetBrains Mono',monospace" }}>■ {criticalCount} крит.</span>
+          </div>
+        </div>
+
+        {/* Fuel type pressure */}
+        <div style={{ marginBottom: "0.65rem" }}>
+          <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.4rem", letterSpacing: "0.1em", marginBottom: "0.35rem" }}>ДАВЛЕНИЕ_ПО_ТОПЛИВУ · ЦЕНОВОЙ_МУЛЬТИПЛИКАТОР</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+            {fuelPressure.map(({ fuel, pressure: fp }) => {
+              const fpColor = fp <= 0 ? "#22c55e" : fp <= 8 ? "#eab308" : "#ef4444";
+              const FUEL_COLORS: Record<string, string> = { "АИ-92": "#a855f7", "АИ-95": "#db2777", "ДТ": "#f59e0b", "Газ": "#22c55e" };
+              const fc = FUEL_COLORS[fuel] ?? "#6b7280";
+              return (
+                <div key={fuel} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <span style={{ fontFamily: "'JetBrains Mono',monospace", color: fc, fontSize: "0.68rem", fontWeight: 700, width: "52px", flexShrink: 0 }}>{fuel}</span>
+                  <div style={{ flex: 1, height: "6px", background: "#0b0b0f", borderRadius: "3px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${Math.min(100, Math.max(2, 50 + fp * 3))}%`, background: fpColor, transition: "width 1s", borderRadius: "3px" }} />
+                  </div>
+                  <span style={{ fontFamily: "'JetBrains Mono',monospace", color: fpColor, fontSize: "0.65rem", fontWeight: 700, width: "36px", textAlign: "right", flexShrink: 0 }}>
+                    {fp > 0 ? "+" : ""}{fp}%
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Worst / Best regions */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem", marginBottom: "0.65rem" }}>
+          <div style={{ background: "#0d0409", border: "1px solid #ef444422", borderRadius: "10px", padding: "0.55rem 0.65rem" }}>
+            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#ef4444", fontSize: "0.4rem", letterSpacing: "0.1em", marginBottom: "0.3rem" }}>🔴 ДЕФИЦИТ</div>
+            {worst3.map(([r, d]) => (
+              <div key={r} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.2rem" }}>
+                <span style={{ color: "#d1d5db", fontSize: "0.62rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                  {r.split(" ").slice(-1)[0].slice(0, 13)}
+                </span>
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#ef4444", fontSize: "0.62rem", fontWeight: 700, flexShrink: 0, marginLeft: "0.3rem" }}>{d.avg_pct}%</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ background: "#040d07", border: "1px solid #22c55e22", borderRadius: "10px", padding: "0.55rem 0.65rem" }}>
+            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e", fontSize: "0.4rem", letterSpacing: "0.1em", marginBottom: "0.3rem" }}>🟢 ПРОФИЦИТ</div>
+            {best3.map(([r, d]) => (
+              <div key={r} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.2rem" }}>
+                <span style={{ color: "#d1d5db", fontSize: "0.62rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                  {r.split(" ").slice(-1)[0].slice(0, 13)}
+                </span>
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e", fontSize: "0.62rem", fontWeight: 700, flexShrink: 0, marginLeft: "0.3rem" }}>{d.avg_pct}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Price spread & summary */}
+        <div style={{ background: "#0b0b0f", border: "1px solid #1e1e2a", borderRadius: "10px", padding: "0.55rem 0.75rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.4rem", letterSpacing: "0.1em", marginBottom: "0.1rem" }}>РАЗБРОС_ЦЕН · АИ-92</div>
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", color: spread > 10 ? "#eab308" : "#22c55e", fontSize: "1.1rem", fontWeight: 700 }}>
+                ±{spread} ₽/л
+              </span>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.4rem", letterSpacing: "0.1em", marginBottom: "0.1rem" }}>ВЕРДИКТ</div>
+              <span style={{
+                background: `${healthColor}15`, border: `1px solid ${healthColor}33`,
+                borderRadius: "6px", padding: "0.2rem 0.55rem",
+                color: healthColor, fontSize: "0.65rem", fontWeight: 800,
+                fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.06em",
+              }}>
+                {healthLabel}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────
 // ─── AI Price Predictions ─────────────────────────────────────────
 function AIPricePredictions() {
@@ -610,6 +790,12 @@ export function AnalyticsTab({ onNavigate }: Props) {
       {/* Crisis banner */}
       <CrisisBanner count={criticalCount} onNavigate={onNavigate} />
 
+      {/* News feed — top of page */}
+      <NewsFeed />
+
+      {/* AI price predictions — top of page */}
+      <AIPricePredictions />
+
       {/* Hero stats grid */}
       <div style={{ padding: "0 1rem 0.75rem" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0.5rem" }}>
@@ -627,12 +813,23 @@ export function AnalyticsTab({ onNavigate }: Props) {
           {/* Station counts */}
           <div style={{ background: "#14141c", border: "1px solid #22222f", borderRadius: "14px", padding: "0.9rem 1rem" }}>
             <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.38rem", letterSpacing: "0.12em", marginBottom: "0.1rem" }}>СТАНЦИЙ_В_СЕТИ</div>
-            <p style={{ color: "#6b7280", fontSize: "0.6rem", margin: "0 0 0.3rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>АЗС в базе</p>
-            <AnimatedCounter value={sc.total} color="#a855f7" size="2.2rem" />
-            <div style={{ display: "flex", gap: "8px", marginTop: "0.3rem" }}>
-              <span style={{ color: "#22c55e", fontSize: "0.65rem" }}>🟢{sc.green}</span>
-              <span style={{ color: "#eab308", fontSize: "0.65rem" }}>🟡{sc.yellow}</span>
-              <span style={{ color: "#ef4444", fontSize: "0.65rem" }}>🔴{sc.red}</span>
+            <p style={{ color: "#6b7280", fontSize: "0.6rem", margin: "0 0 0.55rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>Статус АЗС</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e", flexShrink: 0 }} />
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e", fontSize: "1.35rem", fontWeight: 700, lineHeight: 1 }}>{sc.green}</span>
+                <span style={{ color: "#4b5563", fontSize: "0.58rem" }}>норма</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#eab308", boxShadow: "0 0 6px #eab308", flexShrink: 0 }} />
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#eab308", fontSize: "1.35rem", fontWeight: 700, lineHeight: 1 }}>{sc.yellow}</span>
+                <span style={{ color: "#4b5563", fontSize: "0.58rem" }}>мало</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#ef4444", boxShadow: "0 0 6px #ef4444", flexShrink: 0 }} />
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#ef4444", fontSize: "1.35rem", fontWeight: 700, lineHeight: 1 }}>{sc.red}</span>
+                <span style={{ color: "#4b5563", fontSize: "0.58rem" }}>нет</span>
+              </div>
             </div>
           </div>
         </div>
@@ -796,31 +993,8 @@ export function AnalyticsTab({ onNavigate }: Props) {
         </div>
       </div>
 
-      {/* Stacked availability bars */}
-      <div style={{ padding: "0 1rem 0.5rem" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.65rem" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <div>
-              <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.46rem", letterSpacing: "0.14em", marginBottom: "0.1rem" }}>СТАТУС_РАСПРЕДЕЛЕНИЕ</div>
-              <p style={{ color: "#9ca3af", fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.06em", margin: 0, fontWeight: 700 }}>Распределение статусов</p>
-            </div>
-            <span style={{ background: "#a855f715", border: "1px solid #a855f730", borderRadius: "4px", color: "#a855f7", fontSize: "0.55rem", fontWeight: 700, padding: "0.1rem 0.35rem", fontFamily: "'JetBrains Mono',monospace" }}>
-              {filtered.length} регионов
-            </span>
-          </div>
-          <div style={{ display: "flex", gap: "0.5rem" }}>
-            <span style={{ color: "#22c55e88", fontSize: "0.56rem", fontFamily: "'JetBrains Mono',monospace" }}>■ норма</span>
-            <span style={{ color: "#eab30888", fontSize: "0.56rem", fontFamily: "'JetBrains Mono',monospace" }}>■ мало</span>
-            <span style={{ color: "#ef444488", fontSize: "0.56rem", fontFamily: "'JetBrains Mono',monospace" }}>■ нет</span>
-          </div>
-        </div>
-        {filtered.map(([region, d], i) => <AvailabilityBar key={region} region={region} data={d} rank={i} />)}
-      </div>
-
-      {/* AI Price Predictions */}
-      <AIPricePredictions />
-
-      <NewsFeed />
+      {/* Deep market analysis */}
+      <MarketAnalysis regions={regions} data={data} />
     </div>
   );
 }
@@ -833,7 +1007,7 @@ const SEVERITY_BG: Record<string, string> = { critical: "#1a050514", warning: "#
 function NewsFeed() {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const [lastNewsRefresh, setLastNewsRefresh] = useState<Date | null>(null);
   const [newsLimit, setNewsLimit] = useState(15);
 
