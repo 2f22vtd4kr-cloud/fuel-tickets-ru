@@ -601,11 +601,27 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
               maxHeight: "70vh",
               overflowY: "auto",
               backdropFilter: "blur(24px)",
+              position: "relative",
             }}>
-              <StationCard
-                station={selectedStation}
-                onClose={() => selectStation(null)}
-              />
+              {/* Drag handle */}
+              <div style={{ display: "flex", justifyContent: "center", paddingTop: "14px", paddingBottom: "2px", flexShrink: 0 }}>
+                <div style={{ width: "64px", height: "4px", background: "rgba(255,255,255,0.1)", borderRadius: "99px" }} />
+              </div>
+
+              {/* Inner top glow */}
+              <div aria-hidden style={{
+                position: "absolute", top: 0, left: 0, right: 0, height: "128px",
+                background: "linear-gradient(to bottom, rgba(168,85,247,0.08), transparent)",
+                borderRadius: "62px 62px 0 0",
+                pointerEvents: "none", zIndex: 0,
+              }} />
+
+              <div style={{ position: "relative", zIndex: 1, paddingBottom: "88px" }}>
+                <StationCard
+                  station={selectedStation}
+                  onClose={() => selectStation(null)}
+                />
+              </div>
             </div>
           </motion.div>
         )}

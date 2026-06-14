@@ -82,6 +82,20 @@ export function BottomNav({ active, onChange, visible = true, badges = {} }: Pro
               />
             )}
 
+            {/* Persistent pulse dot on Sparkles/Reserve tab */}
+            {tab.id === "reserve" && !isActive && (
+              <div style={{
+                position: "absolute",
+                top: "10px", right: "calc(50% - 16px)",
+                width: "6px", height: "6px",
+                borderRadius: "50%",
+                background: "#db2777",
+                boxShadow: "0 0 6px rgba(219,39,119,0.8)",
+                animation: "crisisPulse 1.8s ease-in-out infinite",
+                zIndex: 2,
+              }} />
+            )}
+
             {/* Badge */}
             {badge > 0 && (
               <motion.div
