@@ -562,7 +562,7 @@ export function AnalyticsTab({ onNavigate }: Props) {
   );
 
   return (
-    <div style={{ paddingBottom: "5rem" }}>
+    <div style={{ paddingBottom: "5rem", overflowX: "hidden", width: "100%" }}>
 
       {/* Header */}
       <div style={{ padding: "0.75rem 1rem 0.5rem", position: "relative" }}>

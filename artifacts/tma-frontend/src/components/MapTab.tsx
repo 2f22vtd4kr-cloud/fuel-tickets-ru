@@ -229,7 +229,7 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
       <div
         style={{
           position: "absolute",
-          top: "0.75rem",
+          top: "3rem",
           left: "0.75rem",
           right: "0.75rem",
           zIndex: 1000,
@@ -335,7 +335,7 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
             exit={{ opacity: 0, y: -10 }}
             style={{
               position: "absolute",
-              top: "3.5rem",
+              top: "6.5rem",
               left: "0.75rem",
               right: "0.75rem",
               zIndex: 1000,

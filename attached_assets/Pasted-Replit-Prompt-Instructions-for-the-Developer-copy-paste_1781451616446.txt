@@ -1,0 +1,67 @@
+Replit Prompt / Instructions for the Developer (copy-paste this):
+
+Task: Add Haptic Feedback on Errors
+Goal: Add clear haptic feedback for all error situations (especially payment errors, failed fetches, network issues, etc.) to make the app feel more responsive.
+1. Update Haptic Utility (if not already done)
+Make sure your haptic.ts / utility has error support:
+export const haptic = {
+  // ... existing methods ...
+
+  error() {
+    if (window.Telegram?.WebApp?.HapticFeedback) {
+      window.Telegram.WebApp.HapticFeedback.notificationOccurred('error');
+    }
+  }
+};
+2. Global Error Handling
+Add this in your main app or price/payment services:
+// Global error handler
+const handleError = (message: string, context = '') => {
+  haptic.error();                    // ← Strong error haptic
+  console.error(`Error ${context}:`, message);
+  
+  // Show user-friendly toast
+  showToast({
+    type: 'error',
+    title: 'Ошибка',
+    message: message || 'Что-то пошло не так',
+    duration: 4000
+  });
+};
+3. Apply to Payment Flow (Critical)
+Update the payment modal error case:
+const handleBuyTicket = async (ticketData: any) => {
+  showPaymentModal(ticketData, async () => {
+    try {
+      const response = await fetch('/api/create-stars-invoice', {
+        method: 'POST',
+        body: JSON.stringify(ticketData)
+      });
+      
+      if (!response.ok) throw new Error('Не удалось создать инвойс');
+    } catch (e) {
+      haptic.error();                    // ← Haptic on payment error
+      showErrorModal("Не удалось открыть оплату. Проверьте соединение.");
+    }
+  });
+};
+4. Add to Other Common Places
+	•	Price refresh failures
+	•	API call errors in map / catalog
+	•	AI prediction failures
+	•	Station data loading errors
+Example:
+try {
+  await refreshPrices();
+} catch (e) {
+  haptic.error();
+  // show message
+}
+Please:
+	•	Add haptic.error() (using notificationOccurred('error')) to all error paths.
+	•	Especially strengthen error feedback in the Telegram Stars payment flow.
+	•	Keep all previous features (centered modals, cancel haptic, confirm haptic, dynamic pricing, etc.).
+Redeploy and test error scenarios (e.g., turn off internet during payment attempt).
+Let me know when it’s done!
+
+Paste the entire block into Replit Agent. This completes the haptic feedback coverage for errors.

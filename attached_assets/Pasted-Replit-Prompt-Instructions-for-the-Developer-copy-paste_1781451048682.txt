@@ -1,0 +1,59 @@
+Replit Prompt / Instructions for the Developer (copy-paste this):
+
+Task: Fix Telegram Stars Payments (Make Them Fully Work)
+Problem: Stars payments are still not working properly.
+Solution: Implement correct Telegram Stars integration using the official Bot API (send_invoice with currency="XTR").
+1. Update `bot.py` (Main Bot)
+Add / improve the Stars handler:
+# In bot.py - add this handler
+async def pre_checkout_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.pre_checkout_query
+    await query.answer(ok=True)
+
+async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    payment = update.message.successful_payment
+    if payment.currency == "XTR":
+        payload = payment.invoice_payload
+        user_id = update.effective_user.id
+        # Process the purchase (give voucher, etc.)
+        logger.info(f"Stars payment successful! Payload: {payload}, Stars: {payment.total_amount}")
+        # Call your fulfillment logic
+        await fulfill_ticket_purchase(user_id, payload, payment.total_amount)
+
+# Register handlers
+application.add_handler(PreCheckoutQueryHandler(pre_checkout_query))
+application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment))
+Create Invoice Function (for Stars):
+async def send_stars_invoice(context: ContextTypes.DEFAULT_TYPE, chat_id: int, fuel_type: str, volume: int, stars_amount: int):
+    title = f"⛽️ Талон {volume}л {fuel_type}"
+    description = f"Оплата топливного талона через Telegram Stars"
+    payload = f"ticket_{fuel_type}_{volume}_{int(time.time())}"
+    
+    await context.bot.send_invoice(
+        chat_id=chat_id,
+        title=title,
+        description=description,
+        payload=payload,
+        currency="XTR",           # ← This is the key for Stars
+        prices=[LabeledPrice(label="Талон", amount=stars_amount)],
+        # provider_token is NOT needed for Stars
+    )
+2. Update `tma_backend/payment.py`
+Force StarsPaymentProvider to actually trigger send_invoice via the bot (or expose an endpoint that the frontend calls).
+Set in Replit Secrets:
+	•	TELEGRAM_BOT_TOKEN (your bot token)
+	•	PAYMENT_METHOD=stars
+3. Frontend (TMA) Integration
+In the ticket purchase flow, when user clicks “Оплатить”:
+	•	Call backend endpoint that triggers send_stars_invoice
+	•	Telegram will automatically show the Stars payment popup.
+Replit Agent — Critical:
+	1	Ask the user right now for:
+	◦	TELEGRAM_BOT_TOKEN
+	◦	CRYPTO_BOT_TOKEN (if still using CryptoBot as fallback)
+	2	Set PAYMENT_METHOD=stars in environment variables.
+	3	Test a full purchase flow.
+Please implement full Telegram Stars support using currency="XTR" + send_invoice, update handlers, and make Stars the default payment method.
+Redeploy and confirm Stars payments now work.
+
+Paste this into Replit Agent. It directly follows the official Telegram Stars guide you provided. Let me know the result after they apply it.

@@ -6,6 +6,7 @@ import { usePriceStore } from "@/stores/usePriceStore";
 import { useStationStore } from "@/stores/useStationStore";
 import { useVaultStore } from "@/stores/useVaultStore";
 import { useToast } from "@/components/Toast";
+import { impact, notify } from "@/lib/haptic";
 import type { GasStation, LimitsMap } from "@/types";
 import { FUEL_LABELS } from "@/types";
 
@@ -112,6 +113,136 @@ function BlockOverlay({ reason, onClose }: { reason: string; onClose: () => void
   );
 }
 
+interface PendingConfirm {
+  fuelType: string;
+  volume: number;
+  method: PayMethod;
+  starsAmount: number;
+  totalPrice: number;
+}
+
+function PaymentConfirmModal({ pending, onConfirm, onCancel }: {
+  pending: PendingConfirm;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={{
+        position: "fixed", inset: 0, zIndex: 9100,
+        background: "rgba(5,5,7,0.88)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: "1.5rem",
+      }}
+    >
+      <motion.div
+        initial={{ scale: 0.88, y: 24 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.92, y: 12 }}
+        transition={{ type: "spring", stiffness: 300, damping: 24 }}
+        style={{
+          background: "linear-gradient(160deg,#0d0d18,#0f0820)",
+          border: "1px solid #a855f733",
+          borderRadius: "22px",
+          padding: "1.6rem 1.4rem",
+          maxWidth: "320px",
+          width: "100%",
+          position: "relative",
+          overflow: "hidden",
+          boxShadow: "0 0 60px #a855f722, inset 0 1px 0 #a855f718",
+        }}
+      >
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: "linear-gradient(90deg,transparent,#a855f7,#db2777,transparent)" }} />
+
+        <div style={{ textAlign: "center", marginBottom: "1.25rem" }}>
+          <motion.div
+            animate={{ rotate: [0, 8, -8, 0] }}
+            transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+            style={{ fontSize: "2.4rem", marginBottom: "0.6rem" }}
+          >
+            ⛽
+          </motion.div>
+          <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#4b5563", fontSize: "0.5rem", letterSpacing: "0.16em", marginBottom: "0.4rem" }}>
+            ПОДГОТОВКА_ОПЛАТЫ
+          </div>
+          <h3 style={{ margin: "0 0 0.3rem", color: "#e2e8f0", fontSize: "1.1rem", fontWeight: 800 }}>
+            Подтвердите заказ
+          </h3>
+          <p style={{ margin: 0, color: "#6b7280", fontSize: "0.78rem", lineHeight: 1.5 }}>
+            {pending.volume}л {pending.fuelType}
+          </p>
+        </div>
+
+        <div style={{
+          background: "#14141c", border: "1px solid #22222f",
+          borderRadius: "14px", padding: "0.85rem 1rem",
+          marginBottom: "1.1rem",
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.45rem" }}>
+            <span style={{ color: "#6b7280", fontSize: "0.72rem" }}>Объём</span>
+            <span style={{ color: "#e2e8f0", fontFamily: "'JetBrains Mono',monospace", fontSize: "0.8rem", fontWeight: 700 }}>
+              {pending.volume} л
+            </span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.45rem" }}>
+            <span style={{ color: "#6b7280", fontSize: "0.72rem" }}>Сумма</span>
+            <span style={{ color: "#a855f7", fontFamily: "'JetBrains Mono',monospace", fontSize: "0.8rem", fontWeight: 700 }}>
+              {pending.totalPrice.toFixed(0)} ₽
+            </span>
+          </div>
+          <div style={{ height: "1px", background: "#22222f", margin: "0.45rem 0" }} />
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ color: "#6b7280", fontSize: "0.72rem" }}>Оплата</span>
+            <span style={{ color: pending.method === "stars" ? "#f59e0b" : "#3b82f6", fontFamily: "'JetBrains Mono',monospace", fontSize: "0.82rem", fontWeight: 800 }}>
+              {pending.method === "stars"
+                ? `⭐ ${pending.starsAmount} Stars`
+                : `💎 ${(pending.totalPrice / 92).toFixed(2)} USDT`}
+            </span>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: "0.6rem" }}>
+          <button
+            onClick={() => { notify("warning" as any); impact("light"); onCancel(); }}
+            style={{
+              flex: 1, padding: "0.85rem",
+              background: "#14141c", border: "1px solid #22222f",
+              borderRadius: "12px", color: "#6b7280",
+              fontSize: "0.9rem", fontWeight: 600, cursor: "pointer",
+            }}
+          >
+            Отмена
+          </button>
+          <motion.button
+            onClick={() => { impact("heavy"); onConfirm(); }}
+            whileTap={{ scale: 0.96 }}
+            animate={{
+              boxShadow: [
+                "0 0 16px rgba(168,85,247,0.35)",
+                "0 0 28px rgba(168,85,247,0.6)",
+                "0 0 16px rgba(168,85,247,0.35)",
+              ],
+            }}
+            transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+            style={{
+              flex: 2, padding: "0.85rem",
+              background: "linear-gradient(135deg,#a855f7,#db2777)",
+              border: "none", borderRadius: "12px",
+              color: "#fff", fontSize: "0.95rem", fontWeight: 800,
+              cursor: "pointer", letterSpacing: "0.02em",
+            }}
+          >
+            Продолжить ⛽
+          </motion.button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 function PaymentMethodSelector({ value, onChange }: { value: PayMethod; onChange: (m: PayMethod) => void }) {
   const methods: { id: PayMethod; label: string; emoji: string; color: string }[] = [
     { id: "stars",     label: "Telegram Stars", emoji: "⭐", color: "#f59e0b" },
@@ -156,10 +287,9 @@ function FuelItem({
   limits: LimitsMap | null;
   userId: number;
   payMethod: PayMethod;
-  onBuy: (fuelType: string, volume: number, payMethod: PayMethod) => Promise<void>;
+  onBuy: (fuelType: string, volume: number, payMethod: PayMethod) => void;
 }) {
   const [volume, setVolume] = useState(20);
-  const [buying, setBuying] = useState(false);
   const getPrice = usePriceStore((s) => s.getPrice);
 
   const limit = limits?.[fuelType];
@@ -181,14 +311,9 @@ function FuelItem({
 
   const starsAmount = Math.ceil(totalPrice / STAR_RUB_RATE);
 
-  const handleBuy = async () => {
-    if (buying || !withinLimit || !available) return;
-    setBuying(true);
-    try {
-      await onBuy(fuelType, volume, payMethod);
-    } finally {
-      setBuying(false);
-    }
+  const handleBuy = () => {
+    if (!withinLimit || !available) return;
+    onBuy(fuelType, volume, payMethod);
   };
 
   const btnLabel = () => {
@@ -314,10 +439,10 @@ function FuelItem({
       </div>
 
       <motion.button
-        disabled={buying || !withinLimit || !available}
+        disabled={!withinLimit || !available}
         onClick={handleBuy}
         whileTap={(!withinLimit || !available) ? undefined : { scale: 0.97 }}
-        animate={(!withinLimit || !available || buying) ? {} : {
+        animate={(!withinLimit || !available) ? {} : {
           boxShadow: [
             "0 0 16px rgba(168,85,247,0.35), 0 4px 16px rgba(219,39,119,0.2)",
             "0 0 28px rgba(168,85,247,0.55), 0 4px 20px rgba(219,39,119,0.35)",
@@ -335,16 +460,13 @@ function FuelItem({
           border: (!withinLimit || !available) ? "1px solid #22222f" : "none",
           borderRadius: "14px",
           fontSize: "0.97rem", fontWeight: 800,
-          cursor: (!withinLimit || !available || buying) ? "not-allowed" : "pointer",
+          cursor: (!withinLimit || !available) ? "not-allowed" : "pointer",
           display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
           letterSpacing: (!withinLimit || !available) ? "0" : "0.02em",
           transition: "background 0.3s",
         }}
       >
-        {buying
-          ? <span style={{ animation: "spin 1s linear infinite", display: "inline-block" }}>⟳</span>
-          : <>{available && withinLimit && <span>⛽</span>}{btnLabel()}</>
-        }
+        <>{available && withinLimit && <span>⛽</span>}{btnLabel()}</>
       </motion.button>
     </motion.div>
   );
@@ -367,6 +489,8 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortMode, setSortMode] = useState<"name" | "availability" | "queue">("availability");
   const [payMethod, setPayMethod] = useState<PayMethod>("stars");
+  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
+  const [purchasing, setPurchasing] = useState(false);
 
   useEffect(() => {
     if (initialStationId && stations.length > 0 && !selectedStation) {
@@ -401,38 +525,51 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
       return avgB - avgA;
     });
 
-  const handleBuy = async (fuelType: string, volume: number, method: PayMethod) => {
-    if (!user || !selectedStation) return;
+  // Step 1: show confirmation modal with medium haptic
+  const handleBuy = (fuelType: string, volume: number, method: PayMethod) => {
+    if (!user || !selectedStation || purchasing) return;
+    const priceData = getPrice(selectedStation.region, fuelType);
+    const pricePerL = priceData?.effective ?? FUEL_PRICES[fuelType] ?? 50;
+    const totalPrice = pricePerL * volume;
+    const starsAmount = Math.ceil(totalPrice / STAR_RUB_RATE);
+    impact("medium");
+    setPendingConfirm({ fuelType, volume, method, starsAmount, totalPrice });
+  };
 
-    if (method === "stars") {
-      try {
+  // Step 2: user confirmed — strong haptic, then call API
+  const handleConfirmPurchase = async () => {
+    if (!pendingConfirm || !user || !selectedStation) return;
+    const { fuelType, volume, method } = pendingConfirm;
+    impact("heavy");
+    setPendingConfirm(null);
+    setPurchasing(true);
+    try {
+      if (method === "stars") {
         const inv = await createStarsInvoice(user.id, fuelType, volume, selectedStation.id);
+        notify("success");
         const tg = (window as unknown as { Telegram?: { WebApp?: { openInvoice?: (url: string) => void } } }).Telegram?.WebApp;
         if (tg?.openInvoice) {
           toast(`⭐ Оплата: ${inv.stars_amount} Stars`, "success");
         } else {
           toast(`⭐ Требуется ${inv.stars_amount} Stars (открой через Telegram)`, "success");
         }
-      } catch (e: unknown) {
-        toast(String(e), "error");
-      }
-      return;
-    }
-
-    if (method === "cryptobot") {
-      try {
+      } else if (method === "cryptobot") {
         const inv = await createCryptoBotInvoice(user.id, fuelType, volume, selectedStation.id);
         if (inv.checkout_url) {
           window.open(inv.checkout_url, "_blank");
+          notify("success");
           toast("💎 Оплата через CryptoBot открыта", "success");
         }
-      } catch (e: unknown) {
-        toast(String(e), "error");
+      } else {
+        notify("error");
+        toast("Выберите способ оплаты: Telegram Stars или Криптовалюта.", "error");
       }
-      return;
+    } catch (e: unknown) {
+      notify("error");
+      toast(String(e), "error");
+    } finally {
+      setPurchasing(false);
     }
-
-    toast("Выберите способ оплаты: Telegram Stars или Криптовалюта.", "error");
   };
 
   if (!user) return (
@@ -446,6 +583,16 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
       <AnimatePresence>
         {blockReason && (
           <BlockOverlay reason={blockReason} onClose={() => setBlockReason(null)} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {pendingConfirm && (
+          <PaymentConfirmModal
+            pending={pendingConfirm}
+            onConfirm={handleConfirmPurchase}
+            onCancel={() => { impact("light"); setPendingConfirm(null); }}
+          />
         )}
       </AnimatePresence>
 
