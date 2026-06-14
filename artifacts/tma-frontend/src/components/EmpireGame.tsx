@@ -479,6 +479,19 @@ function BuildingCard({
   const theme     = CARD_THEMES[def.stage];
   const tier      = getLevelTier(level);
 
+  const prevTierRef = useRef(tier);
+  const [tierUpFlash, setTierUpFlash] = useState<number>(0);
+
+  useEffect(() => {
+    if (prevTierRef.current < tier) {
+      setTierUpFlash(tier);
+      const t = setTimeout(() => setTierUpFlash(0), 1900);
+      prevTierRef.current = tier;
+      return () => clearTimeout(t);
+    }
+    prevTierRef.current = tier;
+  }, [tier]);
+
   // Visual parameters driven by tier
   const emojiSize  = TIER_EMOJI_SIZE[tier];
   const topHeight  = TIER_TOP_HEIGHT[tier];
@@ -513,6 +526,21 @@ function BuildingCard({
         position: "relative",
       }}
     >
+      {/* ── Active production pulse ── */}
+      {tier >= 1 && (
+        <motion.div
+          animate={{ scale: [1, 1.5, 1], opacity: [0.9, 0.35, 0.9] }}
+          transition={{ repeat: Infinity, duration: 2.8, ease: "easeInOut" }}
+          style={{
+            position: "absolute", top: 5, right: 5,
+            width: 6, height: 6, borderRadius: "50%",
+            background: tier >= 4 ? "#f59e0b" : tier >= 3 ? "#d4a820" : "#10b981",
+            boxShadow: `0 0 6px ${tier >= 4 ? "#f59e0baa" : tier >= 3 ? "#d4a820aa" : "#10b981aa"}`,
+            zIndex: 15, pointerEvents: "none",
+          }}
+        />
+      )}
+
       {/* ── Legendary outer glow ring ── */}
       {tier === 4 && (
         <motion.div
@@ -525,6 +553,74 @@ function BuildingCard({
           }}
         />
       )}
+
+      {/* ── Tier-up flash overlay ── */}
+      <AnimatePresence>
+        {tierUpFlash > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, transition: { duration: 0.4 } }}
+            style={{
+              position: "absolute", inset: 0, zIndex: 40,
+              borderRadius: "12px",
+              background: "rgba(0,0,0,0.62)",
+              display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center",
+              overflow: "hidden",
+              pointerEvents: "none",
+            }}
+          >
+            {/* Radial burst */}
+            <motion.div
+              initial={{ scale: 0.2, opacity: 0.9 }}
+              animate={{ scale: 3, opacity: 0 }}
+              transition={{ duration: 0.7, ease: "easeOut" }}
+              style={{
+                position: "absolute",
+                width: 50, height: 50, borderRadius: "50%",
+                background: tierUpFlash >= 4
+                  ? "radial-gradient(circle, #f59e0b 0%, transparent 70%)"
+                  : `radial-gradient(circle, ${stage.color} 0%, transparent 70%)`,
+              }}
+            />
+            {/* Stars pop in one by one */}
+            <div style={{ display: "flex", gap: "1px", zIndex: 1, marginBottom: "4px" }}>
+              {Array.from({ length: Math.min(TIER_STARS[tierUpFlash] || 1, 3) }).map((_, i) => (
+                <motion.span
+                  key={i}
+                  initial={{ scale: 0, rotate: -45 }}
+                  animate={{ scale: 1.3, rotate: 0 }}
+                  transition={{ delay: 0.1 + i * 0.12, type: "spring", stiffness: 400, damping: 14 }}
+                  style={{ fontSize: "0.9rem" }}
+                >
+                  {tierUpFlash >= 4 ? "🌟" : "⭐"}
+                </motion.span>
+              ))}
+            </div>
+            {/* Badge text */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.7 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.22, type: "spring", stiffness: 320 }}
+              style={{
+                background: tierUpFlash >= 4
+                  ? "linear-gradient(135deg,#d4a820,#f5c518)"
+                  : stage.color,
+                color: tierUpFlash >= 4 ? "#3a1e00" : "#fff",
+                fontWeight: 900, fontSize: "0.48rem",
+                letterSpacing: "0.1em",
+                padding: "2px 7px", borderRadius: "5px",
+                textShadow: "none",
+                boxShadow: `0 2px 8px ${stage.color}88`,
+                zIndex: 1,
+              }}
+            >
+              {tierUpFlash === 4 ? "👑 ЛЕГЕНДА" : `⭐ ТИР ${tierUpFlash}`}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Illustrated top area ── */}
       <div
@@ -791,71 +887,96 @@ function DailyRewards({
 
   return (
     <div style={{
-      background: "linear-gradient(135deg, #fffbeb, #fef3c7)",
+      background: "linear-gradient(135deg,#fffbeb 0%,#fef3c7 60%,#fef9e7 100%)",
       borderRadius: "20px",
       border: "1.5px solid #fde68a",
-      padding: "16px",
+      padding: "14px 14px 12px",
       margin: "0 16px",
+      boxShadow: "0 4px 16px rgba(245,158,11,0.1)",
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-        <span style={{ fontSize: "1.2rem" }}>🎁</span>
-        <div>
-          <div style={{ fontWeight: 800, fontSize: "0.85rem", color: "#92400e" }}>Ежедневные награды</div>
-          <div style={{ fontSize: "0.65rem", color: "#a16207" }}>7-дневный цикл бонусов</div>
+      {/* Header row */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+          <span style={{ fontSize: "1.05rem" }}>🎁</span>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: "0.78rem", color: "#92400e" }}>Ежедневные награды</div>
+            <div style={{ fontSize: "0.56rem", color: "#a16207" }}>7-дневный цикл · заходите каждый день</div>
+          </div>
+        </div>
+        <div style={{
+          background: "#f59e0b", color: "#fff",
+          borderRadius: "8px", padding: "3px 8px",
+          fontSize: "0.58rem", fontWeight: 800,
+        }}>
+          День {((day % 7) + 1)}/7
         </div>
       </div>
-      <div style={{ display: "flex", gap: "6px", marginBottom: "12px" }}>
-        {DAILY_COINS.map((coins, i) => {
+
+      {/* Day mini-card strip */}
+      <div style={{ display: "flex", gap: "4px", marginBottom: "10px" }}>
+        {DAILY_COINS.map((coinAmount, i) => {
           const dayNum = i + 1;
           const isCurrent = dayNum === ((day % 7) + 1) && available;
           const isDone = day > 0 && dayNum <= (day % 7 === 0 ? 7 : day % 7) && !available;
+          const isSpecial = dayNum === 7;
           return (
             <div
               key={dayNum}
               style={{
-                flex: 1,
-                background: isDone ? "#10b981" : isCurrent ? "#f59e0b" : "#fff",
-                borderRadius: "10px",
-                border: isCurrent ? "2px solid #d97706" : isDone ? "2px solid #059669" : "1.5px solid #e5e7eb",
-                padding: "6px 2px",
+                flex: 1, minWidth: 0, position: "relative",
+                background: isDone
+                  ? "linear-gradient(160deg,#059669,#047857)"
+                  : isCurrent
+                  ? "linear-gradient(160deg,#f59e0b,#d97706)"
+                  : "linear-gradient(160deg,#f9fafb,#f3f4f6)",
+                borderRadius: "9px",
+                border: `${isCurrent ? "2px" : "1.5px"} solid ${
+                  isDone ? "#059669" : isCurrent ? "#b45309" : "#e5e7eb"
+                }`,
+                padding: "5px 2px 4px",
                 textAlign: "center",
+                boxShadow: isCurrent ? "0 4px 14px rgba(245,158,11,0.5)" : isDone ? "0 2px 6px rgba(5,150,105,0.2)" : "none",
+                transform: isCurrent ? "translateY(-3px) scale(1.07)" : "none",
                 transition: "all 0.2s",
-                boxShadow: isCurrent ? "0 2px 8px #f59e0b66" : "none",
               }}
             >
-              <div style={{ fontSize: "0.55rem", color: isDone ? "#fff" : isCurrent ? "#92400e" : "#9ca3af", fontWeight: 600 }}>
-                {isDone ? "✓" : `Д${dayNum}`}
+              <div style={{
+                fontSize: "0.44rem", fontWeight: 900, lineHeight: 1, marginBottom: "2px",
+                color: isDone ? "rgba(255,255,255,0.85)" : isCurrent ? "rgba(120,53,15,0.9)" : "#9ca3af",
+              }}>
+                {isDone ? "✅" : isSpecial ? "👑" : `Д${dayNum}`}
               </div>
-              <div style={{ fontSize: "0.5rem", color: isDone ? "#d1fae5" : isCurrent ? "#78350f" : "#6b7280", fontWeight: 700 }}>
-                {fmtCoins(coins)}
+              <div style={{
+                fontSize: "0.44rem", fontWeight: 900, lineHeight: 1,
+                color: isDone ? "#d1fae5" : isCurrent ? "#78350f" : "#6b7280",
+                fontFamily: "'JetBrains Mono', monospace",
+              }}>
+                {fmtCoins(coinAmount)}
               </div>
             </div>
           );
         })}
       </div>
+
       {available ? (
         <motion.button
-          whileTap={{ scale: 0.96 }}
+          whileTap={{ scale: 0.95 }}
+          animate={{ boxShadow: ["0 3px 12px #f59e0b55","0 5px 22px #f59e0b88","0 3px 12px #f59e0b55"] }}
+          transition={{ repeat: Infinity, duration: 1.8 }}
           onClick={onClaim}
           style={{
-            width: "100%",
-            padding: "10px",
-            background: "linear-gradient(135deg, #f59e0b, #d97706)",
-            color: "#fff",
-            border: "none",
-            borderRadius: "12px",
-            fontWeight: 800,
-            fontSize: "0.8rem",
-            cursor: "pointer",
-            boxShadow: "0 2px 12px #f59e0b66",
+            width: "100%", padding: "10px",
+            background: "linear-gradient(135deg,#f59e0b,#d97706)",
+            color: "#fff", border: "none", borderRadius: "12px",
+            fontWeight: 800, fontSize: "0.78rem", cursor: "pointer",
           }}
         >
-          🎁 Получить награду дня {((day % 7) + 1)} · {fmtCoins(DAILY_COINS[(day % 7)])} монет
+          🎁 Получить: +{fmtCoins(DAILY_COINS[(day % 7)])} монет
         </motion.button>
       ) : (
         <div style={{
           textAlign: "center", padding: "8px",
-          color: "#a16207", fontSize: "0.72rem", fontWeight: 600,
+          color: "#a16207", fontSize: "0.7rem", fontWeight: 600,
         }}>
           ⏰ Следующая награда через {fmtTime(timer)}
         </div>
@@ -863,6 +984,12 @@ function DailyRewards({
     </div>
   );
 }
+
+const PODIUM_CFG = [
+  { bg: "linear-gradient(160deg,#fffbeb,#fef3c7)", border: "#f59e0b", text: "#92400e", coin: "#d97706", emoji: "🥇" },
+  { bg: "linear-gradient(160deg,#f8fafc,#f1f5f9)", border: "#9ca3af", text: "#374151", coin: "#6b7280", emoji: "🥈" },
+  { bg: "linear-gradient(160deg,#fff7ed,#ffedd5)", border: "#cd7c2c", text: "#7c2d12", coin: "#9a3412", emoji: "🥉" },
+];
 
 function EmpireLeaderboard({ userId }: { userId: number }) {
   const { leaderboard, fetchLeaderboard } = useEmpireStore();
@@ -872,28 +999,35 @@ function EmpireLeaderboard({ userId }: { userId: number }) {
     if (open) fetchLeaderboard();
   }, [open, fetchLeaderboard]);
 
+  const top3 = leaderboard.slice(0, 3);
+  const rest  = leaderboard.slice(3, 10);
+
   return (
     <div style={{ margin: "0 16px" }}>
-      <button
+      <motion.button
+        whileTap={{ scale: 0.97 }}
         onClick={() => setOpen((v) => !v)}
         style={{
-          width: "100%",
-          padding: "12px 16px",
-          background: open ? "linear-gradient(135deg, #1e40af, #1d4ed8)" : "linear-gradient(135deg, #3b82f6, #2563eb)",
-          color: "#fff",
-          border: "none",
-          borderRadius: "16px",
-          fontWeight: 700,
-          fontSize: "0.82rem",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
+          width: "100%", padding: "11px 16px",
+          background: open
+            ? "linear-gradient(135deg,#d4a820,#f59e0b)"
+            : "linear-gradient(135deg,#f59e0b,#d97706)",
+          color: "#3a1e00",
+          border: "1.5px solid rgba(255,220,80,0.35)",
+          borderRadius: open ? "16px 16px 0 0" : "16px",
+          fontWeight: 800, fontSize: "0.82rem", cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          boxShadow: "0 3px 14px rgba(245,158,11,0.3)",
         }}
       >
         <span>🏆 Рейтинг империй</span>
-        <span style={{ opacity: 0.8 }}>{open ? "▲" : "▼"}</span>
-      </button>
+        <motion.span
+          animate={{ rotate: open ? 180 : 0 }}
+          transition={{ duration: 0.22 }}
+          style={{ opacity: 0.7, fontSize: "0.68rem" }}
+        >▼</motion.span>
+      </motion.button>
+
       <AnimatePresence>
         {open && (
           <motion.div
@@ -903,54 +1037,116 @@ function EmpireLeaderboard({ userId }: { userId: number }) {
             style={{ overflow: "hidden" }}
           >
             <div style={{
-              background: "#fff",
+              background: "linear-gradient(180deg,#fffbeb 0%,#fff 50%)",
               borderRadius: "0 0 16px 16px",
-              border: "1.5px solid #dbeafe",
+              border: "1.5px solid #f59e0b55",
               borderTop: "none",
-              overflow: "hidden",
+              paddingBottom: "6px",
             }}>
               {leaderboard.length === 0 ? (
-                <div style={{ padding: "16px", textAlign: "center", color: "#6b7280", fontSize: "0.8rem" }}>
+                <div style={{ padding: "20px", textAlign: "center", color: "#6b7280", fontSize: "0.8rem" }}>
                   Нет данных
                 </div>
               ) : (
-                leaderboard.slice(0, 10).map((e, i) => (
-                  <div
-                    key={e.user_id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      padding: "10px 14px",
-                      borderBottom: i < leaderboard.length - 1 ? "1px solid #f1f5f9" : "none",
-                      background: e.user_id === userId ? "#eff6ff" : "transparent",
-                    }}
-                  >
-                    <div style={{
-                      width: "28px", height: "28px",
-                      background: e.rank <= 3 ? ["#f59e0b","#9ca3af","#cd7c2c"][e.rank - 1] : "#e5e7eb",
-                      borderRadius: "50%",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: "0.7rem", fontWeight: 800, color: e.rank <= 3 ? "#fff" : "#374151",
-                      flexShrink: 0, marginRight: "10px",
-                    }}>
-                      {e.rank <= 3 ? ["🥇","🥈","🥉"][e.rank - 1] : e.rank}
+                <>
+                  {/* ── Top 3 podium cards ── */}
+                  {top3.length > 0 && (
+                    <div style={{ display: "flex", gap: "6px", padding: "10px 10px 6px" }}>
+                      {top3.map((e, i) => {
+                        const cfg = PODIUM_CFG[i];
+                        const isMe = e.user_id === userId;
+                        return (
+                          <motion.div
+                            key={e.user_id}
+                            initial={{ scale: 0.78, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            transition={{ delay: i * 0.07, type: "spring", stiffness: 300, damping: 20 }}
+                            style={{
+                              flex: 1,
+                              background: cfg.bg,
+                              border: `${i === 0 ? "2px" : "1.5px"} solid ${cfg.border}`,
+                              borderRadius: "12px",
+                              padding: i === 0 ? "10px 6px" : "8px 5px",
+                              textAlign: "center",
+                              boxShadow: i === 0
+                                ? `0 5px 18px ${cfg.border}44`
+                                : `0 2px 8px ${cfg.border}22`,
+                              outline: isMe ? "2px solid #3b82f6" : "none",
+                              outlineOffset: "2px",
+                              position: "relative",
+                            }}
+                          >
+                            {e.prestige_count > 0 && (
+                              <div style={{ position: "absolute", top: 3, right: 5, fontSize: "0.48rem", color: "#f59e0b", fontWeight: 700 }}>
+                                ⭐×{e.prestige_count}
+                              </div>
+                            )}
+                            <div style={{ fontSize: i === 0 ? "1.6rem" : "1.25rem", lineHeight: 1 }}>{cfg.emoji}</div>
+                            <div style={{
+                              fontSize: "0.56rem", fontWeight: 900, color: cfg.text,
+                              marginTop: "4px", lineHeight: 1.3,
+                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                              padding: "0 2px",
+                            }}>
+                              {e.username ? `@${e.username}` : `#${e.user_id}`}
+                              {isMe && <span style={{ color: "#3b82f6" }}> ✓</span>}
+                            </div>
+                            <div style={{ fontSize: "0.52rem", color: cfg.text, opacity: 0.7, marginTop: "2px" }}>
+                              Ур.{e.empire_level}
+                            </div>
+                            <div style={{
+                              fontSize: "0.52rem", fontWeight: 800, color: cfg.coin,
+                              fontFamily: "'JetBrains Mono', monospace", marginTop: "2px",
+                            }}>
+                              {fmtCoins(e.coins)}💰
+                            </div>
+                          </motion.div>
+                        );
+                      })}
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: "0.78rem", color: "#1c1917", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {e.username ? `@${e.username}` : `Игрок #${e.user_id}`}
-                        {e.user_id === userId && <span style={{ color: "#3b82f6", marginLeft: 4 }}>(ты)</span>}
-                      </div>
-                      <div style={{ fontSize: "0.62rem", color: "#6b7280" }}>
-                        Ур.{e.empire_level} · {fmtCoins(e.coins)} монет
-                      </div>
+                  )}
+
+                  {/* ── Ranks 4–10 ── */}
+                  {rest.length > 0 && (
+                    <div style={{ margin: "0 8px 4px", borderRadius: "10px", overflow: "hidden", border: "1px solid #f3f4f6" }}>
+                      {rest.map((e, i) => (
+                        <div
+                          key={e.user_id}
+                          style={{
+                            display: "flex", alignItems: "center",
+                            padding: "8px 12px",
+                            borderBottom: i < rest.length - 1 ? "1px solid #f9fafb" : "none",
+                            background: e.user_id === userId ? "#eff6ff" : i % 2 === 0 ? "#fff" : "#fafafa",
+                          }}
+                        >
+                          <div style={{
+                            width: "22px", height: "22px",
+                            background: "#f3f4f6", borderRadius: "6px",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: "0.6rem", fontWeight: 800, color: "#6b7280",
+                            flexShrink: 0, marginRight: "9px",
+                          }}>
+                            {e.rank}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, fontSize: "0.74rem", color: "#1c1917", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {e.username ? `@${e.username}` : `Игрок #${e.user_id}`}
+                              {e.user_id === userId && <span style={{ color: "#3b82f6", marginLeft: 3 }}>(ты)</span>}
+                            </div>
+                            <div style={{ fontSize: "0.6rem", color: "#9ca3af" }}>
+                              Ур.{e.empire_level} · {fmtCoins(e.coins)} монет
+                            </div>
+                          </div>
+                          {e.prestige_count > 0 && (
+                            <div style={{ fontSize: "0.62rem", color: "#f59e0b", fontWeight: 700, flexShrink: 0 }}>
+                              ⭐×{e.prestige_count}
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                    {e.prestige_count > 0 && (
-                      <div style={{ fontSize: "0.65rem", color: "#f59e0b", fontWeight: 700 }}>
-                        ⭐×{e.prestige_count}
-                      </div>
-                    )}
-                  </div>
-                ))
+                  )}
+                </>
               )}
             </div>
           </motion.div>
@@ -1213,6 +1409,8 @@ export function EmpireGame() {
   const [selectedBuilding, setSelectedBuilding] = useState<string | null>(null);
   const collectBtnRef = useRef<HTMLButtonElement>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const seenAchievementsRef = useRef<Set<string>>(new Set());
+  const achievementsInitializedRef = useRef(false);
   const userId = user?.id;
 
   useEffect(() => {
@@ -1225,6 +1423,15 @@ export function EmpireGame() {
       }
     });
   }, [userId, fetch]);
+
+  // Seed already-earned achievements on first data load (suppress toasts for old ones)
+  useEffect(() => {
+    if (!data || achievementsInitializedRef.current) return;
+    achievementsInitializedRef.current = true;
+    ACHIEVEMENTS.forEach((ach) => {
+      if (ach.check(data)) seenAchievementsRef.current.add(ach.id);
+    });
+  }, [data]);
 
   // Track income history for sparkline (up to 12 data points)
   useEffect(() => {
@@ -1284,6 +1491,19 @@ export function EmpireGame() {
       if (result.empire_level > prevEmpLevel) {
         const newStage = STAGES.slice().reverse().find((s) => result.empire_level >= s.unlock) ?? STAGES[0];
         setLevelUpData({ level: result.empire_level, stage: newStage });
+      }
+      // Check for newly unlocked achievements and toast them with staggered delay
+      const newData = useEmpireStore.getState().data;
+      if (newData) {
+        let toastDelay = 900;
+        ACHIEVEMENTS.forEach((ach) => {
+          if (!seenAchievementsRef.current.has(ach.id) && ach.check(newData)) {
+            seenAchievementsRef.current.add(ach.id);
+            const d = toastDelay;
+            setTimeout(() => addToast(`${ach.emoji} ${ach.label}`, "success"), d);
+            toastDelay += 550;
+          }
+        });
       }
     } catch (e: unknown) {
       hapticNotify("error");
@@ -1436,22 +1656,37 @@ export function EmpireGame() {
             {empireLevel >= 20 && (
               <motion.button
                 whileTap={{ scale: 0.94 }}
+                animate={{
+                  boxShadow: [
+                    "0 3px 12px rgba(124,58,237,0.4), 0 0 0 0 rgba(124,58,237,0)",
+                    "0 3px 22px rgba(124,58,237,0.75), 0 0 0 4px rgba(124,58,237,0.15)",
+                    "0 3px 12px rgba(124,58,237,0.4), 0 0 0 0 rgba(124,58,237,0)",
+                  ],
+                }}
+                transition={{ repeat: Infinity, duration: 2.4, ease: "easeInOut" }}
                 onClick={() => { hapticImpact("light"); setShowPrestige(true); }}
                 style={{
                   marginTop: "6px",
                   background: "linear-gradient(135deg, #7c3aed, #6d28d9)",
                   color: "#fff",
-                  border: "none",
+                  border: "1px solid rgba(167,139,250,0.5)",
                   borderRadius: "10px",
-                  padding: "4px 12px",
+                  padding: "4px 14px",
                   fontWeight: 800,
                   fontSize: "0.68rem",
                   cursor: "pointer",
-                  boxShadow: "0 3px 12px rgba(124,58,237,0.4)",
                   letterSpacing: "0.01em",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "5px",
                 }}
               >
-                ⭐ Престиж
+                <motion.span
+                  animate={{ rotate: [0, 18, -18, 0] }}
+                  transition={{ repeat: Infinity, duration: 3.5, ease: "easeInOut" }}
+                  style={{ display: "inline-block" }}
+                >⭐</motion.span>
+                Престиж
               </motion.button>
             )}
           </div>
@@ -1555,6 +1790,42 @@ export function EmpireGame() {
             </motion.button>
           )}
         </div>
+
+        {/* Achievement badges strip */}
+        {data && (() => {
+          const earned = ACHIEVEMENTS.filter((a) => a.check(data));
+          if (earned.length === 0) return null;
+          return (
+            <div style={{
+              display: "flex", gap: "5px", overflowX: "auto",
+              marginTop: "10px",
+              paddingBottom: "2px",
+              msOverflowStyle: "none" as const,
+            }}>
+              {earned.map((ach) => (
+                <div
+                  key={ach.id}
+                  style={{
+                    flexShrink: 0,
+                    background: "rgba(255,255,255,0.72)",
+                    border: `1px solid ${currentStage.color}55`,
+                    borderRadius: "20px",
+                    padding: "3px 9px",
+                    fontSize: "0.56rem",
+                    fontWeight: 700,
+                    color: "#92400e",
+                    display: "flex", alignItems: "center", gap: "3px",
+                    whiteSpace: "nowrap",
+                    boxShadow: `0 1px 4px ${currentStage.color}22`,
+                  }}
+                >
+                  <span>{ach.emoji}</span>
+                  <span>{ach.label}</span>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Daily rewards */}
@@ -1577,34 +1848,64 @@ export function EmpireGame() {
 
         return (
           <div key={stage.stage} style={{ marginBottom: "20px" }}>
-            {/* Stage header */}
-            <div style={{
-              display: "flex", alignItems: "center", gap: "10px",
-              padding: "0 16px", marginBottom: "10px",
-            }}>
-              <div style={{
-                flex: 1, height: "1px",
-                background: isUnlocked ? `linear-gradient(90deg, transparent, ${stage.color}66)` : "#e5e7eb",
-              }} />
-              <div style={{
-                background: isUnlocked ? stage.color : "#e5e7eb",
-                color: isUnlocked ? "#fff" : "#9ca3af",
-                borderRadius: "99px",
-                padding: "4px 12px",
-                fontSize: "0.72rem",
-                fontWeight: 800,
-                display: "flex", alignItems: "center", gap: "4px",
-                whiteSpace: "nowrap",
-              }}>
-                {stage.label}
-                {!isUnlocked && (
-                  <span style={{ fontSize: "0.6rem", opacity: 0.8 }}>🔒 +{nextUnlockNeeded} ур.</span>
+            {/* Stage header — parchment scroll banner */}
+            <div style={{ padding: "0 16px", marginBottom: "10px" }}>
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                style={{
+                  position: "relative",
+                  display: "flex", alignItems: "center",
+                  background: isUnlocked ? CARD_THEMES[stage.stage].banner : "linear-gradient(135deg, #d1d5db, #9ca3af)",
+                  borderRadius: "10px",
+                  padding: "7px 12px",
+                  border: `1.5px solid ${isUnlocked ? CARD_THEMES[stage.stage].border : "#d1d5db"}`,
+                  boxShadow: isUnlocked ? `0 3px 14px ${stage.color}30, inset 0 1px 0 rgba(255,255,255,0.18)` : "none",
+                  overflow: "hidden",
+                }}
+              >
+                {isUnlocked && (
+                  <div style={{
+                    position: "absolute", inset: 0, borderRadius: "10px",
+                    background: "linear-gradient(105deg, transparent 35%, rgba(255,255,255,0.14) 50%, transparent 65%)",
+                    pointerEvents: "none",
+                  }} />
                 )}
-              </div>
-              <div style={{
-                flex: 1, height: "1px",
-                background: isUnlocked ? `linear-gradient(90deg, ${stage.color}66, transparent)` : "#e5e7eb",
-              }} />
+                <div style={{ fontSize: "1rem", marginRight: "8px", opacity: isUnlocked ? 1 : 0.5, flexShrink: 0 }}>
+                  {["🏰","🏛️","🏙️","✈️"][stage.stage - 1]}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{
+                    fontWeight: 900, fontSize: "0.68rem",
+                    color: isUnlocked ? CARD_THEMES[stage.stage].bannerText : "#6b7280",
+                    letterSpacing: "0.05em",
+                  }}>
+                    {stage.label.toUpperCase()}
+                  </div>
+                  <div style={{
+                    fontSize: "0.54rem", fontWeight: 600,
+                    color: isUnlocked
+                      ? (CARD_THEMES[stage.stage].bannerText === "#ffffff" ? "rgba(255,255,255,0.7)" : "rgba(58,30,0,0.55)")
+                      : "#9ca3af",
+                  }}>
+                    {isUnlocked
+                      ? `${stageDefs.length} зданий · Этап ${stage.stage}`
+                      : `🔒 Откроется через +${nextUnlockNeeded} ур.`}
+                  </div>
+                </div>
+                {isUnlocked && (() => {
+                  const totalTiers = stageDefs.reduce((acc, d) => acc + getLevelTier(buildings[d.key] ?? 0), 0);
+                  return totalTiers > 0 ? (
+                    <div style={{
+                      fontSize: "0.62rem", fontWeight: 800, flexShrink: 0, marginLeft: "6px",
+                      color: CARD_THEMES[stage.stage].bannerText === "#ffffff" ? "rgba(255,255,255,0.88)" : "rgba(58,30,0,0.72)",
+                    }}>
+                      ⭐ {totalTiers}
+                    </div>
+                  ) : null;
+                })()}
+              </motion.div>
             </div>
 
             {/* Building grid */}
@@ -1638,20 +1939,68 @@ export function EmpireGame() {
         <EmpireLeaderboard userId={userId} />
       </div>
 
-      {/* XP info note */}
+      {/* Progression & XP overview card */}
       <div style={{
         margin: "12px 16px 0",
-        background: "#eff6ff",
-        borderRadius: "12px",
-        padding: "10px 14px",
-        border: "1px solid #dbeafe",
+        background: "linear-gradient(135deg,#fffbeb,#fef3c7)",
+        borderRadius: "16px",
+        padding: "12px 14px",
+        border: "1.5px solid #fde68a",
+        boxShadow: "0 2px 8px rgba(245,158,11,0.08)",
       }}>
-        <div style={{ fontSize: "0.68rem", color: "#1d4ed8", fontWeight: 600, marginBottom: "2px" }}>
-          💡 Как работает XP
+        {/* Next stage progress bar */}
+        {(() => {
+          const nextSt = STAGES.find((s) => s.stage === currentStage.stage + 1);
+          if (!nextSt) return null;
+          const progress = Math.min((empireLevel / nextSt.unlock) * 100, 100);
+          return (
+            <div style={{ marginBottom: "10px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                <div style={{ fontSize: "0.62rem", fontWeight: 700, color: "#92400e" }}>
+                  🔓 До этапа «{nextSt.label}»
+                </div>
+                <div style={{ fontSize: "0.58rem", color: "#a16207", fontWeight: 600, fontFamily: "'JetBrains Mono',monospace" }}>
+                  {empireLevel}/{nextSt.unlock} ур.
+                </div>
+              </div>
+              <div style={{ height: "5px", background: "rgba(0,0,0,0.08)", borderRadius: "99px", overflow: "hidden" }}>
+                <motion.div
+                  animate={{ width: `${progress}%` }}
+                  transition={{ duration: 0.8, ease: "easeOut" }}
+                  style={{
+                    height: "100%", borderRadius: "99px",
+                    background: progress > 75
+                      ? "linear-gradient(90deg,#10b981,#059669)"
+                      : progress > 40
+                      ? "linear-gradient(90deg,#f59e0b,#d97706)"
+                      : "linear-gradient(90deg,#ef4444,#dc2626)",
+                  }}
+                />
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Stats row */}
+        <div style={{ display: "flex", gap: "6px", marginBottom: "8px" }}>
+          {[
+            { value: String(Object.values(buildings).filter((v) => (v as number) > 0).length), label: "зданий" },
+            { value: String(totalBuildingLevels), label: "уровней" },
+            { value: fmtCoins(availableXp), label: "своб. XP" },
+          ].map((s, i, arr) => (
+            <div key={s.label} style={{ flex: 1, textAlign: "center", display: "flex", alignItems: "center" }}>
+              {i > 0 && <div style={{ width: "1px", height: "24px", background: "#fde68a", marginRight: "6px" }} />}
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: "0.72rem", fontWeight: 900, color: "#d97706", fontFamily: "'JetBrains Mono',monospace" }}>{s.value}</div>
+                <div style={{ fontSize: "0.52rem", color: "#a16207" }}>{s.label}</div>
+              </div>
+            </div>
+          ))}
         </div>
-        <div style={{ fontSize: "0.62rem", color: "#3b82f6", lineHeight: 1.5 }}>
-          Свободный XP = ваш общий XP минус потраченный в Империи.
-          Уровень аккаунта <strong>никогда не снижается</strong> — это только баланс для игры.
+
+        {/* XP explanation */}
+        <div style={{ fontSize: "0.57rem", color: "#a16207", lineHeight: 1.5, paddingTop: "6px", borderTop: "1px solid #fde68a" }}>
+          💡 Свободный XP = ваш общий XP минус потраченный в Империи. Уровень аккаунта <strong>никогда не снижается</strong>.
         </div>
       </div>
     </div>

@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, PieChart, Pie, Cell,
+  ResponsiveContainer, PieChart, Pie, Cell, ReferenceLine,
 } from "recharts";
 import { fetchAnalytics, fetchTrend, fetchNews, fetchSystemStats } from "@/api/client";
 import type { SystemStats } from "@/api/client";
@@ -973,6 +973,8 @@ export function AnalyticsTab({ onNavigate }: Props) {
                     return d.toLocaleString("ru", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
                   }}
                 />
+                <ReferenceLine y={60} stroke="#22c55e" strokeDasharray="4 3" strokeWidth={1} strokeOpacity={0.45} label={{ value: "60%", fill: "#22c55e88", fontSize: 8, position: "insideTopRight" }} />
+                <ReferenceLine y={25} stroke="#ef4444" strokeDasharray="4 3" strokeWidth={1} strokeOpacity={0.45} label={{ value: "25%", fill: "#ef444488", fontSize: 8, position: "insideTopRight" }} />
                 <Area type="monotone" dataKey="availability" stroke="#a855f7" strokeWidth={2} fill="url(#trendGrad)" dot={false} activeDot={{ r: 4, fill: "#a855f7" }} />
               </AreaChart>
             </ResponsiveContainer>

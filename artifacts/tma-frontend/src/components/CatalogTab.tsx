@@ -556,18 +556,50 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
 
       {/* ── Quick fuel-type chips ── */}
       {!selectedStation && !matchedFuelType && (
-        <div style={{ padding: "0 1rem 0.5rem", display: "flex", gap: "0.3rem", overflowX: "auto", paddingBottom: "0.5rem" }}>
-          {["АИ-92","АИ-95","АИ-95+","ДТ","ДТ+","Газ"].map((ft) => (
-            <button key={ft} onClick={() => { impact("light"); setSearchQuery(ft.replace("АИ-","").toLowerCase()); }} style={{
-              flexShrink: 0, padding: "0.22rem 0.6rem",
-              background: "#0d0d18", border: "1px solid #1e1e2a",
-              borderRadius: "6px", color: "#6b7280", fontSize: "0.65rem",
-              cursor: "pointer", transition: "border-color 0.15s, color 0.15s",
-              fontFamily: "'JetBrains Mono',monospace",
-            }}
-            onMouseEnter={(e) => { (e.target as HTMLButtonElement).style.borderColor = "#a855f755"; (e.target as HTMLButtonElement).style.color = "#a855f7"; }}
-            onMouseLeave={(e) => { (e.target as HTMLButtonElement).style.borderColor = "#1e1e2a"; (e.target as HTMLButtonElement).style.color = "#6b7280"; }}
-            >{ft}</button>
+        <div style={{ padding: "0 1rem 0.5rem", display: "flex", gap: "0.35rem", overflowX: "auto", paddingBottom: "0.5rem" }}>
+          {([
+            { ft: "АИ-92",  icon: "⛽", color: "#22c55e", q: "92" },
+            { ft: "АИ-95",  icon: "⛽", color: "#3b82f6", q: "95" },
+            { ft: "АИ-95+", icon: "✨", color: "#a855f7", q: "95+" },
+            { ft: "АИ-100", icon: "🏎", color: "#f59e0b", q: "100" },
+            { ft: "ДТ",     icon: "🚛", color: "#f97316", q: "дт" },
+            { ft: "ДТ+",    icon: "🚛", color: "#d97706", q: "дт+" },
+            { ft: "Газ",    icon: "💧", color: "#14b8a6", q: "газ" },
+          ] as const).map(({ ft, icon, color, q }) => (
+            <button
+              key={ft}
+              onClick={() => { impact("light"); setSearchQuery(q); }}
+              style={{
+                flexShrink: 0,
+                padding: "0.25rem 0.65rem",
+                background: `${color}10`,
+                border: `1px solid ${color}35`,
+                borderRadius: "8px",
+                color: color,
+                fontSize: "0.65rem",
+                cursor: "pointer",
+                fontFamily: "'JetBrains Mono',monospace",
+                fontWeight: 600,
+                display: "flex", alignItems: "center", gap: "0.28rem",
+                boxShadow: `0 0 8px ${color}12`,
+                transition: "background 0.15s, border-color 0.15s, box-shadow 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                const el = e.currentTarget;
+                el.style.background = `${color}22`;
+                el.style.borderColor = `${color}66`;
+                el.style.boxShadow = `0 0 12px ${color}28`;
+              }}
+              onMouseLeave={(e) => {
+                const el = e.currentTarget;
+                el.style.background = `${color}10`;
+                el.style.borderColor = `${color}35`;
+                el.style.boxShadow = `0 0 8px ${color}12`;
+              }}
+            >
+              <span style={{ fontSize: "0.68rem" }}>{icon}</span>
+              {ft}
+            </button>
           ))}
         </div>
       )}
@@ -718,6 +750,22 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
                           );
                         })}
                       </div>
+                      {/* Mini per-fuel availability strip */}
+                      {s.fuel_statuses.length > 0 && (
+                        <div style={{ display: "flex", gap: "2px", marginTop: "0.3rem", height: "2px" }}>
+                          {s.fuel_statuses.map((fs) => (
+                            <div
+                              key={fs.fuel_type}
+                              title={`${fs.fuel_type}: ${fs.availability_pct}%`}
+                              style={{
+                                flex: 1, borderRadius: "1px", opacity: 0.65,
+                                background: fs.availability_pct >= 60 ? "#22c55e"
+                                  : fs.availability_pct >= 25 ? "#eab308" : "#ef4444",
+                              }}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 );

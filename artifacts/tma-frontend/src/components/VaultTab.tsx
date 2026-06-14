@@ -163,6 +163,14 @@ function PurchaseCard({ purchase }: { purchase: Purchase }) {
 
       <motion.div
         whileTap={{ scale: 0.985 }}
+        animate={purchase.status === "active" ? {
+          boxShadow: [
+            "0 0 20px #a855f718, 0 0 0 1px #a855f728",
+            "0 0 32px #a855f730, 0 0 0 1px #a855f748",
+            "0 0 20px #a855f718, 0 0 0 1px #a855f728",
+          ],
+        } : {}}
+        transition={purchase.status === "active" ? { repeat: Infinity, duration: 2.8, ease: "easeInOut" } : {}}
         style={{
           background: purchase.status === "active"
             ? "linear-gradient(160deg,#0d0d18,#120820)"
@@ -174,7 +182,6 @@ function PurchaseCard({ purchase }: { purchase: Purchase }) {
           cursor: purchase.status === "active" ? "pointer" : "default",
           position: "relative",
           overflow: "hidden",
-          boxShadow: purchase.status === "active" ? "0 0 20px #a855f718" : "none",
         }}
         onClick={() => purchase.status === "active" && setShowQr(true)}
       >
@@ -531,23 +538,32 @@ export function VaultTab({ initialPurchaseId }: VaultTabProps) {
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               style={{
-                background: "#14141c",
-                border: "1px solid #22222f",
+                background: "linear-gradient(160deg,#0e0e1a,#110d1a)",
+                border: "1px solid #a855f722",
+                borderLeft: "3px solid #a855f766",
                 borderRadius: "10px",
                 padding: "0.55rem 0.75rem",
                 marginBottom: "0.4rem",
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
+                position: "relative",
+                overflow: "hidden",
               }}
             >
-              <div style={{ minWidth: 0 }}>
-                <p style={{ margin: 0, color: "#e2e8f0", fontSize: "0.78rem", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {sub.station_name}
-                </p>
-                <p style={{ margin: 0, color: "#6b7280", fontSize: "0.65rem" }}>
-                  {sub.station_region}{sub.fuel_type ? ` · ${sub.fuel_type}` : ""}
-                </p>
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,#a855f733,transparent)" }} />
+              <div style={{ display: "flex", alignItems: "center", gap: "0.55rem", minWidth: 0 }}>
+                <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "26px", height: "26px", borderRadius: "50%", background: "#a855f715", border: "1px solid #a855f730", flexShrink: 0 }}>
+                  🔔
+                </span>
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ margin: 0, color: "#e2e8f0", fontSize: "0.78rem", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {sub.station_name}
+                  </p>
+                  <p style={{ margin: 0, color: "#6b7280", fontSize: "0.62rem" }}>
+                    {sub.station_region}{sub.fuel_type ? ` · ${sub.fuel_type}` : ""}
+                  </p>
+                </div>
               </div>
               <button
                 onClick={() => {
@@ -559,7 +575,7 @@ export function VaultTab({ initialPurchaseId }: VaultTabProps) {
                   background: "none",
                   border: "1px solid #ef444420",
                   borderRadius: "6px",
-                  color: "#ef4444",
+                  color: "#ef444499",
                   fontSize: "0.65rem",
                   padding: "0.25rem 0.45rem",
                   cursor: "pointer",
@@ -589,24 +605,32 @@ export function VaultTab({ initialPurchaseId }: VaultTabProps) {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
               style={{
-                background: "#14141c",
-                border: "1px solid #a855f720",
+                background: "linear-gradient(160deg,#0d0d18,#0e0b18)",
+                border: "1px solid #eab30820",
+                borderLeft: "3px solid #eab30866",
                 borderRadius: "12px",
-                padding: "0.65rem 0.85rem",
+                padding: "0.6rem 0.85rem",
                 marginBottom: "0.4rem",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
                 gap: "0.5rem",
+                position: "relative",
+                overflow: "hidden",
               }}
             >
-              <div>
-                <p style={{ margin: 0, color: "#e2e8f0", fontSize: "0.82rem", fontWeight: 600 }}>
-                  {region}
-                </p>
-                <p style={{ margin: "0.1rem 0 0", color: "#6b7280", fontSize: "0.68rem" }}>
-                  Отслеживается · Мониторинг доступности
-                </p>
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,#eab30833,transparent)" }} />
+              <div style={{ display: "flex", alignItems: "center", gap: "0.55rem" }}>
+                <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
+                  <span style={{ fontSize: "0.9rem" }}>⭐</span>
+                  <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 5px #22c55e", display: "inline-block", animation: "tmaPulse 2s infinite" }} />
+                </div>
+                <div>
+                  <p style={{ margin: 0, color: "#e2e8f0", fontSize: "0.82rem", fontWeight: 600 }}>{region}</p>
+                  <p style={{ margin: "0.1rem 0 0", color: "#4b5563", fontSize: "0.62rem", fontFamily: "'JetBrains Mono',monospace" }}>
+                    МОНИТОРИНГ · LIVE
+                  </p>
+                </div>
               </div>
               <button
                 onClick={() => removeFav(region)}
@@ -684,8 +708,22 @@ export function VaultTab({ initialPurchaseId }: VaultTabProps) {
                   border: `1px solid ${ach.unlocked ? "#a855f740" : "#22222f"}`,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: "1.1rem",
-                  boxShadow: ach.unlocked ? "0 0 12px #a855f730" : "none",
+                  boxShadow: ach.unlocked ? "0 0 14px #a855f738" : "none",
+                  position: "relative",
+                  overflow: "hidden",
                 }}>
+                  {ach.unlocked && (
+                    <motion.div
+                      initial={{ x: "-100%" }}
+                      animate={{ x: "200%" }}
+                      transition={{ delay: i * 0.08, duration: 0.55, ease: "easeInOut", repeat: Infinity, repeatDelay: 4 }}
+                      style={{
+                        position: "absolute", top: 0, bottom: 0, width: "50%",
+                        background: "linear-gradient(90deg,transparent,rgba(168,85,247,0.22),transparent)",
+                        pointerEvents: "none",
+                      }}
+                    />
+                  )}
                   {ach.icon}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>

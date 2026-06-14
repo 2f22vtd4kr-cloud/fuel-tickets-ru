@@ -296,32 +296,59 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
           🌡
         </button>
 
-        {/* Station count badge */}
+        {/* Quick status strip — tap to filter */}
         <div
           style={{
             background: "rgba(20,20,28,0.92)",
-            border: `1px solid ${filtered.length < stations.length ? "#a855f740" : "#22222f"}`,
+            border: "1px solid #22222f",
             borderRadius: "10px",
-            color: filtered.length < stations.length ? "#a855f7" : "#9ca3af",
-            padding: "0.4rem 0.75rem",
-            fontSize: "0.72rem",
             backdropFilter: "blur(12px)",
-            fontFamily: "'JetBrains Mono',monospace",
-            letterSpacing: "0.04em",
             display: "flex",
             alignItems: "center",
-            gap: "0.35rem",
+            overflow: "hidden",
           }}
         >
           {loading ? (
-            <span style={{ color: "#374151" }}>···</span>
+            <span style={{ color: "#374151", fontSize: "0.7rem", padding: "0.4rem 0.75rem", fontFamily: "'JetBrains Mono',monospace" }}>···</span>
           ) : (
             <>
-              <span style={{ color: filtered.length < stations.length ? "#a855f7" : "#6b7280", fontSize: "0.6rem" }}>▸</span>
-              {filtered.length} АЗС
-              {filtered.length < stations.length && (
-                <span style={{ color: "#4b5563", fontSize: "0.6rem" }}>/ {stations.length}</span>
-              )}
+              {([
+                { status: "green",  color: "#22c55e", dot: "●" },
+                { status: "yellow", color: "#eab308", dot: "●" },
+                { status: "red",    color: "#ef4444", dot: "●" },
+              ] as const).map(({ status, color, dot }) => {
+                const cnt = filtered.filter((s) => dominantStatus(s) === status).length;
+                const isActive = filterStatus === status;
+                return (
+                  <button
+                    key={status}
+                    onClick={() => setFilter("filterStatus", isActive ? "all" : status)}
+                    style={{
+                      background: isActive ? `${color}18` : "transparent",
+                      border: "none",
+                      borderRight: "1px solid #22222f",
+                      padding: "0.38rem 0.55rem",
+                      cursor: "pointer",
+                      display: "flex", alignItems: "center", gap: "0.22rem",
+                      transition: "background 0.15s",
+                    }}
+                  >
+                    <span style={{ color, fontSize: "0.55rem", lineHeight: 1 }}>{dot}</span>
+                    <span style={{
+                      fontFamily: "'JetBrains Mono',monospace",
+                      fontSize: "0.68rem", fontWeight: isActive ? 800 : 500,
+                      color: isActive ? color : "#6b7280",
+                    }}>{cnt}</span>
+                  </button>
+                );
+              })}
+              <span style={{
+                fontFamily: "'JetBrains Mono',monospace",
+                fontSize: "0.6rem", color: filtered.length < stations.length ? "#a855f7" : "#4b5563",
+                padding: "0 0.5rem",
+              }}>
+                {filtered.length < stations.length ? `${filtered.length}/${stations.length}` : `${stations.length}`}
+              </span>
             </>
           )}
         </div>

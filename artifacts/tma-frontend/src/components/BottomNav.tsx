@@ -136,7 +136,7 @@ export function BottomNav({ active, onChange, visible = true, badges = {} }: Pro
             >
               <motion.div
                 animate={{
-                  color: isActive ? "#c084fc" : "#374151",
+                  color: isActive ? "#c084fc" : "#555f70",
                   scale: isActive ? 1.1 : 1,
                   filter: isActive
                     ? "drop-shadow(0 0 8px rgba(168,85,247,0.6))"

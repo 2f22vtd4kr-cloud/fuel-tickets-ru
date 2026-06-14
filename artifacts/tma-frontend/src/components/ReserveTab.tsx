@@ -35,6 +35,8 @@ function CardTile({ card, delay }: { card: FlipCard; delay: number }) {
   const [revealed, setRevealed] = useState(false);
   const color = RARITY_COLORS[card.rarity] ?? "#6b7280";
   const isPositive = card.xp >= 0;
+  const isPremium = card.rarity === "legendary" || card.rarity === "mythic";
+  const isEpic = card.rarity === "epic";
 
   useEffect(() => {
     const t = setTimeout(() => setRevealed(true), delay);
@@ -47,28 +49,66 @@ function CardTile({ card, delay }: { card: FlipCard; delay: number }) {
       animate={revealed ? { rotateY: 0, opacity: 1 } : { rotateY: 180, opacity: 0.3 }}
       transition={{ type: "spring", damping: 18, stiffness: 200 }}
       style={{
-        background: revealed ? `${color}18` : "linear-gradient(135deg,#1e1e2a,#14141c)",
-        border: `1px solid ${revealed ? color + "55" : "#22222f"}`,
+        background: revealed
+          ? isPremium
+            ? `linear-gradient(160deg,${color}28,${color}10)`
+            : `${color}18`
+          : "linear-gradient(135deg,#1e1e2a,#14141c)",
+        border: `${isPremium && revealed ? "1.5px" : "1px"} solid ${revealed ? color + (isPremium ? "88" : "55") : "#22222f"}`,
         borderRadius: "12px",
         padding: "0.55rem 0.35rem",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: "0.25rem",
-        minHeight: "90px",
-        boxShadow: revealed ? `0 0 14px ${color}33` : "none",
+        display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center",
+        gap: "0.25rem", minHeight: "90px",
+        position: "relative", overflow: "hidden",
+        boxShadow: revealed
+          ? isPremium
+            ? `0 0 26px ${color}55, 0 0 8px ${color}33, inset 0 0 12px ${color}10`
+            : isEpic
+            ? `0 0 16px ${color}44`
+            : `0 0 14px ${color}33`
+          : "none",
         transition: "box-shadow 0.4s",
       }}
     >
-      <span style={{ fontSize: "1.6rem", lineHeight: 1 }}>
+      {/* Shimmer sweep on legendary/mythic */}
+      {revealed && isPremium && (
+        <motion.div
+          initial={{ x: "-100%" }}
+          animate={{ x: "220%" }}
+          transition={{ delay: 0.25, duration: 0.75, ease: "easeInOut", repeat: Infinity, repeatDelay: 3.5 }}
+          style={{
+            position: "absolute", top: 0, bottom: 0, width: "40%",
+            background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.14),transparent)",
+            pointerEvents: "none", zIndex: 1,
+          }}
+        />
+      )}
+      {/* Epic glow pulse */}
+      {revealed && isEpic && (
+        <motion.div
+          animate={{ opacity: [0.12, 0.28, 0.12] }}
+          transition={{ repeat: Infinity, duration: 2.5 }}
+          style={{
+            position: "absolute", inset: 0, borderRadius: "12px",
+            background: `radial-gradient(circle at 50% 30%, ${color}40, transparent 70%)`,
+            pointerEvents: "none",
+          }}
+        />
+      )}
+
+      <motion.span
+        animate={revealed && isPremium ? { scale: [1, 1.1, 1] } : {}}
+        transition={{ delay: 0.3, duration: 0.5 }}
+        style={{ fontSize: isPremium && revealed ? "1.9rem" : "1.6rem", lineHeight: 1, zIndex: 2 }}
+      >
         {revealed ? card.emoji : "❓"}
-      </span>
+      </motion.span>
       {revealed && (
         <>
           <span style={{
             fontSize: "0.58rem", color, fontWeight: 700, textAlign: "center",
-            lineHeight: 1.2, maxWidth: "90%",
+            lineHeight: 1.2, maxWidth: "90%", zIndex: 2,
           }}>
             {card.name}
           </span>
@@ -77,14 +117,15 @@ function CardTile({ card, delay }: { card: FlipCard; delay: number }) {
             color: isPositive ? "#22c55e" : "#ef4444",
             fontWeight: 800,
             fontFamily: "'JetBrains Mono', monospace",
+            zIndex: 2,
           }}>
             {isPositive ? "+" : ""}{card.xp.toLocaleString("ru")}
           </span>
           <span style={{
             fontSize: "0.5rem", color,
-            background: `${color}22`,
-            borderRadius: "4px",
-            padding: "0.1rem 0.3rem",
+            background: `${color}${isPremium ? "35" : "22"}`,
+            border: isPremium ? `1px solid ${color}44` : "none",
+            borderRadius: "4px", padding: "0.1rem 0.3rem", zIndex: 2,
           }}>
             {card.rarity}
           </span>
@@ -238,23 +279,56 @@ function FlipGame() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 1.2 }}
               style={{
-                background: `${glowColor}11`,
-                border: `1px solid ${glowColor}44`,
-                borderRadius: "10px",
-                padding: "0.65rem",
+                background: `linear-gradient(160deg,${glowColor}18,${glowColor}06)`,
+                border: `1px solid ${glowColor}55`,
+                borderRadius: "12px",
+                padding: "0.75rem",
                 textAlign: "center",
+                position: "relative",
+                overflow: "hidden",
+                boxShadow: (result.result_type === "legendary" || result.result_type === "mythic")
+                  ? `0 0 28px ${glowColor}35`
+                  : "none",
               }}
             >
-              <p style={{
-                margin: "0 0 0.2rem",
-                color: glowColor,
-                fontWeight: 700,
-                fontSize: "0.85rem",
-              }}>
+              {/* Top accent line */}
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: `linear-gradient(90deg,transparent,${glowColor},transparent)` }} />
+
+              {/* Shimmer on legendary/mythic */}
+              {(result.result_type === "legendary" || result.result_type === "mythic") && (
+                <motion.div
+                  initial={{ x: "-100%" }}
+                  animate={{ x: "220%" }}
+                  transition={{ delay: 1.5, duration: 0.9, ease: "easeInOut" }}
+                  style={{
+                    position: "absolute", top: 0, bottom: 0, width: "40%",
+                    background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent)",
+                    pointerEvents: "none",
+                  }}
+                />
+              )}
+
+              {/* XP delta */}
+              <motion.div
+                initial={{ scale: 0.7, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 1.3, type: "spring", stiffness: 300, damping: 20 }}
+                style={{
+                  fontFamily: "'JetBrains Mono',monospace",
+                  fontSize: "1.55rem", fontWeight: 900,
+                  color: result.total_xp_delta >= 0 ? "#22c55e" : "#ef4444",
+                  marginBottom: "0.3rem",
+                  lineHeight: 1,
+                }}
+              >
+                {result.total_xp_delta >= 0 ? "+" : ""}{result.total_xp_delta.toLocaleString("ru")} XP
+              </motion.div>
+
+              <p style={{ margin: "0 0 0.25rem", color: glowColor, fontWeight: 700, fontSize: "0.82rem" }}>
                 {result.message}
               </p>
-              <p style={{ margin: 0, color: "#9ca3af", fontSize: "0.7rem" }}>
-                Следующий розыгрыш — завтра после полуночи
+              <p style={{ margin: 0, color: "#4b5563", fontSize: "0.6rem" }}>
+                ⏳ Следующий розыгрыш — завтра после полуночи
               </p>
             </motion.div>
           </>
@@ -276,6 +350,14 @@ interface Spawnable {
   alive: boolean;
 }
 
+interface Particle {
+  id: number;
+  x: number;
+  y: number;
+  text: string;
+  color: string;
+}
+
 function TapGame() {
   const { user, refresh } = useUserStore();
   const { setTapScore, tapHighScore } = useGameStore();
@@ -285,7 +367,9 @@ function TapGame() {
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(GAME_DURATION);
   const [items, setItems] = useState<Spawnable[]>([]);
+  const [particles, setParticles] = useState<Particle[]>([]);
   const nextId = useRef(0);
+  const particleId = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const spawnRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const scoreRef = useRef(0);
@@ -353,12 +437,20 @@ function TapGame() {
     spawnRef.current = setInterval(spawnItem, 600);
   };
 
-  const tapItem = (id: number, type: "pump" | "canister") => {
+  const tapItem = (id: number, type: "pump" | "canister", px: number, py: number) => {
     impact(type === "pump" ? "light" : "medium");
     setItems((prev) => prev.filter((i) => i.id !== id));
     const delta = type === "pump" ? 1 : -1;
     scoreRef.current = Math.max(0, scoreRef.current + delta);
     setScore(scoreRef.current);
+    const pid = particleId.current++;
+    const p: Particle = {
+      id: pid, x: px, y: py,
+      text: type === "pump" ? "+1" : "−1",
+      color: type === "pump" ? "#22c55e" : "#ef4444",
+    };
+    setParticles((prev) => [...prev, p]);
+    setTimeout(() => setParticles((prev) => prev.filter((q) => q.id !== pid)), 750);
   };
 
   const timePercent = (timeLeft / GAME_DURATION) * 100;
@@ -423,9 +515,25 @@ function TapGame() {
               ⚡ Начать игру
             </motion.button>
             {tapHighScore > 0 && (
-              <p style={{ color: "#4b5563", fontSize: "0.62rem", marginTop: "0.5rem", fontFamily: "'JetBrains Mono',monospace" }}>
-                Ваш рекорд: <span style={{ color: "#eab308" }}>{tapHighScore}</span>
-              </p>
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 }}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: "0.45rem",
+                  background: "linear-gradient(135deg,#1a1200,#0d0d00)",
+                  border: "1px solid #f59e0b44",
+                  borderRadius: "10px", padding: "0.35rem 1rem",
+                  marginTop: "0.65rem",
+                  boxShadow: "0 0 12px #f59e0b18",
+                }}
+              >
+                <span style={{ fontSize: "0.85rem" }}>🏅</span>
+                <span style={{ color: "#78716c", fontSize: "0.6rem", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.06em" }}>РЕКОРД</span>
+                <span style={{ color: "#f59e0b", fontFamily: "'JetBrains Mono',monospace", fontSize: "1.15rem", fontWeight: 800, lineHeight: 1, textShadow: "0 0 10px #f59e0b66" }}>
+                  {tapHighScore}
+                </span>
+              </motion.div>
             )}
           </div>
         )}
@@ -488,6 +596,31 @@ function TapGame() {
                 backgroundImage: "linear-gradient(#a855f7 1px,transparent 1px),linear-gradient(90deg,#a855f7 1px,transparent 1px)",
                 backgroundSize: "32px 32px",
               }} />
+              {/* Tap particles */}
+              <AnimatePresence>
+                {particles.map((p) => (
+                  <motion.div
+                    key={`p-${p.id}`}
+                    initial={{ opacity: 1, y: 0, scale: 0.8 }}
+                    animate={{ opacity: 0, y: -48, scale: 1.3 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.65, ease: "easeOut" }}
+                    style={{
+                      position: "absolute",
+                      left: `${p.x}%`, top: `${p.y}%`,
+                      transform: "translate(-50%,-50%)",
+                      color: p.color,
+                      fontFamily: "'JetBrains Mono',monospace",
+                      fontSize: "1.05rem", fontWeight: 900,
+                      pointerEvents: "none", zIndex: 50,
+                      textShadow: `0 0 10px ${p.color}`,
+                    }}
+                  >
+                    {p.text}
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+
               <AnimatePresence>
                 {items.map((item) => (
                   <motion.button
@@ -496,7 +629,7 @@ function TapGame() {
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0, opacity: 0, rotate: item.type === "pump" ? 45 : 0 }}
                     transition={{ duration: 0.18, type: "spring", stiffness: 400, damping: 20 }}
-                    onClick={() => tapItem(item.id, item.type)}
+                    onClick={() => tapItem(item.id, item.type, item.x, item.y)}
                     style={{
                       position: "absolute",
                       left: `${item.x}%`, top: `${item.y}%`,

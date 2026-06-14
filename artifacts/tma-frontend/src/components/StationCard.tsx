@@ -114,6 +114,20 @@ export function StationCard({ station, onClose }: Props) {
     >
       {/* Status top bar */}
       <div style={{ height: "2px", background: `linear-gradient(90deg, transparent, ${statusColor}, ${statusColor}88, transparent)` }} />
+      {/* Crisis scan-line sweep */}
+      {dominantStatus === "red" && (
+        <motion.div
+          animate={{ top: ["0%", "100%", "0%"] }}
+          transition={{ repeat: Infinity, duration: 3.5, ease: "linear" }}
+          style={{
+            position: "absolute",
+            left: 0, right: 0, height: "1px",
+            background: "linear-gradient(90deg, transparent, #ef444420, transparent)",
+            pointerEvents: "none",
+            zIndex: 0,
+          }}
+        />
+      )}
 
       {/* Header */}
       <div style={{ padding: "0.9rem 1rem 0.65rem", borderBottom: `1px solid ${statusColor}15` }}>
