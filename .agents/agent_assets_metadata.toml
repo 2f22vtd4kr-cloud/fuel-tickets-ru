@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "ytHRI4njNYBvbpp2IsJHN"
+uri = "file://attached_assets/sample_ticket.png"
+type = "image"
+title = "Пример топливного талона"

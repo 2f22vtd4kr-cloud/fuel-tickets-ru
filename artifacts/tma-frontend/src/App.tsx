@@ -507,7 +507,7 @@ export default function App() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: slideDir * -16 }}
               transition={{ duration: 0.22, ease: [0.25, 0.46, 0.45, 0.94] }}
-              style={{ position: "absolute", inset: 0, overflowY: "auto", overflowX: "hidden" }}
+              style={{ position: "absolute", top: `${TICKER_H + 8}px`, left: 0, right: 0, bottom: 0, overflowY: "auto", overflowX: "hidden" }}
             >
               {activeTab === "catalog" && <CatalogTab initialStationId={initialStationId} />}
               {activeTab === "ai"      && <AiTab onNavigate={handleTabChange} />}
