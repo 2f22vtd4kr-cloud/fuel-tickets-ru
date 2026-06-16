@@ -174,7 +174,7 @@ interface MapTabProps {
 
 export function MapTab({ visible, initialStationId, navVisible = true, onNavToggle }: MapTabProps) {
   const { stations, fetch, loading } = useStationStore();
-  const { viewport, filterStatus, filterFuel, filterRegion, filterNetwork, setFilter, selectedStationId, selectStation } =
+  const { viewport, filterStatus, filterFuel, filterRegion, filterNetwork, filterZone, setFilter, selectedStationId, selectStation } =
     useMapStore();
   const [showFilters, setShowFilters] = useState(false);
   const [showHeatmap, setShowHeatmap] = useState(true);
@@ -279,6 +279,7 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
     }
     if (filterRegion && s.region !== filterRegion) return false;
     if (filterNetwork && s.network !== filterNetwork) return false;
+    if (filterZone && s.zone_type !== filterZone) return false;
     if (showFavoritesOnly && !isStationFavorite(s.id)) return false;
     if (searchLower) {
       const haystack = `${s.name} ${s.network} ${s.address ?? ""} ${s.region}`.toLowerCase();
@@ -330,12 +331,12 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
         <button
           onClick={() => setShowFilters(!showFilters)}
           style={{
-            background: (filterStatus !== "all" || filterFuel || filterNetwork || filterRegion)
+            background: (filterStatus !== "all" || filterFuel || filterNetwork || filterRegion || filterZone)
               ? "rgba(168,85,247,0.15)"
               : "rgba(20,20,28,0.92)",
-            border: `1px solid ${(filterStatus !== "all" || filterFuel || filterNetwork || filterRegion) ? "#a855f755" : "#22222f"}`,
+            border: `1px solid ${(filterStatus !== "all" || filterFuel || filterNetwork || filterRegion || filterZone) ? "#a855f755" : "#22222f"}`,
             borderRadius: "10px",
-            color: (filterStatus !== "all" || filterFuel || filterNetwork || filterRegion) ? "#c084fc" : "#e2e8f0",
+            color: (filterStatus !== "all" || filterFuel || filterNetwork || filterRegion || filterZone) ? "#c084fc" : "#e2e8f0",
             padding: "0.4rem 0.75rem",
             fontSize: "0.75rem",
             cursor: "pointer",
@@ -344,14 +345,14 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
             alignItems: "center",
             gap: "0.3rem",
             fontWeight: 600,
-            boxShadow: (filterStatus !== "all" || filterFuel || filterNetwork || filterRegion)
+            boxShadow: (filterStatus !== "all" || filterFuel || filterNetwork || filterRegion || filterZone)
               ? "0 0 10px rgba(168,85,247,0.25)"
               : "none",
             transition: "all 0.2s",
           }}
         >
           ⬡ Фильтры{" "}
-          {(filterStatus !== "all" || filterFuel || filterNetwork || filterRegion) && (
+          {(filterStatus !== "all" || filterFuel || filterNetwork || filterRegion || filterZone) && (
             <span
               style={{
                 background: "#a855f7",
@@ -364,6 +365,56 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
             />
           )}
         </button>
+
+        {/* Crisis quick-filter */}
+        {(() => {
+          const redCount = stations.filter((s) => dominantStatus(s) === "red").length;
+          const isCrisisFilter = filterStatus === "red";
+          if (redCount === 0) return null;
+          return (
+            <button
+              onClick={() => setFilter("filterStatus", isCrisisFilter ? "all" : "red")}
+              title="Показать только кризисные АЗС"
+              style={{
+                background: isCrisisFilter ? "rgba(239,68,68,0.2)" : "rgba(20,20,28,0.92)",
+                border: `1px solid ${isCrisisFilter ? "#ef444488" : "#ef444430"}`,
+                borderRadius: "10px",
+                color: isCrisisFilter ? "#fca5a5" : "#ef4444",
+                padding: "0.4rem 0.6rem",
+                fontSize: "0.72rem", fontWeight: 700,
+                cursor: "pointer",
+                backdropFilter: "blur(12px)",
+                display: "flex", alignItems: "center", gap: "0.25rem",
+                transition: "all 0.2s",
+                boxShadow: isCrisisFilter ? "0 0 10px rgba(239,68,68,0.3)" : "none",
+                animation: !isCrisisFilter && redCount > 20 ? "crisisPulse 2s ease-in-out infinite" : "none",
+              }}
+            >
+              <span style={{ fontSize: "0.6rem" }}>●</span>
+              {redCount}
+            </button>
+          );
+        })()}
+
+        {/* Zone quick-filter */}
+        {([
+          { z: "critical", label: "🔴", title: "Кризисная зона" },
+          { z: "standard", label: "🟣", title: "Стандартная зона" },
+          { z: "eastern",  label: "🟡", title: "Восточная зона" },
+        ] as const).map(({ z, label, title }) => (
+          <button key={z}
+            onClick={() => setFilter("filterZone", filterZone === z ? null : z)}
+            title={title}
+            style={{
+              background: filterZone === z ? "rgba(168,85,247,0.15)" : "rgba(20,20,28,0.92)",
+              border: `1px solid ${filterZone === z ? "#a855f755" : "#22222f"}`,
+              borderRadius: "10px", color: filterZone === z ? "#c084fc" : "#9ca3af",
+              padding: "0.4rem 0.5rem", fontSize: "0.7rem", cursor: "pointer",
+              backdropFilter: "blur(12px)", transition: "all 0.2s",
+              boxShadow: filterZone === z ? "0 0 8px rgba(168,85,247,0.2)" : "none",
+            }}
+          >{label}</button>
+        ))}
 
         {/* Geolocation nearest station */}
         <button
@@ -522,6 +573,26 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
             cursor: "pointer",
           }} onClick={() => setShowFavoritesOnly(false)}>
             ⭐ {filtered.length} АЗС ×
+          </div>
+        )}
+
+        {/* Zone filter active badge */}
+        {filterZone && !searchQuery && !showFavoritesOnly && (
+          <div style={{
+            background: "rgba(168,85,247,0.12)",
+            border: "1px solid #a855f744",
+            borderRadius: "10px",
+            padding: "0.4rem 0.55rem",
+            fontFamily: "'JetBrains Mono',monospace",
+            fontSize: "0.62rem",
+            color: "#c084fc",
+            backdropFilter: "blur(12px)",
+            flexShrink: 0,
+            cursor: "pointer",
+            display: "flex", alignItems: "center", gap: "0.3rem",
+          }} onClick={() => setFilter("filterZone", null)}>
+            {{ critical: "🔴", standard: "🟣", eastern: "🟡" }[filterZone] ?? "⬡"}
+            {filtered.length} АЗС ×
           </div>
         )}
 
@@ -711,13 +782,14 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
               </div>
             </div>
 
-            {(filterStatus !== "all" || filterFuel || filterRegion || filterNetwork) && (
+            {(filterStatus !== "all" || filterFuel || filterRegion || filterNetwork || filterZone) && (
               <button
                 onClick={() => {
                   setFilter("filterStatus", "all");
                   setFilter("filterFuel", null);
                   setFilter("filterRegion", null);
                   setFilter("filterNetwork", null);
+                  setFilter("filterZone", null);
                 }}
                 style={{
                   width: "100%",

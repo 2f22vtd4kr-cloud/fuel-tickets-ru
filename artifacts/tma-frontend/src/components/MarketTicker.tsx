@@ -86,18 +86,20 @@ export function MarketTicker() {
   const items = [...tickerItems, ...tickerItems];
   const speed = Math.max(28, items.length * 3);
 
+  const hasCrisis = news.some((n) => n.severity === "critical");
+
   return (
     <div style={{
-      background: "rgba(6,6,10,0.99)",
-      borderBottom: "1px solid rgba(168,85,247,0.18)",
+      background: hasCrisis ? "rgba(10,4,4,0.99)" : "rgba(6,6,10,0.99)",
+      borderBottom: `1px solid ${hasCrisis ? "rgba(239,68,68,0.35)" : "rgba(168,85,247,0.18)"}`,
       height: "40px",
       overflow: "hidden",
       position: "relative",
       display: "flex",
       alignItems: "center",
       backdropFilter: "blur(20px)",
-      boxShadow: "0 2px 16px rgba(0,0,0,0.5)",
-      transition: flashIdx > 0 ? "background 0.4s" : undefined,
+      boxShadow: hasCrisis ? "0 2px 16px rgba(239,68,68,0.15)" : "0 2px 16px rgba(0,0,0,0.5)",
+      transition: "background 0.5s, border-color 0.5s, box-shadow 0.5s",
       ...(flashIdx > 0 ? { background: "rgba(34,197,94,0.08)" } : {}),
     }}>
       <style>{`

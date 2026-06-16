@@ -1054,6 +1054,25 @@ function XpTiers() {
 
 // ─── Daily Check-in ───────────────────────────────────────────────
 
+function useCountdown(targetISO: string | null): string | null {
+  const [display, setDisplay] = useState<string | null>(null);
+  useEffect(() => {
+    if (!targetISO) { setDisplay(null); return; }
+    const update = () => {
+      const diff = new Date(targetISO).getTime() - Date.now();
+      if (diff <= 0) { setDisplay("00:00:00"); return; }
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      setDisplay(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`);
+    };
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [targetISO]);
+  return display;
+}
+
 function DailyCheckin() {
   const { user, refresh } = useUserStore();
   const { add: toast } = useToast();
@@ -1061,6 +1080,7 @@ function DailyCheckin() {
   const [done, setDone] = useState(false);
   const [nextAt, setNextAt] = useState<string | null>(null);
   const [streak, setStreak] = useState(0);
+  const countdown = useCountdown(done ? nextAt : null);
 
   const handleCheckin = async () => {
     if (!user || loading || done) return;
@@ -1132,7 +1152,9 @@ function DailyCheckin() {
             </div>
             <p style={{ margin: "0 0 0.5rem", color: "#4b5563", fontSize: "0.68rem" }}>
               {done
-                ? `Получен${nextTime ? ` · следующий в ${nextTime}` : " · до завтра"}`
+                ? countdown
+                  ? <span>Следующий через <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#a855f7", fontWeight: 700 }}>{countdown}</span></span>
+                  : `Получен${nextTime ? ` · следующий в ${nextTime}` : " · до завтра"}`
                 : "Каждые 24 часа. Серия дней = бонусные XP"}
             </p>
             {/* Streak dots */}
@@ -1215,8 +1237,8 @@ function LeaderboardSection() {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
 
-  const load = async () => {
-    if (board) { setOpen((v) => !v); return; }
+  const load = async (force = false) => {
+    if (board && !force) { setOpen((v) => !v); return; }
     setLoading(true);
     try {
       const data = await fetchLeaderboard(user?.id);
@@ -1246,7 +1268,7 @@ function LeaderboardSection() {
       }}>
         {/* Header button */}
         <button
-          onClick={load}
+          onClick={() => void load()}
           style={{
             width: "100%", display: "flex", alignItems: "center",
             justifyContent: "space-between",
@@ -1275,7 +1297,7 @@ function LeaderboardSection() {
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            {loading && (
+            {loading ? (
               <motion.span
                 animate={{ rotate: 360 }}
                 transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
@@ -1283,6 +1305,12 @@ function LeaderboardSection() {
               >
                 ⟳
               </motion.span>
+            ) : open && (
+              <button
+                onClick={(e) => { e.stopPropagation(); void load(true); }}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#6b7280", fontSize: "0.75rem", padding: "2px 4px", borderRadius: "4px" }}
+                title="Обновить рейтинг"
+              >↻</button>
             )}
             <span style={{ color: "#6b7280", fontSize: "0.75rem" }}>
               {open ? "▲" : "▼"}

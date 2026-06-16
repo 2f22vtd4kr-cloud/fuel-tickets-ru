@@ -184,6 +184,7 @@ export function NewsTab({ onNavigate }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [severityFilter, setSeverityFilter] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -200,6 +201,13 @@ export function NewsTab({ onNavigate }: Props) {
 
   useEffect(() => { void load(); }, [load]);
 
+  // Auto-refresh every 5 minutes
+  useEffect(() => {
+    const id = setInterval(() => void load(), 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [load]);
+
+  const filteredNews = severityFilter ? news.filter(n => n.severity === severityFilter) : news;
   const criticalCount = news.filter(n => n.severity === "critical").length;
   const warningCount  = news.filter(n => n.severity === "warning").length;
   const crisisLevel   = criticalCount >= 3 ? 5 : criticalCount >= 2 ? 4 : criticalCount >= 1 ? 3 : warningCount >= 2 ? 2 : 1;
@@ -245,22 +253,74 @@ export function NewsTab({ onNavigate }: Props) {
       </AnimatePresence>
 
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
         <div>
           <h2 style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--text-primary)" }}>Лента новостей</h2>
           <p style={{ fontSize: "0.7rem", color: "var(--text-tertiary)", marginTop: "1px" }}>
-            Топливный кризис · {news.length} событий
+            Топливный кризис · {filteredNews.length}{severityFilter ? ` из ${news.length}` : ""} событий
           </p>
         </div>
-        <button
-          onClick={() => void load()}
-          disabled={loading}
-          className="btn-glass"
-          style={{ width: "36px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
-        >
-          <RefreshCw size={15} style={{ animation: loading ? "spin 1s linear infinite" : "none", color: "var(--accent-primary)" }} />
-        </button>
+        <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
+          {(criticalCount + warningCount) > 0 && (
+            <button
+              onClick={() => {
+                localStorage.setItem("tma-news-last-visit", Date.now().toString());
+                window.dispatchEvent(new CustomEvent("tma-news-read-all"));
+              }}
+              style={{
+                background: "rgba(168,85,247,0.08)", border: "1px solid #a855f722",
+                borderRadius: "8px", color: "#6b7280",
+                fontSize: "0.6rem", padding: "0.25rem 0.5rem",
+                cursor: "pointer", whiteSpace: "nowrap",
+              }}
+              title="Отметить все как прочитанное"
+            >✓ Прочитано</button>
+          )}
+          <button
+            onClick={() => void load()}
+            disabled={loading}
+            className="btn-glass"
+            style={{ width: "36px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+          >
+            <RefreshCw size={15} style={{ animation: loading ? "spin 1s linear infinite" : "none", color: "var(--accent-primary)" }} />
+          </button>
+        </div>
       </div>
+
+      {/* Severity filter chips */}
+      {!loading && news.length > 0 && (
+        <div style={{ display: "flex", gap: "0.35rem", marginBottom: "12px", overflowX: "auto", paddingBottom: "2px" }}>
+          <button
+            onClick={() => setSeverityFilter(null)}
+            style={{
+              flexShrink: 0, padding: "3px 10px",
+              background: !severityFilter ? "rgba(168,85,247,0.18)" : "rgba(255,255,255,0.04)",
+              border: `1px solid ${!severityFilter ? "#a855f7" : "#22222f"}`,
+              borderRadius: "999px", color: !severityFilter ? "#a855f7" : "#6b7280",
+              fontSize: "0.62rem", cursor: "pointer", fontWeight: 600,
+            }}
+          >Все · {news.length}</button>
+          {(["critical","warning","info","success"] as const).map((sev) => {
+            const cfg = SEVERITY_CONFIG[sev];
+            const count = news.filter(n => n.severity === sev).length;
+            if (!count) return null;
+            return (
+              <button key={sev}
+                onClick={() => setSeverityFilter(severityFilter === sev ? null : sev)}
+                style={{
+                  flexShrink: 0, padding: "3px 10px",
+                  background: severityFilter === sev ? `${cfg.color}22` : "rgba(255,255,255,0.04)",
+                  border: `1px solid ${severityFilter === sev ? cfg.color : "#22222f"}`,
+                  borderRadius: "999px", color: severityFilter === sev ? cfg.color : "#6b7280",
+                  fontSize: "0.62rem", cursor: "pointer", fontWeight: 600, display: "flex", alignItems: "center", gap: "4px",
+                }}
+              >
+                <span>{cfg.emoji}</span>{count}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {loading ? (
         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -277,14 +337,25 @@ export function NewsTab({ onNavigate }: Props) {
         </div>
       ) : (
         <>
-          {news.map(item => (
+          {filteredNews.map(item => (
             <NewsCard key={item.id} item={item} onNavigate={onNavigate} />
           ))}
-          <CrisisTimeline items={news} />
-          {news.length === 0 && (
-            <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--text-tertiary)" }}>
-              <p style={{ fontSize: "2rem", marginBottom: "8px" }}>📰</p>
-              <p>Новостей пока нет</p>
+          {!severityFilter && <CrisisTimeline items={news} />}
+          {filteredNews.length === 0 && (
+            <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--text-tertiary)" }}>
+              <p style={{ fontSize: "2rem", marginBottom: "8px" }}>{severityFilter ? (SEVERITY_CONFIG[severityFilter]?.emoji ?? "📰") : "📰"}</p>
+              <p style={{ fontSize: "0.9rem", marginBottom: "8px" }}>
+                {severityFilter ? `Нет новостей «${SEVERITY_CONFIG[severityFilter]?.label ?? severityFilter}»` : "Новостей пока нет"}
+              </p>
+              {severityFilter && (
+                <button
+                  onClick={() => setSeverityFilter(null)}
+                  className="btn-glass"
+                  style={{ padding: "6px 14px", fontSize: "0.75rem", marginTop: "6px" }}
+                >
+                  Сбросить фильтр
+                </button>
+              )}
             </div>
           )}
         </>

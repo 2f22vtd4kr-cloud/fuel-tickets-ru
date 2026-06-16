@@ -204,6 +204,10 @@ export function VpnModal({ onClose, isTroubleshooter = false, onSessionChange }:
         animate={{ y: 0 }}
         exit={{ y: "100%" }}
         transition={{ type: "spring", damping: 28, stiffness: 280 }}
+        drag="y"
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={{ top: 0, bottom: 0.3 }}
+        onDragEnd={(_e, info) => { if (info.offset.y > 80 || info.velocity.y > 400) onClose(); }}
         onClick={(e) => e.stopPropagation()}
         style={{
           background: "linear-gradient(180deg,#0d0d18,#0a0a12)",
@@ -214,9 +218,13 @@ export function VpnModal({ onClose, isTroubleshooter = false, onSessionChange }:
           maxHeight: "88vh",
           overflowY: "auto",
           position: "relative",
+          touchAction: "none",
         }}
       >
         <div style={{ position: "sticky", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#a855f7,#db2777,transparent)", zIndex: 10 }} />
+        <div style={{ display: "flex", justifyContent: "center", paddingTop: "10px", paddingBottom: "2px" }}>
+          <div style={{ width: "40px", height: "4px", borderRadius: "99px", background: "rgba(255,255,255,0.12)" }} />
+        </div>
         <div style={{ padding: "1.25rem 1rem 0" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.8rem" }}>
           <div>

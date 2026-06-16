@@ -375,7 +375,10 @@ function getDynamicChips(crisisPct: number, remainingL: number, empireLevel: num
     chips.push({ label: "💰 Цены АИ-95", query: "Сколько стоит АИ-95 сейчас?" });
   }
 
-  return chips.slice(0, 4);
+  chips.push({ label: "🛣️ Маршрут", query: "Помоги составить маршрут с остановками на АЗС" });
+  chips.push({ label: "📉 Дизель", query: "Где сейчас дешевле всего дизельное топливо?" });
+
+  return chips.slice(0, 5);
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -464,7 +467,7 @@ export function AiTab({ onNavigate }: Props) {
         green_stations:  greenCount,
         user_id:         uid,
         total_stations:  stations.length,
-        region:          user?.region ?? "Севастополь",
+        region:          "Севастополь",
         daily_used:      dailyUsed,
         daily_max:       dailyMax,
         empire_coins:    empireCoins,

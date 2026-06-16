@@ -145,12 +145,16 @@ export function StationCard({ station, onClose }: Props) {
   const { isStationFavorite, toggleStationFavorite } = useFavoritesStore();
   const isFav = isStationFavorite(station.id);
 
+  const [reportedVote, setReportedVote] = useState<"available" | "unavailable" | null>(null);
+  const [subStatus, setSubStatus] = useState<SubscriptionStatus | null>(null);
+
   const handleReport = async (vote: "available" | "unavailable") => {
-    if (!user) return;
+    if (!user || reportedVote) return;
     impact("light");
     try {
       await reportStation(station.id, user.id, vote);
       updateReport(station.id, vote === "available" ? 10 : -10);
+      setReportedVote(vote);
       notify("success");
       toast(vote === "available" ? "✓ Отчёт принят. +5 XP" : "✕ Отчёт принят. +5 XP", "success");
     } catch {
@@ -158,8 +162,6 @@ export function StationCard({ station, onClose }: Props) {
       toast("Не удалось отправить отчёт", "error");
     }
   };
-
-  const [subStatus, setSubStatus] = useState<SubscriptionStatus | null>(null);
   const [subLoading, setSubLoading] = useState(false);
 
   // Personal notes
@@ -460,11 +462,39 @@ export function StationCard({ station, onClose }: Props) {
           <div style={{ flex: 1, height: "1px", background: "linear-gradient(90deg,#1e1e2a,transparent)" }} />
         </div>
         <div style={{ display: "flex", gap: "0.5rem" }}>
-          <button onClick={() => handleReport("available")} style={{ flex: 1, padding: "0.55rem 0.5rem", background: "linear-gradient(135deg,#16a34a15,#22c55e0d)", border: "1px solid #22c55e44", borderRadius: "10px", color: "#22c55e", fontSize: "0.8rem", cursor: "pointer", fontWeight: 700, boxShadow: "0 0 8px #22c55e18" }}>
-            ✓ Есть топливо
+          <button
+            onClick={() => handleReport("available")}
+            disabled={!!reportedVote}
+            style={{
+              flex: 1, padding: "0.55rem 0.5rem",
+              background: reportedVote === "available"
+                ? "linear-gradient(135deg,#16a34a30,#22c55e20)"
+                : "linear-gradient(135deg,#16a34a15,#22c55e0d)",
+              border: `1px solid ${reportedVote === "available" ? "#22c55e88" : "#22c55e44"}`,
+              borderRadius: "10px", color: reportedVote ? (reportedVote === "available" ? "#22c55e" : "#4b5563") : "#22c55e",
+              fontSize: "0.8rem", cursor: reportedVote ? "default" : "pointer", fontWeight: 700,
+              boxShadow: reportedVote === "available" ? "0 0 12px #22c55e30" : "0 0 8px #22c55e18",
+              transition: "all 0.2s",
+            }}
+          >
+            {reportedVote === "available" ? "✓ Отправлено" : "✓ Есть топливо"}
           </button>
-          <button onClick={() => handleReport("unavailable")} style={{ flex: 1, padding: "0.55rem 0.5rem", background: "linear-gradient(135deg,#dc262615,#ef44440d)", border: "1px solid #ef444444", borderRadius: "10px", color: "#ef4444", fontSize: "0.8rem", cursor: "pointer", fontWeight: 700, boxShadow: "0 0 8px #ef444418" }}>
-            ✕ Нет топлива
+          <button
+            onClick={() => handleReport("unavailable")}
+            disabled={!!reportedVote}
+            style={{
+              flex: 1, padding: "0.55rem 0.5rem",
+              background: reportedVote === "unavailable"
+                ? "linear-gradient(135deg,#dc262630,#ef444420)"
+                : "linear-gradient(135deg,#dc262615,#ef44440d)",
+              border: `1px solid ${reportedVote === "unavailable" ? "#ef444488" : "#ef444444"}`,
+              borderRadius: "10px", color: reportedVote ? (reportedVote === "unavailable" ? "#ef4444" : "#4b5563") : "#ef4444",
+              fontSize: "0.8rem", cursor: reportedVote ? "default" : "pointer", fontWeight: 700,
+              boxShadow: reportedVote === "unavailable" ? "0 0 12px #ef444430" : "0 0 8px #ef444418",
+              transition: "all 0.2s",
+            }}
+          >
+            {reportedVote === "unavailable" ? "✕ Отправлено" : "✕ Нет топлива"}
           </button>
           <button
             onClick={() => {

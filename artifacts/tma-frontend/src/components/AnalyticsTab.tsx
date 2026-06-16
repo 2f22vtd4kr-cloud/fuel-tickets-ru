@@ -9,6 +9,7 @@ import type { SystemStats } from "@/api/client";
 import type { NewsItem } from "@/types";
 import { useFavoritesStore } from "@/stores/useFavoritesStore";
 import { usePriceStore } from "@/stores/usePriceStore";
+import { useStationStore } from "@/stores/useStationStore";
 import type { Analytics, RegionalSupply, TrendPoint, TabId } from "@/types";
 
 interface Props { onNavigate?: (tab: TabId) => void; }
@@ -581,12 +582,13 @@ function MarketAnalysis({ regions, data }: { regions: Record<string, RegionalSup
 }
 
 // ── Regional supply ranking table ────────────────────────────────
-function RegionRanking({ regions }: { regions: RegionalSupply[] }) {
+function RegionRanking({ regions }: { regions: Record<string, RegionalSupply> }) {
   const [sortKey, setSortKey] = useState<"pct" | "name">("pct");
   const [open, setOpen] = useState(false);
 
-  const sorted = [...regions].sort((a, b) =>
-    sortKey === "pct" ? b.avg_availability - a.avg_availability : a.region.localeCompare(b.region, "ru")
+  const entries = Object.entries(regions).map(([name, r]) => ({ name, ...r }));
+  const sorted = [...entries].sort((a, b) =>
+    sortKey === "pct" ? b.avg_pct - a.avg_pct : a.name.localeCompare(b.name, "ru")
   );
 
   const top5 = sorted.slice(0, 5);
@@ -612,10 +614,10 @@ function RegionRanking({ regions }: { regions: RegionalSupply[] }) {
 
       <div style={{ background: "#0a0a14", border: "1px solid #1e1e2a", borderRadius: "12px", overflow: "hidden" }}>
         {display.map((r, i) => {
-          const pct = Math.round(r.avg_availability);
+          const pct = Math.round(r.avg_pct);
           const color = pct >= 60 ? "#22c55e" : pct >= 25 ? "#eab308" : "#ef4444";
           return (
-            <div key={r.region} style={{
+            <div key={r.name} style={{
               display: "flex", alignItems: "center", gap: "0.5rem",
               padding: "0.4rem 0.65rem",
               borderBottom: i < display.length - 1 ? "1px solid #1a1a24" : "none",
@@ -623,7 +625,7 @@ function RegionRanking({ regions }: { regions: RegionalSupply[] }) {
             }}>
               <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.5rem", width: "14px", textAlign: "right", flexShrink: 0 }}>{i + 1}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: "0.68rem", color: "#e2e8f0", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.region}</div>
+                <div style={{ fontSize: "0.68rem", color: "#e2e8f0", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", marginTop: "2px" }}>
                   <div style={{ flex: 1, height: "3px", background: "#1a1a24", borderRadius: "2px", overflow: "hidden" }}>
                     <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: "2px", transition: "width 0.6s ease" }} />
@@ -653,12 +655,13 @@ function RegionRanking({ regions }: { regions: RegionalSupply[] }) {
 }
 
 // ── Supply forecast (linear extrapolation from trend data) ────────
-function SupplyForecast({ regions }: { regions: RegionalSupply[] }) {
-  const total = regions.length;
-  const green = regions.filter((r) => r.avg_availability >= 60).length;
-  const yellow = regions.filter((r) => r.avg_availability >= 25 && r.avg_availability < 60).length;
-  const red = regions.filter((r) => r.avg_availability < 25).length;
-  const overall = total > 0 ? regions.reduce((s, r) => s + r.avg_availability, 0) / total : 0;
+function SupplyForecast({ regions }: { regions: Record<string, RegionalSupply> }) {
+  const vals = Object.values(regions);
+  const total = vals.length;
+  const green = vals.filter((r) => r.avg_pct >= 60).length;
+  const yellow = vals.filter((r) => r.avg_pct >= 25 && r.avg_pct < 60).length;
+  const red = vals.filter((r) => r.avg_pct < 25).length;
+  const overall = total > 0 ? vals.reduce((s, r) => s + r.avg_pct, 0) / total : 0;
 
   const forecastHours = [6, 12, 24];
   const DECAY = -0.4;
@@ -1549,6 +1552,25 @@ function NetworkReliabilityWidget() {
   const reliabilityPct = Math.round((withFuel / total) * 100);
   const reliColor = reliabilityPct >= 70 ? "#22c55e" : reliabilityPct >= 40 ? "#eab308" : "#ef4444";
 
+  // Zone breakdown
+  const zones = ["critical", "standard", "eastern"] as const;
+  const zoneInfo: Record<string, { label: string; color: string; emoji: string }> = {
+    critical: { label: "Кризисная", color: "#ef4444", emoji: "🔴" },
+    standard: { label: "Стандарт",  color: "#a855f7", emoji: "🟣" },
+    eastern:  { label: "Восток",    color: "#f59e0b", emoji: "🟡" },
+  };
+  const zoneStats = zones.map((z) => {
+    const zStations = stations.filter((s) => s.zone_type === z);
+    const zAvg = zStations.length
+      ? Math.round(zStations.reduce((acc, s) => {
+          const sAvg = s.fuel_statuses.length
+            ? s.fuel_statuses.reduce((a, f) => a + f.availability_pct, 0) / s.fuel_statuses.length : 0;
+          return acc + sAvg;
+        }, 0) / zStations.length)
+      : 0;
+    return { z, count: zStations.length, avg: zAvg, ...zoneInfo[z] };
+  });
+
   return (
     <div style={{ padding: "0 1rem 1.5rem" }}>
       <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.5rem" }}>
@@ -1558,7 +1580,7 @@ function NetworkReliabilityWidget() {
         background: "linear-gradient(135deg,#0a0a14,#0d0d18)",
         border: "1px solid #1e1e2a", borderRadius: "14px",
         padding: "0.75rem", display: "flex", gap: "0.5rem",
-        position: "relative", overflow: "hidden",
+        position: "relative", overflow: "hidden", marginBottom: "0.5rem",
       }}>
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: `linear-gradient(90deg,transparent,${reliColor}44,transparent)` }} />
         {[
@@ -1572,6 +1594,24 @@ function NetworkReliabilityWidget() {
               {value}{suffix}
             </div>
             <div style={{ color: "#374151", fontSize: "0.52rem", marginTop: "3px" }}>{label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Zone breakdown */}
+      <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.4rem", letterSpacing: "0.14em", marginBottom: "0.4rem" }}>
+        ЗОНЫ · СРЕДНЯЯ_ДОСТУПНОСТЬ
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+        {zoneStats.map(({ z, label, color, emoji, count, avg }) => (
+          <div key={z} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <span style={{ fontSize: "0.65rem", flexShrink: 0 }}>{emoji}</span>
+            <span style={{ color: "#9ca3af", fontSize: "0.65rem", width: "72px", flexShrink: 0 }}>{label}</span>
+            <div style={{ flex: 1, height: "6px", background: "#0b0b0f", borderRadius: "3px", overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${avg}%`, background: avg >= 60 ? "#22c55e" : avg >= 25 ? "#eab308" : "#ef4444", transition: "width 1s", borderRadius: "3px" }} />
+            </div>
+            <span style={{ fontFamily: "'JetBrains Mono',monospace", color, fontSize: "0.65rem", fontWeight: 700, width: "30px", textAlign: "right", flexShrink: 0 }}>{avg}%</span>
+            <span style={{ color: "#374151", fontSize: "0.55rem", flexShrink: 0 }}>{count}АЗС</span>
           </div>
         ))}
       </div>

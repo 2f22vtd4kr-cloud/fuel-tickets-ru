@@ -5,7 +5,7 @@ import { useUserStore } from "@/stores/useUserStore";
 import { useFavoritesStore } from "@/stores/useFavoritesStore";
 import { fetchReferral, fetchAchievements, fetchUserSubscriptions, unsubscribeFromStation, fetchCreditsBalance, fetchUserNotes, deleteStationNote } from "@/api/client";
 import type { Achievement } from "@/api/client";
-import type { Purchase, ReferralInfo, Subscription, CreditTx } from "@/types";
+import type { Purchase, ReferralInfo, Subscription, CreditTx, TabId } from "@/types";
 import { FUEL_LABELS, XP_TIER_THRESHOLDS } from "@/types";
 import QRCode from "qrcode";
 import { jsPDF } from "jspdf";
@@ -314,9 +314,10 @@ function PurchaseCard({ purchase }: { purchase: Purchase }) {
 
 interface VaultTabProps {
   initialPurchaseId?: number;
+  onNavigate?: (tab: TabId) => void;
 }
 
-export function VaultTab({ initialPurchaseId }: VaultTabProps) {
+export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
   const { user } = useUserStore();
   const { purchases, loading, fetch } = useVaultStore();
   const [highlightedId, setHighlightedId] = useState<number | undefined>(initialPurchaseId);
@@ -354,6 +355,7 @@ export function VaultTab({ initialPurchaseId }: VaultTabProps) {
   const { favoriteRegions, removeFavorite: removeFav, favoriteStations, toggleStationFavorite } = useFavoritesStore();
   const active = purchases.filter((p) => p.status === "active");
   const history = purchases.filter((p) => p.status !== "active");
+  const totalLiters = purchases.reduce((sum, p) => sum + (p.volume ?? 0), 0);
 
   if (!user) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#6b7280" }}>
@@ -379,7 +381,17 @@ export function VaultTab({ initialPurchaseId }: VaultTabProps) {
                 </h2>
               </div>
               <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: "0.65rem" }}>
-                {active.length} активных талонов · {history.length} использовано
+                {active.length} активных · {history.length} исп.
+                {totalLiters > 0 && (
+                  <span style={{ color: "var(--accent-fuel)", marginLeft: "6px", fontFamily: "var(--font-mono)", fontWeight: 700 }}>
+                    · ⛽{totalLiters.toLocaleString("ru")}л
+                  </span>
+                )}
+                {purchases.length > 0 && (() => {
+                  const firstDate = new Date(purchases.reduce((oldest, p) => p.created_at < oldest ? p.created_at : oldest, purchases[0].created_at));
+                  const days = Math.floor((Date.now() - firstDate.getTime()) / 86400000);
+                  return days > 0 ? <span style={{ color: "#4b5563", marginLeft: "6px" }}>· {days}д в системе</span> : null;
+                })()}
               </p>
             </div>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
@@ -1014,6 +1026,19 @@ export function VaultTab({ initialPurchaseId }: VaultTabProps) {
               Оформите первый ваучер в каталоге,<br />чтобы начать копить XP и историю операций.
             </p>
           </div>
+          <button
+            onClick={() => onNavigate?.("catalog")}
+            style={{
+              background: "linear-gradient(135deg,#a855f7,#db2777)",
+              border: "none", borderRadius: "12px", color: "#fff",
+              fontSize: "0.8rem", fontWeight: 700,
+              padding: "0.6rem 1.4rem", cursor: "pointer",
+              boxShadow: "0 0 16px #a855f740",
+              marginTop: "0.25rem",
+            }}
+          >
+            🎫 Открыть Каталог
+          </button>
           <div style={{
             background: "#0d0d18", border: "1px solid #a855f722", borderRadius: "10px",
             padding: "0.5rem 1rem", fontSize: "0.68rem",

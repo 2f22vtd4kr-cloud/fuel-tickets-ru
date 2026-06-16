@@ -105,7 +105,7 @@ function calcOfflineEarnings(state: GameState): Partial<Record<ResourceId, numbe
   const elapsedSec = Math.min(elapsedMs / 1000, OFFLINE_MAX_SEC);
   if (elapsedSec < 30) return {};
   const gains: Partial<Record<ResourceId, number>> = {};
-  let s = { ...state, particles: [], notifications: [] };
+  let s: GameState = { ...state, particles: [] as Particle[], notifications: [] as GameState["notifications"] };
   const steps = Math.min(Math.floor(elapsedSec), 3600);
   for (let i = 0; i < steps; i++) {
     s = tick(s, 1 * OFFLINE_MULTIPLIER);
@@ -255,9 +255,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!building) return;
     const def = BUILDINGS[building.id];
     if (building.level >= def.maxLevel) return;
-    const cost = Math.round(Object.entries(def.buildCost).reduce((acc, [res, base]) => {
+    const costMap = Object.entries(def.buildCost).reduce<Partial<Record<ResourceId, number>>>((acc, [res, base]) => {
       return { ...acc, [res]: Math.round((base as number) * Math.pow(def.upgradeCostMultiplier, building.level)) };
-    }, {} as Partial<Record<ResourceId, number>>)[Object.keys(def.buildCost)[0]] as number);
+    }, {});
+    const firstKey = Object.keys(def.buildCost)[0] as ResourceId;
+    const cost = Math.round((costMap[firstKey] ?? 0));
     const coinCost = Math.round((def.buildCost.coins ?? 0) * Math.pow(def.upgradeCostMultiplier, building.level));
     if ((state.resources.coins ?? 0) < coinCost) return;
     const newResources = { ...state.resources, coins: (state.resources.coins ?? 0) - coinCost };

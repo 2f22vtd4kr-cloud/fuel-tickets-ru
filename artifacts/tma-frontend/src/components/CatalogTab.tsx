@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Fuse from "fuse.js";
-import { fetchLimits, createStarsInvoice, createCryptoBotInvoice } from "@/api/client";
+import { fetchLimits, createStarsInvoice, createCryptoBotInvoice, fetchStations as apiFetchStations } from "@/api/client";
 import { useUserStore } from "@/stores/useUserStore";
 import { usePriceStore } from "@/stores/usePriceStore";
 import { useStationStore } from "@/stores/useStationStore";
@@ -329,9 +329,11 @@ function FuelItem({ fuelType, station, limits, userId, payMethod, onBuy }: {
 // ─── CatalogTab ────────────────────────────────────────────────────────────
 interface CatalogTabProps { initialStationId?: number; onCalcOpenChange?: (open: boolean) => void; }
 
+const RECENTLY_VIEWED_KEY = "tma-recently-viewed";
+
 export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabProps) {
   const { user } = useUserStore();
-  const { stations } = useStationStore();
+  const { stations, loading, lastFetched } = useStationStore();
   useVaultStore();
   const { add: toast } = useToast();
   const getPrice = usePriceStore((s) => s.getPrice);
@@ -345,11 +347,18 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
   const [blockReason, setBlockReason] = useState<string | null>(null);
   const [showCalculator, setShowCalculator] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortMode, setSortMode] = useState<"name" | "availability" | "queue" | "price">("availability");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [sortMode, setSortMode] = useState<"name" | "availability" | "queue" | "price" | "nearest">("availability");
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [zoneFilter, setZoneFilter] = useState<"critical" | "standard" | "eastern" | null>(null);
   const [payMethod, setPayMethod] = useState<PayMethod>("stars");
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
   const [purchasing, setPurchasing] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [refreshing, setRefreshing] = useState(false);
+  const [recentlyViewed, setRecentlyViewed] = useState<number[]>(() => {
+    try { return JSON.parse(localStorage.getItem(RECENTLY_VIEWED_KEY) || "[]"); } catch { return []; }
+  });
 
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -365,8 +374,14 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
     fetchLimits(user.id, selectedStation.zone_type).then(setLimits).catch(() => {});
   }, [user, selectedStation]);
 
+  // Debounce search query by 200ms
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(searchQuery), 200);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
   // Reset pagination when search/sort changes
-  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [searchQuery, sortMode]);
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [debouncedQuery, sortMode]);
 
   // IntersectionObserver auto-load-more
   useEffect(() => {
@@ -384,6 +399,30 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
     return () => observer.disconnect();
   }, [selectedStation]);
 
+  // ── Recently viewed helper ────────────────────────────────────────────────
+  const addRecentlyViewed = useCallback((id: number) => {
+    setRecentlyViewed((prev) => {
+      const updated = [id, ...prev.filter((x) => x !== id)].slice(0, 5);
+      localStorage.setItem(RECENTLY_VIEWED_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  // ── Pull-to-refresh ───────────────────────────────────────────────────────
+  const handleRefresh = useCallback(async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    impact("medium");
+    useStationStore.setState({ lastFetched: null });
+    try { await useStationStore.getState().fetch(); } finally { setRefreshing(false); }
+  }, [refreshing]);
+
+  // ── Crisis count ──────────────────────────────────────────────────────────
+  const crisisCount = useMemo(() => stations.filter((s) => {
+    const avg = s.fuel_statuses.length ? s.fuel_statuses.reduce((a, b) => a + b.availability_pct, 0) / s.fuel_statuses.length : 0;
+    return avg < 25;
+  }).length, [stations]);
+
   // ── Fuse.js fuzzy search instance ────────────────────────────────────────
   const fuse = useMemo(() => new Fuse(stations, {
     keys: [
@@ -398,7 +437,15 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
   }), [stations]);
 
   // ── Fuel-alias detection ─────────────────────────────────────────────────
-  const matchedFuelType = matchFuelAlias(searchQuery);
+  const matchedFuelType = matchFuelAlias(debouncedQuery);
+
+  const haversineKm = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  };
 
   const sortStations = (arr: GasStation[]) =>
     [...arr].sort((a, b) => {
@@ -409,29 +456,35 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
         const pB = getPrice(b.region, "АИ-92")?.effective ?? 999;
         return pA - pB;
       }
+      if (sortMode === "nearest" && userCoords) {
+        const dA = haversineKm(userCoords.lat, userCoords.lng, a.lat, a.lng);
+        const dB = haversineKm(userCoords.lat, userCoords.lng, b.lat, b.lng);
+        return dA - dB;
+      }
       const avgA = a.fuel_statuses.length ? a.fuel_statuses.reduce((s, f) => s + f.availability_pct, 0) / a.fuel_statuses.length : 0;
       const avgB = b.fuel_statuses.length ? b.fuel_statuses.reduce((s, f) => s + f.availability_pct, 0) / b.fuel_statuses.length : 0;
       return avgB - avgA;
     });
 
   const filteredStations = useMemo(() => {
-    if (!searchQuery) return sortStations(stations);
+    const applyZone = (arr: GasStation[]) => zoneFilter ? arr.filter(s => s.zone_type === zoneFilter) : arr;
+    if (!debouncedQuery) return applyZone(sortStations(stations));
     if (matchedFuelType) {
-      return sortStations(stations.filter(s => s.fuel_statuses.some(f => f.fuel_type === matchedFuelType)));
+      return applyZone(sortStations(stations.filter(s => s.fuel_statuses.some(f => f.fuel_type === matchedFuelType))));
     }
     // Fuse.js fuzzy search (falls back to substring if query is too short)
-    if (searchQuery.trim().length < 2) {
-      const q = searchQuery.toLowerCase();
-      return sortStations(stations.filter(s =>
+    if (debouncedQuery.trim().length < 2) {
+      const q = debouncedQuery.toLowerCase();
+      return applyZone(sortStations(stations.filter(s =>
         s.name.toLowerCase().includes(q) ||
         s.network.toLowerCase().includes(q) ||
         s.region.toLowerCase().includes(q)
-      ));
+      )));
     }
-    const results = fuse.search(searchQuery);
-    return sortStations(results.map(r => r.item));
+    const results = fuse.search(debouncedQuery);
+    return applyZone(sortStations(results.map(r => r.item)));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stations, searchQuery, sortMode, matchedFuelType, fuse]);
+  }, [stations, debouncedQuery, sortMode, matchedFuelType, fuse, userCoords, zoneFilter]);
 
   const visibleStations = filteredStations.slice(0, Math.min(visibleCount, MAX_INLINE));
   const hasMore = filteredStations.length > visibleCount && visibleCount < MAX_INLINE;
@@ -519,6 +572,35 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
         {showCalculator && <FuelCalculatorModal onClose={() => { setShowCalculator(false); onCalcOpenChange?.(false); }} />}
       </AnimatePresence>
 
+      {/* ── Crisis alert bar ── */}
+      <AnimatePresence>
+        {!selectedStation && crisisCount >= 8 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+            style={{ padding: "0 12px 0" }}
+          >
+            <div style={{
+              background: "linear-gradient(135deg,rgba(239,68,68,0.12),rgba(220,38,38,0.08))",
+              border: "1px solid rgba(239,68,68,0.35)",
+              borderRadius: "12px", padding: "8px 12px",
+              display: "flex", alignItems: "center", gap: "8px",
+            }}>
+              <motion.span
+                animate={{ opacity: [1, 0.4, 1] }}
+                transition={{ duration: 1.2, repeat: Infinity }}
+                style={{ fontSize: "0.9rem" }}
+              >🚨</motion.span>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#ef4444", fontSize: "0.6rem", letterSpacing: "0.12em", fontWeight: 700 }}>
+                  КРИЗИС · {crisisCount} АЗС
+                </span>
+                <span style={{ color: "#9ca3af", fontSize: "0.62rem", marginLeft: "6px" }}>с критически низким запасом топлива</span>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ── Header ── */}
       <div style={{ padding: "12px 12px 8px" }}>
         <div className="glass-panel" style={{ padding: "14px", position: "relative", overflow: "hidden" }}>
@@ -532,7 +614,12 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
                 🎫 Талоны
               </h2>
               <p style={{ margin: "4px 0 0", color: "var(--text-secondary)", fontSize: "0.68rem" }}>
-                {stations.length.toLocaleString("ru")} станций · выберите АЗС и тип
+                {stations.length.toLocaleString("ru")} станций
+                {lastFetched && (
+                  <span style={{ color: "var(--text-tertiary)", marginLeft: "6px" }}>
+                    · {(() => { const m = Math.floor((Date.now() - lastFetched) / 60000); return m < 1 ? "только что" : `${m} мин назад`; })()}
+                  </span>
+                )}
               </p>
             </div>
             <div style={{ display: "flex", gap: "6px", alignItems: "center", flexShrink: 0, marginLeft: "8px" }}>
@@ -541,6 +628,14 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
                 title="Калькулятор расхода"
                 style={{ background: "rgba(168,85,247,0.1)", border: "1px solid rgba(168,85,247,0.3)", borderRadius: "10px", color: "#a855f7", fontSize: "1.1rem", padding: "4px 9px", cursor: "pointer", lineHeight: 1 }}
               >🧮</button>
+              <motion.button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                title="Обновить данные"
+                animate={refreshing ? { rotate: 360 } : { rotate: 0 }}
+                transition={refreshing ? { duration: 0.8, repeat: Infinity, ease: "linear" } : { duration: 0.3 }}
+                style={{ background: "rgba(168,85,247,0.08)", border: "1px solid rgba(168,85,247,0.2)", borderRadius: "10px", color: refreshing ? "#a855f7" : "#6b7280", fontSize: "0.9rem", padding: "4px 9px", cursor: refreshing ? "not-allowed" : "pointer", lineHeight: 1 }}
+              >↻</motion.button>
               <div style={{
                 display: "flex", alignItems: "center", gap: "4px",
                 background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.25)",
@@ -575,6 +670,20 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
         )}
       </div>
 
+      {/* ── Skeleton loading ── */}
+      {loading && stations.length === 0 && (
+        <div style={{ padding: "0 1rem" }}>
+          {[...Array(5)].map((_, i) => (
+            <motion.div
+              key={i}
+              animate={{ opacity: [0.4, 0.7, 0.4] }}
+              transition={{ duration: 1.4, repeat: Infinity, delay: i * 0.12 }}
+              style={{ background: "linear-gradient(160deg,#0d0d18,#14141c)", border: "1px solid #1a1a24", borderRadius: "14px", padding: "0.65rem 0.8rem", marginBottom: "0.35rem", height: "62px" }}
+            />
+          ))}
+        </div>
+      )}
+
       {/* ── Fuel-type hint pill ── */}
       <AnimatePresence>
         {matchedFuelType && (
@@ -594,6 +703,37 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── Zone filter chips ── */}
+      {!selectedStation && (
+        <div style={{ padding: "0 1rem 0.4rem", display: "flex", gap: "0.3rem", alignItems: "center" }}>
+          <span style={{ color: "#374151", fontSize: "0.58rem", flexShrink: 0 }}>Зона:</span>
+          {([
+            { key: null,         label: "Все",       color: "#6b7280", bg: "none",                    border: "#22222f" },
+            { key: "critical",   label: "🔴 Крит.",  color: "#ef4444", bg: "rgba(239,68,68,0.1)",    border: "#ef444430" },
+            { key: "standard",   label: "🟣 Станд.", color: "#a855f7", bg: "rgba(168,85,247,0.1)",   border: "#a855f730" },
+            { key: "eastern",    label: "🟡 Восток", color: "#f59e0b", bg: "rgba(245,158,11,0.1)",   border: "#f59e0b30" },
+          ] as const).map(({ key, label, color, bg, border }) => {
+            const isActive = zoneFilter === key;
+            return (
+              <button key={String(key)} onClick={() => { impact("light"); setZoneFilter(key); }}
+                style={{
+                  flexShrink: 0, padding: "0.18rem 0.5rem",
+                  background: isActive ? bg : "none",
+                  border: `1px solid ${isActive ? border : "#1a1a24"}`,
+                  borderRadius: "6px", color: isActive ? color : "#374151",
+                  fontSize: "0.6rem", cursor: "pointer", fontWeight: isActive ? 700 : 400,
+                }}
+              >{label}</button>
+            );
+          })}
+          {zoneFilter && (
+            <span style={{ marginLeft: "auto", color: "#374151", fontSize: "0.57rem", flexShrink: 0 }}>
+              {filteredStations.length} АЗС
+            </span>
+          )}
+        </div>
+      )}
 
       {/* ── Quick fuel-type chips ── */}
       {!selectedStation && !matchedFuelType && (
@@ -646,10 +786,11 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
       )}
 
       {/* ── Sort row ── */}
-      <div style={{ padding: "0 1rem 0.5rem", display: "flex", gap: "0.35rem", alignItems: "center" }}>
-        <span style={{ color: "#4b5563", fontSize: "0.65rem", marginRight: "0.1rem" }}>Сорт:</span>
+      <div style={{ padding: "0 1rem 0.5rem", display: "flex", gap: "0.35rem", alignItems: "center", overflowX: "auto" }}>
+        <span style={{ color: "#4b5563", fontSize: "0.65rem", marginRight: "0.1rem", flexShrink: 0 }}>Сорт:</span>
         {(["availability", "name", "queue", "price"] as const).map((mode) => (
           <button key={mode} onClick={() => setSortMode(mode)} style={{
+            flexShrink: 0,
             background: sortMode === mode ? "rgba(168,85,247,0.2)" : "none",
             border: `1px solid ${sortMode === mode ? "#a855f7" : "#22222f"}`,
             borderRadius: "6px", color: sortMode === mode ? "#a855f7" : "#6b7280",
@@ -658,10 +799,67 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
             {mode === "availability" ? "Наличие" : mode === "name" ? "Назв." : mode === "queue" ? "Очередь" : "Цена↑"}
           </button>
         ))}
-        <span style={{ marginLeft: "auto", color: "#4b5563", fontSize: "0.65rem" }}>
+        <button
+          onClick={() => {
+            if (sortMode === "nearest" && userCoords) { setSortMode("availability"); return; }
+            navigator.geolocation?.getCurrentPosition(
+              (pos) => {
+                setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                setSortMode("nearest");
+                toast("📍 Сортировка: ближайшие АЗС", "success");
+              },
+              () => toast("Геолокация недоступна", "error"),
+              { timeout: 6000, maximumAge: 60000 }
+            );
+          }}
+          style={{
+            flexShrink: 0,
+            background: sortMode === "nearest" ? "rgba(34,197,94,0.15)" : "none",
+            border: `1px solid ${sortMode === "nearest" ? "#22c55e" : "#22222f"}`,
+            borderRadius: "6px", color: sortMode === "nearest" ? "#22c55e" : "#6b7280",
+            fontSize: "0.67rem", padding: "0.2rem 0.45rem", cursor: "pointer",
+          }}
+        >
+          📍 Рядом
+        </button>
+        <span style={{ marginLeft: "auto", color: "#4b5563", fontSize: "0.65rem", flexShrink: 0 }}>
           {filteredStations.length.toLocaleString("ru")} АЗС
         </span>
       </div>
+
+      {/* ── Recently viewed strip ── */}
+      {!selectedStation && !searchQuery && recentlyViewed.length > 0 && (
+        <div style={{ padding: "0 1rem 0.65rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.45rem" }}>
+            <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#6b7280", fontSize: "0.46rem", letterSpacing: "0.14em" }}>НЕДАВНО_ПРОСМОТРЕНО</span>
+            <div style={{ flex: 1, height: "1px", background: "linear-gradient(90deg,#6b728022,transparent)" }} />
+          </div>
+          <div style={{ display: "flex", gap: "0.4rem", overflowX: "auto", paddingBottom: "0.25rem" }}>
+            {recentlyViewed.map((id) => {
+              const s = stations.find((st) => st.id === id);
+              if (!s) return null;
+              const avg = s.fuel_statuses.length ? Math.round(s.fuel_statuses.reduce((acc, f) => acc + f.availability_pct, 0) / s.fuel_statuses.length) : 0;
+              const color = avg >= 60 ? "#22c55e" : avg >= 25 ? "#eab308" : "#ef4444";
+              return (
+                <motion.div key={s.id} whileTap={{ scale: 0.95 }}
+                  onClick={() => { addRecentlyViewed(s.id); setSelectedStation(s); }}
+                  style={{
+                    flexShrink: 0, minWidth: "100px", maxWidth: "120px",
+                    background: "linear-gradient(160deg,#0a0a14,#0d0d18)",
+                    border: "1px solid #22222f", borderRadius: "12px",
+                    padding: "0.5rem 0.6rem", cursor: "pointer",
+                    position: "relative", overflow: "hidden",
+                  }}>
+                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: `linear-gradient(90deg,transparent,${color}88,transparent)` }} />
+                  <p style={{ margin: "0 0 0.1rem", fontFamily: "'JetBrains Mono',monospace", color, fontSize: "0.95rem", fontWeight: 800, lineHeight: 1 }}>{avg}%</p>
+                  <p style={{ margin: 0, color: "#e2e8f0", fontSize: "0.62rem", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</p>
+                  <p style={{ margin: "0.1rem 0 0", color: "#374151", fontSize: "0.55rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>🕐 {s.network || "АЗС"}</p>
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Favorites strip ── */}
       {!selectedStation && !searchQuery && favoriteStations.length > 0 && (
@@ -678,7 +876,7 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
               const avg = s.fuel_statuses.length ? Math.round(s.fuel_statuses.reduce((acc, f) => acc + f.availability_pct, 0) / s.fuel_statuses.length) : 0;
               const color = avg >= 60 ? "#22c55e" : avg >= 25 ? "#eab308" : "#ef4444";
               return (
-                <motion.div key={s.id} whileTap={{ scale: 0.95 }} onClick={() => setSelectedStation(s)} style={{
+                <motion.div key={s.id} whileTap={{ scale: 0.95 }} onClick={() => { addRecentlyViewed(s.id); setSelectedStation(s); }} style={{
                   flexShrink: 0, minWidth: "110px", maxWidth: "130px",
                   background: "linear-gradient(160deg,#0a0a14,#14100a)",
                   border: "1px solid #f59e0b30", borderRadius: "12px",
@@ -719,7 +917,7 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
                 const avg = s.fuel_statuses.length ? Math.round(s.fuel_statuses.reduce((acc, f) => acc + f.availability_pct, 0) / s.fuel_statuses.length) : 0;
                 const color = avg >= 60 ? "#22c55e" : avg >= 25 ? "#eab308" : "#ef4444";
                 return (
-                  <motion.div key={s.id} whileTap={{ scale: 0.95 }} onClick={() => setSelectedStation(s)} style={{
+                  <motion.div key={s.id} whileTap={{ scale: 0.95 }} onClick={() => { addRecentlyViewed(s.id); setSelectedStation(s); }} style={{
                     flexShrink: 0, minWidth: "120px", maxWidth: "135px",
                     background: `linear-gradient(160deg,#0a0d18,${color}08)`,
                     border: `1px solid ${color}30`, borderRadius: "12px",
@@ -744,10 +942,23 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
         <div style={{ padding: "0 1rem" }}>
           {filteredStations.length === 0 ? (
             <div style={{ textAlign: "center", padding: "3rem 1rem", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.75rem" }}>
-              <div style={{ width: "64px", height: "64px", borderRadius: "18px", background: "linear-gradient(135deg,#0d0d18,#14141c)", border: "1px solid #a855f722", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.8rem", boxShadow: "0 0 20px #a855f710" }}>🔍</div>
+              <motion.div
+                animate={{ scale: [1, 1.06, 1] }} transition={{ duration: 2.4, repeat: Infinity }}
+                style={{ width: "64px", height: "64px", borderRadius: "18px", background: "linear-gradient(135deg,#0d0d18,#14141c)", border: "1px solid #a855f722", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.8rem", boxShadow: "0 0 20px #a855f710" }}
+              >🔍</motion.div>
               <div>
                 <p style={{ margin: "0 0 0.25rem", color: "#e2e8f0", fontSize: "0.88rem", fontWeight: 700 }}>АЗС не найдены</p>
-                <p style={{ margin: 0, color: "#4b5563", fontSize: "0.72rem" }}>Попробуйте изменить запрос или фильтры</p>
+                <p style={{ margin: 0, color: "#4b5563", fontSize: "0.72rem" }}>Нет совпадений по запросу «{debouncedQuery}»</p>
+              </div>
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <button
+                  onClick={() => { setSearchQuery(""); impact("light"); }}
+                  style={{ background: "rgba(168,85,247,0.12)", border: "1px solid #a855f740", borderRadius: "10px", color: "#a855f7", fontSize: "0.72rem", fontWeight: 700, padding: "0.45rem 1rem", cursor: "pointer" }}
+                >✕ Сбросить</button>
+                <button
+                  onClick={handleRefresh}
+                  style={{ background: "rgba(59,130,246,0.1)", border: "1px solid #3b82f640", borderRadius: "10px", color: "#3b82f6", fontSize: "0.72rem", fontWeight: 700, padding: "0.45rem 1rem", cursor: "pointer" }}
+                >↻ Обновить</button>
               </div>
               <div style={{ background: "#0d0d18", border: "1px solid #1e1e2a", borderRadius: "8px", padding: "0.3rem 0.75rem", fontSize: "0.58rem", fontFamily: "'JetBrains Mono',monospace", color: "#374151" }}>
                 SEARCH_RESULT · 0 STATIONS
@@ -755,8 +966,9 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
             </div>
           ) : (
             <>
-              {visibleStations.map((s) => {
+              {visibleStations.map((s: GasStation) => {
                 const hasFuel = s.fuel_statuses.some((f) => f.availability_pct > 0);
+                // addRecentlyViewed is called on click below
                 const avgAvail = s.fuel_statuses.length
                   ? Math.round(s.fuel_statuses.reduce((acc, f) => acc + f.availability_pct, 0) / s.fuel_statuses.length)
                   : 0;
@@ -771,7 +983,7 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
 
                 return (
                   <motion.div
-                    key={s.id} whileTap={{ scale: 0.975 }} onClick={() => setSelectedStation(s)}
+                    key={s.id} whileTap={{ scale: 0.975 }} onClick={() => { addRecentlyViewed(s.id); setSelectedStation(s); }}
                     style={{
                       background: avgAvail < 25 ? "linear-gradient(160deg,#100606,#0d0d14)" : avgAvail >= 60 ? "linear-gradient(160deg,#060f0a,#0d0d14)" : "#0d0d14",
                       border: `1px solid ${avgAvail < 25 ? "#ef444428" : avgAvail >= 60 ? "#22c55e20" : "#1a1a24"}`,
@@ -785,9 +997,16 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
                       <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.3rem" }}>
                         <div style={{ minWidth: 0, flex: 1 }}>
-                          <p style={{ margin: "0 0 0.05rem", color: "#e2e8f0", fontSize: "0.85rem", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", letterSpacing: "-0.01em" }}>
-                            {s.name}
-                          </p>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", marginBottom: "0.05rem" }}>
+                            <p style={{ margin: 0, color: "#e2e8f0", fontSize: "0.85rem", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", letterSpacing: "-0.01em", flex: 1, minWidth: 0 }}>
+                              {s.name}
+                            </p>
+                            {sortMode === "nearest" && userCoords && (
+                              <span style={{ flexShrink: 0, background: "rgba(34,197,94,0.1)", border: "1px solid #22c55e30", borderRadius: "5px", color: "#22c55e", fontSize: "0.52rem", padding: "0.05rem 0.25rem", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>
+                                📍{haversineKm(userCoords.lat, userCoords.lng, s.lat, s.lng).toFixed(1)}км
+                              </span>
+                            )}
+                          </div>
                           <p style={{ margin: 0, color: "#374151", fontSize: "0.62rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                             {s.region.split(" ").slice(-1)[0]} · {s.network || "АЗС"}
                           </p>
@@ -848,14 +1067,14 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
                         </div>
                       )}
                       </div>
-                      {/* Compare button */}
-                      {selectedStation && selectedStation.id !== s.id && (
+                      {/* Compare button - in else-branch of !selectedStation so it is non-null */}
+                      {selectedStation!.id !== (s as GasStation).id && (
                         <button
-                          onClick={(e) => { e.stopPropagation(); setCompareStation(s); setShowCompare(true); }}
+                          onClick={(e) => { e.stopPropagation(); setCompareStation(s as GasStation); setShowCompare(true); }}
                           style={{
-                            background: compareStation?.id === s.id ? "rgba(59,130,246,0.15)" : "none",
-                            border: `1px solid ${compareStation?.id === s.id ? "#3b82f6" : "#22222f"}`,
-                            borderRadius: "6px", color: compareStation?.id === s.id ? "#3b82f6" : "#374151",
+                            background: compareStation?.id === (s as GasStation).id ? "rgba(59,130,246,0.15)" : "none",
+                            border: `1px solid ${compareStation?.id === (s as GasStation).id ? "#3b82f6" : "#22222f"}`,
+                            borderRadius: "6px", color: compareStation?.id === (s as GasStation).id ? "#3b82f6" : "#374151",
                             fontSize: "0.6rem", padding: "0.15rem 0.35rem", cursor: "pointer", flexShrink: 0,
                             marginTop: "0.25rem",
                           }}

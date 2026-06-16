@@ -33,6 +33,7 @@ import { useStationStore } from "@/stores/useStationStore";
 import { useMapStore } from "@/stores/useMapStore";
 import { usePriceStore } from "@/stores/usePriceStore";
 import { useVaultStore } from "@/stores/useVaultStore";
+import { fetchNews } from "@/api/client";
 import { parseStartParam } from "@/lib/deeplink";
 import { select as hapticSelect } from "@/lib/haptic";
 import type { TabId } from "@/types";
@@ -90,6 +91,7 @@ const DEFAULT_TAB: TabId = "map";
 const SPLASH_KEY = "tma-splash-seen-v2";
 const ONBOARDING_KEY = "tma-onboarding-v1";
 const AI_BANNER_KEY = "tma-ai-banner-dismissed-v1";
+const NEWS_LAST_VISIT_KEY = "tma-news-last-visit";
 const TICKER_H = 40;
 
 export default function App() {
@@ -106,6 +108,7 @@ export default function App() {
   const [showWallet, setShowWallet] = useState(false);
   const [showAiBanner, setShowAiBanner] = useState(false);
   const [calcOpen, setCalcOpen] = useState(false);
+  const [newsBadgeCount, setNewsBadgeCount] = useState(0);
   const vpnSuggested = useRef(false);
   const adminPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -127,6 +130,24 @@ export default function App() {
     void initPrices();
     const disconnect = connectWs();
     return disconnect;
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── News badge — count critical+warning items since last visit ───
+  useEffect(() => {
+    const lastVisit = parseInt(localStorage.getItem(NEWS_LAST_VISIT_KEY) ?? "0", 10);
+    fetchNews(undefined, 30)
+      .then((items) => {
+        const unread = items.filter((n) => {
+          const isImportant = n.severity === "critical" || n.severity === "warning";
+          const isNew = new Date(n.created_at).getTime() > lastVisit;
+          return isImportant && isNew;
+        });
+        if (unread.length > 0) setNewsBadgeCount(unread.length);
+      })
+      .catch(() => {});
+    const onReadAll = () => setNewsBadgeCount(0);
+    window.addEventListener("tma-news-read-all", onReadAll);
+    return () => window.removeEventListener("tma-news-read-all", onReadAll);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── AI suggestion banner (Phase 4.3): show if last purchase >7d ─
@@ -235,6 +256,10 @@ export default function App() {
     hapticSelect();
     setActiveTab(tab);
     if (!navVisible) setNavVisible(true);
+    if (tab === "news") {
+      setNewsBadgeCount(0);
+      localStorage.setItem(NEWS_LAST_VISIT_KEY, Date.now().toString());
+    }
   };
 
   // ── Splash done → show onboarding for first-timers ──────────────
@@ -319,11 +344,16 @@ export default function App() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: "100%" }}
             transition={{ type: "spring", damping: 28, stiffness: 260 }}
+            drag="y"
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={{ top: 0, bottom: 0.25 }}
+            onDragEnd={(_e, info) => { if (info.offset.y > 100 || info.velocity.y > 500) setShowWallet(false); }}
             style={{
               position: "fixed", inset: 0, zIndex: 9200,
               background: "var(--bg-base)",
               overflowY: "auto", overflowX: "hidden",
               paddingTop: `${TICKER_H + 8}px`, paddingBottom: "20px",
+              touchAction: "none",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px 4px" }}>
@@ -333,7 +363,7 @@ export default function App() {
                 style={{ background: "var(--bg-glass)", border: "1px solid var(--border-glass)", borderRadius: "50%", width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--text-muted)", fontSize: "1.1rem" }}
               >×</button>
             </div>
-            <VaultTab initialPurchaseId={initialPurchaseId} />
+            <VaultTab initialPurchaseId={initialPurchaseId} onNavigate={handleTabChange} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -521,7 +551,10 @@ export default function App() {
         active={activeTab}
         onChange={handleTabChange}
         visible={navVisible}
-        badges={crisisCount > 0 ? { catalog: crisisCount } : {}}
+        badges={{
+          ...(crisisCount > 0 ? { catalog: crisisCount } : {}),
+          ...(newsBadgeCount > 0 ? { news: newsBadgeCount } : {}),
+        }}
       />
     </ErrorBoundary>
   );

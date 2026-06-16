@@ -89,6 +89,10 @@ export function AdminPanel({ onClose }: Props) {
         animate={{ y: 0 }}
         exit={{ y: "100%" }}
         transition={{ type: "spring", damping: 28, stiffness: 260 }}
+        drag="y"
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={{ top: 0, bottom: 0.3 }}
+        onDragEnd={(_e, info) => { if (info.offset.y > 80 || info.velocity.y > 400) onClose(); }}
         onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%",
@@ -100,9 +104,13 @@ export function AdminPanel({ onClose }: Props) {
           display: "flex",
           flexDirection: "column",
           boxShadow: "0 -8px 60px rgba(168,85,247,0.15)",
+          touchAction: "none",
         }}
       >
         <div style={{ height: "2px", background: "linear-gradient(90deg, transparent, #a855f7, #db2777, transparent)", flexShrink: 0 }} />
+        <div style={{ display: "flex", justifyContent: "center", paddingTop: "10px", paddingBottom: "2px" }}>
+          <div style={{ width: "40px", height: "4px", borderRadius: "99px", background: "rgba(255,255,255,0.12)" }} />
+        </div>
 
         {/* Header */}
         <div style={{
