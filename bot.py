@@ -742,7 +742,7 @@ def _build_stats_text() -> str:
     return (
         f"⬡ *ТОПЛИВО ⛽️ · ДАШБОРД СИСТЕМЫ*\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🗓 `{s['today']}` · Севастополь / Крым\n"
+        f"🗓 `{s['today']}` · Матрица Снабжения · Россия\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
 
         f"👥 *ПОЛЬЗОВАТЕЛИ*\n"
@@ -1217,7 +1217,7 @@ async def menu_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await query.edit_message_text(
             "⬡ *ТОПЛИВО ⛽️ · ТОПЛИВО ⛽️*\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "🔌 `СИСТЕМА_ОНЛАЙН` · Севастополь / Крым\n"
+            "🔌 `СИСТЕМА_ОНЛАЙН` · Матрица Снабжения · Россия\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
             "Выберите действие:",
             parse_mode="Markdown",
@@ -2618,7 +2618,7 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             lines.append(f"`{prefix}` {icon} {short_name}: `{pct:.0f}%`")
 
     lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    lines.append("_Данные в реальном времени · Севастополь / Крым_")
+    lines.append("_Данные в реальном времени · Матрица Снабжения · Россия_")
     await update.message.reply_text(
         "\n".join(lines),
         parse_mode="Markdown",
