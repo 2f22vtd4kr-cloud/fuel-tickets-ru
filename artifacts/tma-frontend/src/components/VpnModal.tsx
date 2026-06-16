@@ -100,15 +100,20 @@ function ActiveSessionBanner({ session, onClose }: { session: VpnSession; onClos
 interface Props {
   onClose: () => void;
   isTroubleshooter?: boolean;
+  onSessionChange?: (active: boolean) => void;
 }
 
-export function VpnModal({ onClose, isTroubleshooter = false }: Props) {
+export function VpnModal({ onClose, isTroubleshooter = false, onSessionChange }: Props) {
   const { user } = useUserStore();
   const { add: toast } = useToast();
   const [payMethod, setPayMethod] = useState<PayMethod>("stars");
   const [loading, setLoading] = useState<string | null>(null);
   const [activeSession, setActiveSession] = useState<VpnSession | null>(null);
   const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    onSessionChange?.(activeSession !== null);
+  }, [activeSession]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!user) return;

@@ -98,6 +98,7 @@ export default function App() {
   const [initialPurchaseId, setInitialPurchaseId] = useState<number | undefined>();
   const [navVisible, setNavVisible] = useState(true);
   const [showVpn, setShowVpn] = useState(false);
+  const [vpnActive, setVpnActive] = useState(false);
   const [vpnTroubleshooter, setVpnTroubleshooter] = useState(false);
   const [showSplash, setShowSplash] = useState(() => !localStorage.getItem(SPLASH_KEY));
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -304,6 +305,7 @@ export default function App() {
           <VpnModal
             isTroubleshooter={vpnTroubleshooter}
             onClose={() => { setShowVpn(false); setVpnTroubleshooter(false); }}
+            onSessionChange={setVpnActive}
           />
         )}
       </AnimatePresence>
@@ -336,6 +338,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* VPN floating button */}
+      <style>{`@keyframes vpnGlow{0%,100%{box-shadow:0 0 8px #22c55e88,0 0 18px #22c55e44}50%{box-shadow:0 0 16px #22c55ecc,0 0 32px #22c55e66}}`}</style>
       <button
         onClick={() => { setVpnTroubleshooter(false); setShowVpn(true); }}
         title="VPN-доступ"
@@ -347,17 +350,42 @@ export default function App() {
           width: "38px", height: "38px",
           borderRadius: "50%",
           background: "rgba(8,8,20,0.88)",
-          border: "1px solid #1e1e2a",
-          boxShadow: "none",
+          border: vpnActive ? "1px solid #22c55e88" : "1px solid #1e1e2a",
+          animation: vpnActive ? "vpnGlow 2s ease-in-out infinite" : "none",
           cursor: "pointer",
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
           fontSize: "1rem",
           gap: "1px",
-          transition: "bottom 0.3s",
+          transition: "bottom 0.3s, border-color 0.4s",
         }}
       >
         <span style={{ fontSize: "1rem", lineHeight: 1 }}>🎉</span>
-        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.38rem", color: "#6b7280", letterSpacing: "0.04em", lineHeight: 1 }}>VPN</span>
+        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.38rem", color: vpnActive ? "#22c55e" : "#6b7280", letterSpacing: "0.04em", lineHeight: 1 }}>VPN</span>
+      </button>
+
+      {/* Universal nav hide/show pill — visible on all tabs */}
+      <button
+        onClick={() => setNavVisible((v) => !v)}
+        title={navVisible ? "Скрыть навигацию" : "Показать навигацию"}
+        style={{
+          position: "fixed",
+          bottom: navVisible ? "calc(env(safe-area-inset-bottom, 0px) + 80px)" : "calc(env(safe-area-inset-bottom, 0px) + 10px)",
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 10001,
+          background: "rgba(8,8,20,0.88)",
+          border: "1px solid #1e1e2a",
+          borderRadius: "999px",
+          padding: "3px 12px",
+          cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: "4px",
+          backdropFilter: "blur(12px)",
+          transition: "bottom 0.3s",
+        }}
+      >
+        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.38rem", color: "#4b5563", letterSpacing: "0.08em" }}>
+          {navVisible ? "▼ СКРЫТЬ" : "▲ МЕНЮ"}
+        </span>
       </button>
 
       {/* Wallet floating button */}
