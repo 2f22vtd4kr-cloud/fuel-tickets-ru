@@ -340,7 +340,9 @@ export default function App() {
         onClick={() => { setVpnTroubleshooter(false); setShowVpn(true); }}
         title="VPN-доступ"
         style={{
-          position: "fixed", bottom: "calc(env(safe-area-inset-bottom, 0px) + 104px)", left: "12px",
+          position: "fixed",
+          bottom: navVisible ? "calc(env(safe-area-inset-bottom, 0px) + 80px)" : "calc(env(safe-area-inset-bottom, 0px) + 16px)",
+          left: "12px",
           zIndex: 9500,
           width: "38px", height: "38px",
           borderRadius: "50%",
@@ -350,6 +352,7 @@ export default function App() {
           cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center",
           fontSize: "1rem",
+          transition: "bottom 0.3s",
         }}
       >
         🔒
@@ -361,7 +364,9 @@ export default function App() {
         whileTap={{ scale: 0.9 }}
         title="Мой кошелёк"
         style={{
-          position: "fixed", bottom: "calc(env(safe-area-inset-bottom, 0px) + 104px)", right: "12px",
+          position: "fixed",
+          bottom: navVisible ? "calc(env(safe-area-inset-bottom, 0px) + 80px)" : "calc(env(safe-area-inset-bottom, 0px) + 16px)",
+          right: "12px",
           zIndex: 9500,
           width: "38px", height: "38px",
           borderRadius: "50%",
@@ -371,6 +376,7 @@ export default function App() {
           cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center",
           fontSize: "1rem",
+          transition: "bottom 0.3s",
         }}
       >
         💼
@@ -420,26 +426,6 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Crisis badge */}
-      {crisisCount >= 5 && (
-        <div style={{
-          position: "fixed", top: `${TICKER_H + 8}px`, right: "12px",
-          zIndex: 9700,
-          background: "linear-gradient(135deg,#1a0606,#200a0a)",
-          border: "1px solid #ef444455",
-          borderRadius: "8px",
-          padding: "0.2rem 0.5rem",
-          display: "flex", alignItems: "center", gap: "0.3rem",
-          boxShadow: "0 0 12px #ef444430",
-          pointerEvents: "none",
-        }}>
-          <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#ef4444", boxShadow: "0 0 5px #ef4444", animation: "crisisPulse 1.2s infinite", flexShrink: 0 }} />
-          <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#ef4444", fontSize: "0.52rem", letterSpacing: "0.08em" }}>
-            {crisisCount} КРИЗИС
-          </span>
-        </div>
-      )}
 
       {/* Market ticker — fixed strip */}
       <div

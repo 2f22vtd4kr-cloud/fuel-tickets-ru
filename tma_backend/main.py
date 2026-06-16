@@ -1,5 +1,5 @@
 """
-Топливный Узел — FastAPI backend
+Топливо ⛽️ — FastAPI backend
 All routes, background scheduler, analytics, payment, gamification.
 """
 
@@ -168,7 +168,7 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(fluctuate_prices, "interval", minutes=15, jitter=60)
     scheduler.add_job(generate_news_from_availability, "interval", hours=2, jitter=60)
     scheduler.start()
-    logger.info("Топливный Узел API запущен (DB init running in background).")
+    logger.info("Топливо ⛽️ API запущен (DB init running in background).")
 
     yield
 
@@ -177,7 +177,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Топливный Узел API",
+    title="Топливо ⛽️ API",
     version="1.0.0",
     docs_url="/api/docs",
     redoc_url=None,
@@ -3353,7 +3353,7 @@ def _ai_rule_based_reply(message: str, db: Session, context: dict) -> tuple[str,
 
     elif any(w in msg for w in ["помощ", "что ты", "что умеешь", "привет", "здравствуй"]):
         reply = (
-            f"🤖 Я — ИИ-советник Топливного Узла.\n\n"
+            f"🤖 Я — ИИ-советник Топливо ⛽️.\n\n"
             f"Могу помочь с:\n"
             f"• Поиском АЗС с наличием нужного топлива\n"
             f"• Анализом кризисной ситуации\n"
