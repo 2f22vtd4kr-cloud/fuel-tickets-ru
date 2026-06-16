@@ -36,8 +36,9 @@ BOT_TOKEN          = os.getenv("TELEGRAM_BOT_TOKEN", "")
 # Bot username (without @) used for deep-link generation.
 # Set BOT_USERNAME in Replit Secrets or .env to enable ?startapp= links.
 BOT_USERNAME       = os.getenv("BOT_USERNAME", "")
-ADMIN_PASSWORD     = os.getenv("ADMIN_PASSWORD", "crimea2026")
+ADMIN_PASSWORD     = os.getenv("ADMIN_PASSWORD", "")
 ADMIN_CHAT_ID      = int(os.getenv("ADMIN_CHAT_ID", "0")) or None   # chat_id администратора
+ADMIN_ID           = int(os.getenv("ADMIN_ID", "0")) or None         # Telegram user_id администратора
 CRYPTO_BOT_TOKEN   = os.getenv("CRYPTO_BOT_TOKEN", "")
 CRYPTO_PAY_API     = "https://pay.crypt.bot/api/"
 PAID_AMOUNT_USDT   = 12          # фиксированная стоимость ваучера в USDT
@@ -45,7 +46,6 @@ USDT_RUB_RATE      = 92          # курс конвертации для ото
 DB_PATH            = "vouchers.db"
 MAP_URL         = "https://fuel.sevtech.org/map"
 TMA_URL         = "https://fuel-tickets-ru--kolachenkovmyko.replit.app"
-ADMIN_ID        = 7103267900
 
 
 # ─── Deep-link helpers ────────────────────────────────────────────

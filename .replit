@@ -120,6 +120,7 @@ externalPort = 8099
 [userenv]
 
 [userenv.shared]
+PAYMENT_METHOD = "auto"
 
 [userenv.production]
 TMA_PORT = "8080"
