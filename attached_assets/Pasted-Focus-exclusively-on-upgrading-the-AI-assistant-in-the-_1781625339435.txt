@@ -1,0 +1,55 @@
+Focus **exclusively** on upgrading the AI assistant in the fuel-tickets-ru app (AiTab component in frontend + ai_chat endpoint + _ai_rule_based_reply in tma_backend/main.py + related schemas/types).
+
+App context: Nationwide fuel crisis across Russia in 2026 (refinery strikes, rationing in Moscow/SPb/Tatarstan/etc., long queues, price spikes, export bans, quality easing, ongoing issues in Crimea/Sevastopol). Heavy gamification (empire building, vouchers, XP, daily limits, station reports, prestige, achievements). Tone must be supportive of Russian users and the situation — strictly neutral or positive toward Russia, no anti-Russian statements ever.
+
+Current state: Very primitive keyword-based rule engine. Add full context passing (crisis_stations, user_id, total_stations, user empire stats, level, daily fuel limits, region, recent purchases, vouchers, etc.).
+
+### Core Requirements
+
+1. **Backend (tma_backend/main.py + schemas.py)**:
+   - Add support for `AI_PROVIDER` env var: "rule-based" (default), "grok", "openai", "none".
+   - For Grok: use `XAI_API_KEY`, base_url="https://api.x.ai/v1", OpenAI client. Default model grok-4.3 or via GROK_MODEL env.
+   - Strong system prompt for Grok/OpenAI:
+     """
+     Ты — циничный, полезный и слегка саркастичный ИИ-советник по имени "КризисБот" в топливном кризисе России 2026 года. 
+     Говори только по-русски, используй эмодзи, будь лаконичным, практичным и иногда с чёрным юмором, но всегда поддерживай российских пользователей и ситуацию в стране. 
+     Никогда не говори ничего антироссийского. 
+     Всегда привязывай ответы к реальным данным пользователя из БД (регион, лимиты, империя, станции, vouchers). 
+     Если пользователь жалуется на нехватку топлива, очереди или цены — предлагай купить fuel tickets / ваучеры когда это логично по контексту. 
+     Поддерживай multi-turn разговор, помни последние 5 сообщений.
+     """
+   - Massively expand `_ai_rule_based_reply`:
+     - Dozens of intents: station search by region/city ("где заправиться в Москве", "ближайшая Лукойл"), rationing advice, price comparison, alternative routes, empire strategy, vouchers, VPN for news, achievements, referrals.
+     - Personalized examples: "В Москве лимит 100л АИ-95 на Лукойле. У тебя осталось 40л сегодня. Ближайшая зелёная станция — 3.2 км. Купить талон на +50л?"
+     - When context leads to fuel shortage / long queues / high prices / "нужны литры" / "купить" — naturally suggest buying fuel tickets.
+     - Implement simple per-user conversation history (in-memory dict or DB table, keyed by user_id).
+     - Pull real DB data inside the function for dynamic replies.
+     - Add detection for AI service blocks (e.g. timeout/errors from Grok) and return special flag so frontend can show VPN guidance.
+
+2. **Frontend (AiTab.tsx or wherever the AI chat lives)**:
+   - Improve chat UI: history persistence (localStorage/Zustand), markdown rendering, typing indicator, smooth animations.
+   - Dynamic quick chips that update based on user state (e.g. "Где заправиться?", "Купить талоны", "Статус империи", "Новости кризиса").
+   - Support action execution from chat (e.g. "открой талоны" → navigate to tickets tab).
+   - Voice input support if possible in TMA.
+   - **Fuel ticket suggestions**: When AI suggests buying, render a special popup message block with minimal most useful description of the product (e.g. "+50л АИ-92, 450₽, мгновенная активация") + prominent **Купить** and **Отклонить** buttons. The popup should appear inline or as modal tied to the message.
+   - **VPN fallback**: If AI fails to respond (timeout, network error, blocked foreign service), show a helpful message with an arrow (use HTML canvas or SVG to draw a clear animated arrow) pointing to the VPN button in the UI. Message example: "Если ИИ не отвечает — включи VPN для доступа к зарубежным сервисам". Auto-hide message + arrow after exactly 4 seconds.
+   - When AI suggests buying tickets, show a prominent button "Купить талоны" that triggers the purchase flow.
+
+3. **Fuel Tickets Sales Integration**:
+   - AI must proactively suggest buying fuel tickets when conversation context fits (low fuel, ration limits hit, user asks about more liters, crisis advice, etc.).
+   - Suggestions must trigger the special popup block with product description + Buy/Deny buttons.
+
+4. **Additional Polish**:
+   - Update all types/schemas (AiChatRequest/Response etc.).
+   - Full Russian responses, supportive tone, cyberpunk/gamification vibe.
+   - Graceful error handling and fallbacks (including VPN prompt on Grok block).
+   - Add comments with test cases (e.g. "Где заправиться в СПб?", "Мне мало бензина", "Как прокачать империю?", "Купить талоны").
+
+**Output format**:
+- Full updated code for AiTab.tsx (or the AI component).
+- Full updated sections for main.py (ai_chat, _ai_rule_based_reply, provider logic, imports).
+- Any new helper files or schema changes.
+- .env example with AI_PROVIDER=grok and XAI_API_KEY.
+- Testing instructions with 8-10 sample user messages, including low-fuel scenarios and VPN-failure simulation.
+
+Start by reading current AiTab + main.py ai-related code, then implement improvements step-by-step without breaking other features.
