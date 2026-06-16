@@ -105,6 +105,7 @@ export default function App() {
   const [showAdmin, setShowAdmin] = useState(false);
   const [showWallet, setShowWallet] = useState(false);
   const [showAiBanner, setShowAiBanner] = useState(false);
+  const [calcOpen, setCalcOpen] = useState(false);
   const vpnSuggested = useRef(false);
   const adminPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -370,8 +371,9 @@ export default function App() {
         style={{
           position: "fixed",
           bottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)",
-          left: "50%",
+          left: calcOpen ? "33%" : "50%",
           transform: "translateX(-50%)",
+          transition: "left 0.25s cubic-bezier(0.25,0.46,0.45,0.94)",
           zIndex: 10001,
           background: "rgba(8,8,20,0.88)",
           border: "1px solid #1e1e2a",
@@ -506,7 +508,7 @@ export default function App() {
               transition={{ duration: 0.22, ease: [0.25, 0.46, 0.45, 0.94] }}
               style={{ position: "absolute", top: `${TICKER_H + 8}px`, left: 0, right: 0, bottom: 0, overflowY: "auto", overflowX: "hidden" }}
             >
-              {activeTab === "catalog" && <CatalogTab initialStationId={initialStationId} />}
+              {activeTab === "catalog" && <CatalogTab initialStationId={initialStationId} onCalcOpenChange={setCalcOpen} />}
               {activeTab === "ai"      && <AiTab onNavigate={handleTabChange} />}
               {activeTab === "games"   && <GamesTab />}
               {activeTab === "news"    && <NewsTab onNavigate={handleTabChange} />}

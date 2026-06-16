@@ -327,9 +327,9 @@ function FuelItem({ fuelType, station, limits, userId, payMethod, onBuy }: {
 }
 
 // ─── CatalogTab ────────────────────────────────────────────────────────────
-interface CatalogTabProps { initialStationId?: number; }
+interface CatalogTabProps { initialStationId?: number; onCalcOpenChange?: (open: boolean) => void; }
 
-export function CatalogTab({ initialStationId }: CatalogTabProps) {
+export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabProps) {
   const { user } = useUserStore();
   const { stations } = useStationStore();
   useVaultStore();
@@ -516,7 +516,7 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
         )}
       </AnimatePresence>
       <AnimatePresence>
-        {showCalculator && <FuelCalculatorModal onClose={() => setShowCalculator(false)} />}
+        {showCalculator && <FuelCalculatorModal onClose={() => { setShowCalculator(false); onCalcOpenChange?.(false); }} />}
       </AnimatePresence>
 
       {/* ── Header ── */}
@@ -537,7 +537,7 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
             </div>
             <div style={{ display: "flex", gap: "6px", alignItems: "center", flexShrink: 0, marginLeft: "8px" }}>
               <button
-                onClick={() => { impact("light"); setShowCalculator(true); }}
+                onClick={() => { impact("light"); setShowCalculator(true); onCalcOpenChange?.(true); }}
                 title="Калькулятор расхода"
                 style={{ background: "rgba(168,85,247,0.1)", border: "1px solid rgba(168,85,247,0.3)", borderRadius: "10px", color: "#a855f7", fontSize: "1.1rem", padding: "4px 9px", cursor: "pointer", lineHeight: 1 }}
               >🧮</button>
