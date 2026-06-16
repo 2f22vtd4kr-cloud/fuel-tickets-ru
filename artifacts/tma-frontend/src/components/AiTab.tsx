@@ -32,7 +32,7 @@ function makeWelcome(): AiMessage {
   return {
     role: "bot",
     ts: Date.now(),
-    text: `🤖 Добро пожаловать! Я — **КризисБот**, ИИ-советник по топливу.\n\nПомогу найти АЗС, сравнить цены, купить талон и подготовиться к кризису.\n\nПросто напишите вопрос или выберите подсказку ниже.`,
+    text: `⚡ **КризисБот** на связи — ИИ-советник по топливу Крыма.\n\nСеть «Матрица Снабжения»: 236 АЗС по всему полуострову — от Севастополя до Керчи.\n\nСпросите что угодно: где заправиться, когда лучше приехать, какие цены, как купить талон.`,
   };
 }
 
@@ -142,6 +142,44 @@ function TicketSuggestionBlock({
         </motion.button>
       </div>
     </motion.div>
+  );
+}
+
+// ── Clear history button with 2-step confirmation ─────────────────────────────
+function ClearHistoryButton({ onClear }: { onClear: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+  useEffect(() => {
+    if (!confirming) return;
+    const t = setTimeout(() => setConfirming(false), 3000);
+    return () => clearTimeout(t);
+  }, [confirming]);
+  if (confirming) {
+    return (
+      <button
+        onClick={() => { onClear(); setConfirming(false); }}
+        title="Нажми ещё раз для очистки"
+        className="btn-glass"
+        style={{
+          height: "32px", padding: "0 8px",
+          display: "flex", alignItems: "center", gap: "4px",
+          color: "#ef4444", fontSize: "0.65rem", fontWeight: 700,
+          border: "1px solid rgba(239,68,68,0.35)", borderRadius: "8px",
+          animation: "none",
+        }}
+      >
+        <X size={11} /> Очистить?
+      </button>
+    );
+  }
+  return (
+    <button
+      onClick={() => setConfirming(true)}
+      title="Очистить историю"
+      className="btn-glass"
+      style={{ width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+    >
+      <X size={13} style={{ color: "var(--text-tertiary)" }} />
+    </button>
   );
 }
 
@@ -257,10 +295,10 @@ function ChatBubble({
       {isBot && (
         <div style={{
           width: "28px", height: "28px", borderRadius: "50%", flexShrink: 0,
-          background: "linear-gradient(135deg, var(--accent-fuel), #f59e0b)",
+          background: "linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))",
           display: "flex", alignItems: "center", justifyContent: "center",
           marginRight: "8px", marginTop: "2px",
-          boxShadow: "var(--glow-fuel)",
+          boxShadow: "var(--glow-primary)",
         }}>
           <Bot size={14} style={{ color: "#fff" }} />
         </div>
@@ -306,26 +344,35 @@ function ChatBubble({
 // ── Dynamic chips ─────────────────────────────────────────────────────────────
 function getDynamicChips(crisisPct: number, remainingL: number, empireLevel: number) {
   const chips: { label: string; query: string }[] = [];
+  const hour = new Date().getHours();
 
   if (remainingL <= 0) {
     chips.push({ label: "⛽ Лимит исчерпан", query: "Мой суточный лимит исчерпан, что делать?" });
   } else if (remainingL < 20) {
     chips.push({ label: `⚠️ Осталось ${remainingL}л`, query: "Мне мало бензина, нужно топливо" });
+  } else if (hour >= 6 && hour < 10) {
+    chips.push({ label: "🌅 Утро — когда заправиться?", query: "Когда лучше заправиться утром?" });
+  } else if (hour >= 17 && hour < 21) {
+    chips.push({ label: "🌆 Вечер — очереди?", query: "Какие очереди вечером?" });
   }
 
   if (crisisPct > 30) {
     chips.push({ label: "🚨 Острый кризис", query: "Прогноз кризиса — ситуация очень плохая?" });
+  } else if (crisisPct > 10) {
+    chips.push({ label: "⚠️ Прогноз", query: "Каков прогноз топливного кризиса?" });
   } else {
-    chips.push({ label: "📊 Прогноз", query: "Каков прогноз кризиса?" });
+    chips.push({ label: "📊 Ситуация", query: "Какова общая ситуация с топливом?" });
   }
 
-  chips.push({ label: "📍 Найти рядом", query: "Найди ближайшие АЗС с наличием топлива" });
-  chips.push({ label: "🎫 Купить талоны", query: "Хочу купить топливный талон" });
+  chips.push({ label: "📍 АЗС рядом", query: "Найди ближайшие АЗС с наличием топлива" });
+  chips.push({ label: "🎫 Купить талон", query: "Хочу купить топливный талон на АИ-95" });
 
-  if (empireLevel > 1) {
+  if (empireLevel >= 3) {
+    chips.push({ label: "🏰 Prestige", query: "Когда мне делать Prestige в Империи?" });
+  } else if (empireLevel > 1) {
     chips.push({ label: "🏰 Империя", query: "Как прокачать Империю быстрее?" });
   } else {
-    chips.push({ label: "💰 Цены", query: "Сколько стоит АИ-95 сейчас?" });
+    chips.push({ label: "💰 Цены АИ-95", query: "Сколько стоит АИ-95 сейчас?" });
   }
 
   return chips.slice(0, 4);
@@ -406,15 +453,23 @@ export function AiTab({ onNavigate }: Props) {
     setShowVpn(false);
 
     try {
+      const greenCount = stations.filter(s => {
+        const avg = s.fuel_statuses.length
+          ? s.fuel_statuses.reduce((a, b) => a + b.availability_pct, 0) / s.fuel_statuses.length
+          : 0;
+        return avg >= 60;
+      }).length;
       const context = {
         crisis_stations: crisisCount,
+        green_stations:  greenCount,
         user_id:         uid,
         total_stations:  stations.length,
-        region:          "Севастополь",
+        region:          user?.region ?? "Севастополь",
         daily_used:      dailyUsed,
         daily_max:       dailyMax,
         empire_coins:    empireCoins,
         empire_level:    empireLevel,
+        hour:            new Date().getHours(),
       };
       const history = buildBackendHistory(messages);
       const res = await sendAiMessage(userMsg.text, context, history);
@@ -479,9 +534,9 @@ export function AiTab({ onNavigate }: Props) {
       }}>
         <div style={{
           width: "36px", height: "36px", borderRadius: "50%",
-          background: "linear-gradient(135deg, var(--accent-fuel), #f59e0b)",
+          background: "linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))",
           display: "flex", alignItems: "center", justifyContent: "center",
-          boxShadow: "var(--glow-fuel)",
+          boxShadow: "var(--glow-primary)",
         }}>
           <Bot size={18} style={{ color: "#fff" }} />
         </div>
@@ -516,17 +571,10 @@ export function AiTab({ onNavigate }: Props) {
             <Fuel size={14} style={{ color: "var(--accent-secondary)" }} />
           </button>
           {messages.length > 2 && (
-            <button
-              onClick={() => {
-                setMessages([makeWelcome()]);
-                if (uid) localStorage.removeItem(LS_KEY(uid));
-              }}
-              title="Очистить чат"
-              className="btn-glass"
-              style={{ width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
-            >
-              <X size={13} style={{ color: "var(--text-tertiary)" }} />
-            </button>
+            <ClearHistoryButton onClear={() => {
+              setMessages([makeWelcome()]);
+              if (uid) localStorage.removeItem(LS_KEY(uid));
+            }} />
           )}
         </div>
       </div>

@@ -180,6 +180,10 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
   const [showHeatmap, setShowHeatmap] = useState(true);
   const [geoLoading, setGeoLoading] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const dragControls = useDragControls();
 
@@ -190,6 +194,31 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
     const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
+
+  const findNearestGreenFromCenter = () => {
+    const center = mapRef.current?.getCenter();
+    if (!center) return;
+    const greenStations = stations.filter((s) => {
+      const avg = s.fuel_statuses.length
+        ? s.fuel_statuses.reduce((a, b) => a + b.availability_pct, 0) / s.fuel_statuses.length
+        : 0;
+      return avg >= 60;
+    });
+    const pool = greenStations.length ? greenStations : stations.filter(s => {
+      const avg = s.fuel_statuses.length
+        ? s.fuel_statuses.reduce((a, b) => a + b.availability_pct, 0) / s.fuel_statuses.length
+        : 0;
+      return avg >= 25;
+    });
+    if (!pool.length) return;
+    const nearest = pool.reduce((best, s) => {
+      const d = haversineDist(center.lat, center.lng, s.lat, s.lng);
+      const bestD = haversineDist(center.lat, center.lng, best.lat, best.lng);
+      return d < bestD ? s : best;
+    });
+    mapRef.current?.flyTo([nearest.lat, nearest.lng], 15, { duration: 0.9 });
+    selectStation(nearest.id);
+  };
 
   const findNearest = () => {
     if (!navigator.geolocation) { setGeoError("Геолокация не поддерживается"); return; }
@@ -240,6 +269,8 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
     }
   }, [initialStationId, stations.length, selectStation]);
 
+  const searchLower = searchQuery.toLowerCase().trim();
+
   const filtered = stations.filter((s) => {
     const status = dominantStatus(s);
     if (filterStatus !== "all" && status !== filterStatus) return false;
@@ -248,8 +279,21 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
     }
     if (filterRegion && s.region !== filterRegion) return false;
     if (filterNetwork && s.network !== filterNetwork) return false;
+    if (showFavoritesOnly && !isStationFavorite(s.id)) return false;
+    if (searchLower) {
+      const haystack = `${s.name} ${s.network} ${s.address ?? ""} ${s.region}`.toLowerCase();
+      if (!haystack.includes(searchLower)) return false;
+    }
     return true;
   });
+
+  // Jump map to first search result
+  const jumpToSearchResult = () => {
+    if (!searchLower || !filtered.length) return;
+    const first = filtered[0];
+    mapRef.current?.flyTo([first.lat, first.lng], 14, { duration: 0.9 });
+    selectStation(first.id);
+  };
 
   const uniqueRegions = Array.from(new Set(stations.map((s) => s.region))).sort();
   const uniqueNetworks = Array.from(new Set(stations.map((s) => s.network))).sort();
@@ -342,6 +386,26 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
           {geoLoading ? "⟳" : geoError ? "✗" : "📍"}
         </button>
 
+        {/* Nearest green from map center (no GPS required) */}
+        <button
+          onClick={findNearestGreenFromCenter}
+          title="Ближайшая зелёная АЗС от центра карты"
+          style={{
+            background: "rgba(20,20,28,0.92)",
+            border: "1px solid #22222f",
+            borderRadius: "10px",
+            color: "#4ade80",
+            padding: "0.4rem 0.6rem",
+            fontSize: "0.78rem",
+            cursor: "pointer",
+            backdropFilter: "blur(12px)",
+            display: "flex", alignItems: "center", gap: "0.2rem",
+            transition: "all 0.2s",
+          }}
+        >
+          🟢
+        </button>
+
         {/* Heatmap toggle */}
         <button
           onClick={() => setShowHeatmap((v) => !v)}
@@ -360,6 +424,124 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
         >
           🌡
         </button>
+
+        {/* Favorites filter */}
+        <button
+          onClick={() => setShowFavoritesOnly((v) => !v)}
+          title={showFavoritesOnly ? "Показать все АЗС" : "Только избранные"}
+          style={{
+            background: showFavoritesOnly ? "rgba(234,179,8,0.18)" : "rgba(20,20,28,0.92)",
+            border: `1px solid ${showFavoritesOnly ? "#eab30855" : "#22222f"}`,
+            borderRadius: "10px",
+            color: showFavoritesOnly ? "#fde047" : "#9ca3af",
+            padding: "0.4rem 0.6rem",
+            fontSize: "0.78rem",
+            cursor: "pointer",
+            backdropFilter: "blur(12px)",
+            display: "flex", alignItems: "center", gap: "0.25rem",
+            transition: "all 0.2s",
+            boxShadow: showFavoritesOnly ? "0 0 10px rgba(234,179,8,0.25)" : "none",
+          }}
+        >
+          ⭐
+        </button>
+
+        {/* Search — expand on click */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", flex: searchOpen ? 1 : "none" }}>
+          <button
+            onClick={() => {
+              setSearchOpen((v) => !v);
+              if (!searchOpen) {
+                setTimeout(() => searchRef.current?.focus(), 80);
+              } else {
+                setSearchQuery("");
+              }
+            }}
+            style={{
+              background: (searchOpen || searchQuery) ? "rgba(219,39,119,0.15)" : "rgba(20,20,28,0.92)",
+              border: `1px solid ${(searchOpen || searchQuery) ? "#db277755" : "#22222f"}`,
+              borderRadius: "10px",
+              color: (searchOpen || searchQuery) ? "#f472b6" : "#9ca3af",
+              padding: "0.4rem 0.6rem",
+              fontSize: "0.78rem",
+              cursor: "pointer",
+              backdropFilter: "blur(12px)",
+              flexShrink: 0,
+              transition: "all 0.2s",
+            }}
+            title="Поиск АЗС"
+          >
+            🔍
+          </button>
+          <AnimatePresence>
+            {searchOpen && (
+              <motion.div
+                initial={{ width: 0, opacity: 0 }}
+                animate={{ width: "auto", opacity: 1 }}
+                exit={{ width: 0, opacity: 0 }}
+                style={{ overflow: "hidden", flex: 1 }}
+              >
+                <input
+                  ref={searchRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") jumpToSearchResult(); if (e.key === "Escape") { setSearchOpen(false); setSearchQuery(""); } }}
+                  placeholder="АЗС, сеть, адрес…"
+                  style={{
+                    width: "100%",
+                    background: "rgba(10,10,18,0.97)",
+                    border: "1px solid #db277755",
+                    borderRadius: "10px",
+                    color: "#e2e8f0",
+                    padding: "0.4rem 0.65rem",
+                    fontSize: "0.75rem",
+                    outline: "none",
+                    fontFamily: "system-ui, sans-serif",
+                    backdropFilter: "blur(12px)",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Favorites-only active badge */}
+        {showFavoritesOnly && !searchQuery && (
+          <div style={{
+            background: "rgba(234,179,8,0.12)",
+            border: "1px solid #eab30844",
+            borderRadius: "10px",
+            padding: "0.4rem 0.55rem",
+            fontFamily: "'JetBrains Mono',monospace",
+            fontSize: "0.65rem",
+            color: "#fde047",
+            backdropFilter: "blur(12px)",
+            flexShrink: 0,
+            cursor: "pointer",
+          }} onClick={() => setShowFavoritesOnly(false)}>
+            ⭐ {filtered.length} АЗС ×
+          </div>
+        )}
+
+        {/* Search result count badge */}
+        {searchQuery && (
+          <div style={{
+            background: filtered.length > 0 ? "rgba(219,39,119,0.12)" : "rgba(239,68,68,0.12)",
+            border: `1px solid ${filtered.length > 0 ? "#db277744" : "#ef444444"}`,
+            borderRadius: "10px",
+            padding: "0.4rem 0.55rem",
+            fontFamily: "'JetBrains Mono',monospace",
+            fontSize: "0.65rem",
+            color: filtered.length > 0 ? "#f472b6" : "#ef4444",
+            backdropFilter: "blur(12px)",
+            cursor: filtered.length > 0 ? "pointer" : "default",
+            flexShrink: 0,
+          }} onClick={jumpToSearchResult}>
+            {filtered.length > 0 ? `${filtered.length} АЗС →` : "0"}
+          </div>
+        )}
 
         {/* Quick status strip — tap to filter */}
         <div
