@@ -11,6 +11,7 @@ import {
 import { useUserStore } from "@/stores/useUserStore";
 import { useStationStore } from "@/stores/useStationStore";
 import { useToast } from "@/components/Toast";
+import { StationLogo } from "@/components/StationLogo";
 import { impact, notify } from "@/lib/haptic";
 import { usePriceStore } from "@/stores/usePriceStore";
 
@@ -132,12 +133,14 @@ export function StationCard({ station, onClose }: Props) {
       {/* Header */}
       <div style={{ padding: "0.9rem 1rem 0.65rem", borderBottom: `1px solid ${statusColor}15` }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ flex: 1, minWidth: 0, display: "flex", gap: "0.75rem", alignItems: "flex-start" }}>
+            <StationLogo network={station.network || "АЗС"} size={38} />
+            <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem" }}>
               <span style={{
-                width: "10px", height: "10px", borderRadius: "50%",
+                width: "8px", height: "8px", borderRadius: "50%",
                 background: statusColor,
-                boxShadow: `0 0 12px ${statusColor}, 0 0 4px ${statusColor}`,
+                boxShadow: `0 0 10px ${statusColor}, 0 0 4px ${statusColor}`,
                 flexShrink: 0,
                 animation: dominantStatus === "red" ? "crisisPulse 1.2s infinite" : "none",
               }} />
@@ -156,11 +159,7 @@ export function StationCard({ station, onClose }: Props) {
               <span style={{ background: station.queue_cars > 8 ? "#ef444415" : "#a855f710", border: `1px solid ${station.queue_cars > 8 ? "#ef444435" : "#a855f730"}`, borderRadius: "5px", color: station.queue_cars > 8 ? "#ef4444" : "#a855f7", fontSize: "0.58rem", fontWeight: 700, padding: "0.05rem 0.35rem" }}>
                 🚗 {station.queue_cars} авто
               </span>
-              {station.network && (
-                <span style={{ background: "#14141c", border: "1px solid #1e1e2a", borderRadius: "5px", color: "#6b7280", fontSize: "0.58rem", padding: "0.05rem 0.35rem" }}>
-                  {station.network}
-                </span>
-              )}
+            </div>
             </div>
           </div>
           <div style={{ display: "flex", gap: "4px", alignItems: "center", flexShrink: 0, marginLeft: "0.5rem" }}>

@@ -18,11 +18,11 @@ import { ToastContainer } from "@/components/Toast";
 import { BottomNav } from "@/components/BottomNav";
 import { PriceAlertBanner } from "@/components/PriceAlertBanner";
 import { MapTab } from "@/components/MapTab";
-import { AnalyticsTab } from "@/components/AnalyticsTab";
 import { CatalogTab } from "@/components/CatalogTab";
+import { NewsTab } from "@/components/NewsTab";
+import { AiTab } from "@/components/AiTab";
+import { GamesTab } from "@/components/GamesTab";
 import { VaultTab } from "@/components/VaultTab";
-import { ReserveTab } from "@/components/ReserveTab";
-import { EmpireGame } from "@/components/EmpireGame";
 import { VpnModal } from "@/components/VpnModal";
 import { MarketTicker } from "@/components/MarketTicker";
 import { IntroSplash } from "@/components/IntroSplash";
@@ -32,6 +32,7 @@ import { useUserStore } from "@/stores/useUserStore";
 import { useStationStore } from "@/stores/useStationStore";
 import { useMapStore } from "@/stores/useMapStore";
 import { usePriceStore } from "@/stores/usePriceStore";
+import { useVaultStore } from "@/stores/useVaultStore";
 import { parseStartParam } from "@/lib/deeplink";
 import { select as hapticSelect } from "@/lib/haptic";
 import type { TabId } from "@/types";
@@ -88,6 +89,7 @@ interface TelegramWebApp {
 const DEFAULT_TAB: TabId = "map";
 const SPLASH_KEY = "tma-splash-seen-v2";
 const ONBOARDING_KEY = "tma-onboarding-v1";
+const AI_BANNER_KEY = "tma-ai-banner-dismissed-v1";
 const TICKER_H = 40;
 
 export default function App() {
@@ -100,6 +102,8 @@ export default function App() {
   const [showSplash, setShowSplash] = useState(() => !localStorage.getItem(SPLASH_KEY));
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
+  const [showWallet, setShowWallet] = useState(false);
+  const [showAiBanner, setShowAiBanner] = useState(false);
   const vpnSuggested = useRef(false);
   const adminPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -107,6 +111,7 @@ export default function App() {
   const { fetch: fetchStations, stations } = useStationStore();
   const { selectStation } = useMapStore();
   const { initPrices, connectWs, priceAlerts, dismissAlert } = usePriceStore();
+  const { purchases } = useVaultStore();
 
   const crisisCount = stations.reduce((n, s) => {
     const avg = s.fuel_statuses.length
@@ -121,6 +126,22 @@ export default function App() {
     const disconnect = connectWs();
     return disconnect;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── AI suggestion banner (Phase 4.3): show if last purchase >7d ─
+  useEffect(() => {
+    if (localStorage.getItem(AI_BANNER_KEY)) return;
+    const check = () => {
+      if (purchases.length === 0) return; // wait for vault to load
+      const last = purchases.reduce<Date | null>((max, p) => {
+        const d = new Date(p.created_at);
+        return !max || d > max ? d : max;
+      }, null);
+      if (!last) return;
+      const daysSince = (Date.now() - last.getTime()) / 86_400_000;
+      if (daysSince > 7) setShowAiBanner(true);
+    };
+    check();
+  }, [purchases]);
 
   const backCbRef = useRef<(() => void) | null>(null);
 
@@ -239,7 +260,7 @@ export default function App() {
     }
   };
 
-  const tabOrder: TabId[] = ["map", "analytics", "catalog", "vault", "reserve", "empire"];
+  const tabOrder: TabId[] = ["map", "catalog", "ai", "games", "news"];
   const tabIndexRef = useRef(0);
   const prevTabIndex = tabIndexRef.current;
   const curTabIndex = tabOrder.indexOf(activeTab);
@@ -287,6 +308,33 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {showWallet && (
+          <motion.div
+            key="wallet-overlay"
+            initial={{ opacity: 0, y: "100%" }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: "100%" }}
+            transition={{ type: "spring", damping: 28, stiffness: 260 }}
+            style={{
+              position: "fixed", inset: 0, zIndex: 9200,
+              background: "var(--bg-base)",
+              overflowY: "auto", overflowX: "hidden",
+              paddingTop: `${TICKER_H + 8}px`, paddingBottom: "20px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px 4px" }}>
+              <h2 style={{ fontSize: "1rem", fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>💼 Мой кошелёк</h2>
+              <button
+                onClick={() => setShowWallet(false)}
+                style={{ background: "var(--bg-glass)", border: "1px solid var(--border-glass)", borderRadius: "50%", width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--text-muted)", fontSize: "1.1rem" }}
+              >×</button>
+            </div>
+            <VaultTab initialPurchaseId={initialPurchaseId} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* VPN floating button */}
       <button
         onClick={() => { setVpnTroubleshooter(false); setShowVpn(true); }}
@@ -306,6 +354,72 @@ export default function App() {
       >
         🔒
       </button>
+
+      {/* Wallet floating button */}
+      <motion.button
+        onClick={() => setShowWallet(true)}
+        whileTap={{ scale: 0.9 }}
+        title="Мой кошелёк"
+        style={{
+          position: "fixed", bottom: "calc(env(safe-area-inset-bottom, 0px) + 104px)", right: "12px",
+          zIndex: 9500,
+          width: "38px", height: "38px",
+          borderRadius: "50%",
+          background: "linear-gradient(135deg, #fbbf24, #f59e0b)",
+          border: "none",
+          boxShadow: "0 0 14px rgba(251,191,36,0.45)",
+          cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: "1rem",
+        }}
+      >
+        💼
+      </motion.button>
+
+      {/* AI Suggestion Banner (Phase 4.3) */}
+      <AnimatePresence>
+        {showAiBanner && (
+          <motion.div
+            key="ai-banner"
+            initial={{ opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
+            transition={{ duration: 0.25 }}
+            style={{
+              position: "fixed", top: `${TICKER_H + 4}px`, left: "12px", right: "12px",
+              zIndex: 9750,
+              background: "linear-gradient(135deg, rgba(168,85,247,0.15), rgba(219,39,119,0.1))",
+              border: "1px solid rgba(168,85,247,0.3)",
+              borderRadius: "12px", padding: "8px 12px",
+              backdropFilter: "blur(12px)",
+              boxShadow: "0 4px 20px rgba(168,85,247,0.2)",
+              display: "flex", alignItems: "center", gap: "8px",
+            }}
+          >
+            <span style={{ fontSize: "1rem", flexShrink: 0 }}>💡</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ color: "#e2e8f0", fontSize: "0.72rem", fontWeight: 600, margin: "0 0 1px" }}>
+                ИИ-подсказка: ситуация в регионе ухудшилась
+              </p>
+              <p style={{ color: "#9ca3af", fontSize: "0.62rem", margin: 0 }}>
+                Запасы на АЗС снизились. Рекомендуем пополнить талоны.
+              </p>
+            </div>
+            <button
+              onClick={() => { handleTabChange("catalog"); setShowAiBanner(false); localStorage.setItem(AI_BANNER_KEY, "1"); }}
+              style={{
+                background: "linear-gradient(135deg,#a855f7,#db2777)", border: "none",
+                borderRadius: "7px", color: "#fff", fontSize: "0.62rem", fontWeight: 700,
+                padding: "4px 8px", cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap",
+              }}
+            >Талоны</button>
+            <button
+              onClick={() => { setShowAiBanner(false); localStorage.setItem(AI_BANNER_KEY, "1"); }}
+              style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: "1rem", padding: "0 2px", flexShrink: 0, lineHeight: 1 }}
+            >×</button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Crisis badge */}
       {crisisCount >= 5 && (
@@ -379,11 +493,10 @@ export default function App() {
               transition={{ duration: 0.22, ease: [0.25, 0.46, 0.45, 0.94] }}
               style={{ position: "absolute", inset: 0, overflowY: "auto", overflowX: "hidden" }}
             >
-              {activeTab === "analytics" && <AnalyticsTab onNavigate={handleTabChange} />}
               {activeTab === "catalog" && <CatalogTab initialStationId={initialStationId} />}
-              {activeTab === "vault" && <VaultTab initialPurchaseId={initialPurchaseId} />}
-              {activeTab === "reserve" && <ReserveTab />}
-              {activeTab === "empire" && <EmpireGame />}
+              {activeTab === "ai"      && <AiTab onNavigate={handleTabChange} />}
+              {activeTab === "games"   && <GamesTab />}
+              {activeTab === "news"    && <NewsTab onNavigate={handleTabChange} />}
             </motion.div>
           )}
         </AnimatePresence>

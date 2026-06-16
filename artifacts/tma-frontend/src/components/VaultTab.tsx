@@ -8,6 +8,7 @@ import type { Achievement } from "@/api/client";
 import type { Purchase, ReferralInfo, Subscription, CreditTx } from "@/types";
 import { FUEL_LABELS, XP_TIER_THRESHOLDS } from "@/types";
 import QRCode from "qrcode";
+import { jsPDF } from "jspdf";
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   active: { label: "Активен", color: "#22c55e" },
@@ -18,6 +19,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 function QRModal({ hash, onClose }: { hash: string; onClose: () => void }) {
   const [dataUrl, setDataUrl] = useState<string>("");
   const [copied, setCopied] = useState(false);
+  const [saving, setSaving] = useState(false);
   const now = new Date();
 
   useEffect(() => {
@@ -32,6 +34,46 @@ function QRModal({ hash, onClose }: { hash: string; onClose: () => void }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }).catch(() => {});
+  };
+
+  const handleSavePng = async () => {
+    if (!dataUrl) return;
+    setSaving(true);
+    try {
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = `talон_${hash.slice(0, 8)}.png`;
+      link.click();
+    } finally { setSaving(false); }
+  };
+
+  const handleSavePdf = () => {
+    if (!dataUrl) return;
+    setSaving(true);
+    try {
+      const doc = new jsPDF({ format: "a6", unit: "mm", orientation: "portrait" });
+      doc.setFillColor(8, 9, 15);
+      doc.rect(0, 0, 105, 148, "F");
+      doc.setTextColor(168, 85, 247);
+      doc.setFontSize(10);
+      doc.text("ТОПЛИВНЫЙ УЗЕЛ — ЦИФРОВОЙ ТАЛОН", 10, 14);
+      doc.setTextColor(220, 220, 240);
+      doc.setFontSize(8);
+      doc.text(`Код: ${hash}`, 10, 22);
+      doc.text(`Дата: ${now.toLocaleDateString("ru")} ${now.toLocaleTimeString("ru")}`, 10, 28);
+      doc.addImage(dataUrl, "PNG", 22, 36, 62, 62);
+      doc.setTextColor(100, 100, 130);
+      doc.setFontSize(6);
+      doc.text("Предъявите QR-код оператору АЗС", 10, 108);
+      doc.text("@fuel_tickets_ru_bot", 10, 114);
+      doc.save(`талон_${hash.slice(0, 8)}.pdf`);
+    } finally { setSaving(false); }
+  };
+
+  const handleShareTg = () => {
+    const text = `⛽ Мой топливный талон\n\nКод: ${hash}\nДата: ${now.toLocaleDateString("ru")}\n\nПолучен через @fuel_tickets_ru_bot`;
+    const tgUrl = `https://t.me/share/url?url=${encodeURIComponent("https://t.me/fuel_tickets_ru_bot")}&text=${encodeURIComponent(text)}`;
+    window.open(tgUrl, "_blank");
   };
 
   return (
@@ -125,9 +167,32 @@ function QRModal({ hash, onClose }: { hash: string; onClose: () => void }) {
             {copied ? "✓" : "⎘"}
           </span>
         </div>
-        <p style={{ color: "#374151", fontSize: "0.55rem", margin: "0.3rem 0 1rem" }}>
-          {copied ? "Скопировано!" : "Нажмите, чтобы скопировать хэш"}
+        <p style={{ color: "#374151", fontSize: "0.55rem", margin: "0.3rem 0 0.75rem" }}>
+          {copied ? "✓ Скопировано!" : "Нажмите на код для копирования"}
         </p>
+
+        {/* Action buttons grid */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "0.75rem" }}>
+          {[
+            { icon: "📷", label: "Сохранить PNG", onClick: handleSavePng },
+            { icon: "📄", label: "Скачать PDF",   onClick: handleSavePdf },
+            { icon: "📋", label: "Скопировать",   onClick: handleCopy    },
+            { icon: "📤", label: "В Telegram",    onClick: handleShareTg },
+          ].map(({ icon, label, onClick }) => (
+            <button key={label} onClick={onClick} disabled={saving}
+              style={{
+                background: "rgba(168,85,247,0.1)", border: "1px solid rgba(168,85,247,0.25)",
+                borderRadius: "10px", padding: "0.5rem 0.35rem",
+                color: "#c4b5fd", fontSize: "0.65rem", fontWeight: 600,
+                cursor: saving ? "wait" : "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: "4px",
+                opacity: saving ? 0.6 : 1, transition: "background 0.15s",
+              }}
+            >
+              <span style={{ fontSize: "0.8rem" }}>{icon}</span>{label}
+            </button>
+          ))}
+        </div>
 
         <button
           onClick={onClose}
@@ -302,41 +367,43 @@ export function VaultTab({ initialPurchaseId }: VaultTabProps) {
   return (
     <div style={{ height: "100%", overflowY: "auto", paddingBottom: "5rem" }}>
       {/* Header */}
-      <div style={{ padding: "0.75rem 1rem 0.5rem" }}>
-        <div style={{
-          background: "linear-gradient(160deg,#0d0d18,#0f0b1a)",
-          border: "1px solid #db277722",
-          borderRadius: "16px",
-          padding: "0.85rem 1rem",
-          position: "relative",
-          overflow: "hidden",
-        }}>
-          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#db2777,#a855f7,transparent)" }} />
-          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "100%", pointerEvents: "none", opacity: 0.02, backgroundImage: "linear-gradient(#db2777 1px, transparent 1px), linear-gradient(90deg, #db2777 1px, transparent 1px)", backgroundSize: "20px 20px" }} />
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", position: "relative" }}>
+      <div style={{ padding: "12px 12px 8px" }}>
+        <div className="glass-panel" style={{ padding: "14px", position: "relative", overflow: "hidden" }}>
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,var(--accent-secondary),var(--accent-primary),transparent)" }} />
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div>
-              <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#4b5563", fontSize: "0.5rem", letterSpacing: "0.18em", marginBottom: "0.2rem" }}>
-                VAULT_TERMINAL · v4.2
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.15rem" }}>
-                <span style={{ fontSize: "1rem" }}>🗄️</span>
-                <h2 style={{ margin: 0, color: "#e2e8f0", fontSize: "1.05rem", fontWeight: 800, lineHeight: 1 }}>
-                  Мой Сейф
+              <p style={{ margin: "0 0 2px", fontSize: "0.52rem", color: "var(--text-tertiary)", letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "var(--font-mono)" }}>
+                Мой кошелёк
+              </p>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "4px" }}>
+                <span style={{ fontSize: "1.15rem" }}>💼</span>
+                <h2 style={{ margin: 0, color: "var(--text-primary)", fontSize: "1.1rem", fontWeight: 800, lineHeight: 1 }}>
+                  Кошелёк
                 </h2>
               </div>
-              <p style={{ margin: 0, color: "#4b5563", fontSize: "0.62rem" }}>
-                {active.length} активных ваучеров · {history.length} использовано
+              <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: "0.65rem" }}>
+                {active.length} активных талонов · {history.length} использовано
               </p>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.25rem" }}>
-              <div style={{ background: "#0d1f0d", border: "1px solid #22c55e44", borderRadius: "8px", padding: "0.2rem 0.5rem", display: "flex", alignItems: "center", gap: "0.3rem" }}>
-                <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e", display: "inline-block", animation: "tmaPulse 2s infinite" }} />
-                <span style={{ color: "#22c55e", fontSize: "0.58rem", fontWeight: 700, fontFamily: "'JetBrains Mono',monospace" }}>ONLINE</span>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
+              <div style={{
+                display: "flex", alignItems: "center", gap: "4px",
+                background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.25)",
+                borderRadius: "999px", padding: "3px 8px",
+              }}>
+                <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "var(--accent-success)", boxShadow: "0 0 5px var(--accent-success)", display: "inline-block" }} />
+                <span style={{ color: "var(--accent-success)", fontSize: "0.55rem", fontWeight: 700, fontFamily: "var(--font-mono)", letterSpacing: "0.06em" }}>SECURE</span>
               </div>
-              {purchases.length > 0 && (
-                <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#db2777", fontSize: "0.55rem" }}>
-                  {purchases.length} ордеров
-                </span>
+              {active.length > 0 && (
+                <div style={{
+                  background: "linear-gradient(135deg, rgba(244,114,182,0.15), rgba(167,139,250,0.15))",
+                  border: "1px solid rgba(244,114,182,0.3)",
+                  borderRadius: "8px", padding: "2px 8px",
+                  fontSize: "0.6rem", fontWeight: 700,
+                  color: "var(--accent-secondary)", fontFamily: "var(--font-mono)",
+                }}>
+                  {active.length} активных
+                </div>
               )}
             </div>
           </div>

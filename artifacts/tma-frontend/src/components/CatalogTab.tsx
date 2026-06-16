@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Fuse from "fuse.js";
 import { fetchLimits, createStarsInvoice, createCryptoBotInvoice } from "@/api/client";
 import { useUserStore } from "@/stores/useUserStore";
 import { usePriceStore } from "@/stores/usePriceStore";
 import { useStationStore } from "@/stores/useStationStore";
 import { useVaultStore } from "@/stores/useVaultStore";
 import { useToast } from "@/components/Toast";
+import { StationLogo } from "@/components/StationLogo";
 import { impact, notify } from "@/lib/haptic";
 import type { GasStation, LimitsMap } from "@/types";
 import { FUEL_LABELS } from "@/types";
@@ -375,34 +377,49 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
     return () => observer.disconnect();
   }, [selectedStation]);
 
+  // ── Fuse.js fuzzy search instance ────────────────────────────────────────
+  const fuse = useMemo(() => new Fuse(stations, {
+    keys: [
+      { name: "name",    weight: 0.40 },
+      { name: "network", weight: 0.30 },
+      { name: "region",  weight: 0.20 },
+      { name: "address", weight: 0.10 },
+    ],
+    threshold: 0.38,
+    minMatchCharLength: 2,
+    includeScore: true,
+  }), [stations]);
+
   // ── Fuel-alias detection ─────────────────────────────────────────────────
   const matchedFuelType = matchFuelAlias(searchQuery);
 
-  const filteredStations = stations
-    .filter((s) => {
-      if (!searchQuery) return true;
-      const q = searchQuery.toLowerCase();
-
-      // Fuel-type alias search: show stations that carry this fuel
-      if (matchedFuelType) {
-        return s.fuel_statuses.some((f) => f.fuel_type === matchedFuelType);
-      }
-
-      // Text search: name, region, network, address
-      return (
-        s.name.toLowerCase().includes(q) ||
-        s.region.toLowerCase().includes(q) ||
-        s.network.toLowerCase().includes(q) ||
-        s.address.toLowerCase().includes(q)
-      );
-    })
-    .sort((a, b) => {
+  const sortStations = (arr: GasStation[]) =>
+    [...arr].sort((a, b) => {
       if (sortMode === "name") return a.name.localeCompare(b.name, "ru");
       if (sortMode === "queue") return a.queue_cars - b.queue_cars;
       const avgA = a.fuel_statuses.length ? a.fuel_statuses.reduce((s, f) => s + f.availability_pct, 0) / a.fuel_statuses.length : 0;
       const avgB = b.fuel_statuses.length ? b.fuel_statuses.reduce((s, f) => s + f.availability_pct, 0) / b.fuel_statuses.length : 0;
       return avgB - avgA;
     });
+
+  const filteredStations = useMemo(() => {
+    if (!searchQuery) return sortStations(stations);
+    if (matchedFuelType) {
+      return sortStations(stations.filter(s => s.fuel_statuses.some(f => f.fuel_type === matchedFuelType)));
+    }
+    // Fuse.js fuzzy search (falls back to substring if query is too short)
+    if (searchQuery.trim().length < 2) {
+      const q = searchQuery.toLowerCase();
+      return sortStations(stations.filter(s =>
+        s.name.toLowerCase().includes(q) ||
+        s.network.toLowerCase().includes(q) ||
+        s.region.toLowerCase().includes(q)
+      ));
+    }
+    const results = fuse.search(searchQuery);
+    return sortStations(results.map(r => r.item));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stations, searchQuery, sortMode, matchedFuelType, fuse]);
 
   const visibleStations = filteredStations.slice(0, Math.min(visibleCount, MAX_INLINE));
   const hasMore = filteredStations.length > visibleCount && visibleCount < MAX_INLINE;
@@ -488,26 +505,30 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
       </AnimatePresence>
 
       {/* ── Header ── */}
-      <div style={{ padding: "0.75rem 1rem 0.5rem" }}>
-        <div style={{
-          background: "linear-gradient(160deg, #0d0d18, #0f0820)",
-          border: "1px solid #a855f733", borderRadius: "16px",
-          padding: "0.9rem 1rem", position: "relative", overflow: "hidden",
-        }}>
-          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#a855f7,#db2777,transparent)" }} />
+      <div style={{ padding: "12px 12px 8px" }}>
+        <div className="glass-panel" style={{ padding: "14px", position: "relative", overflow: "hidden" }}>
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,var(--accent-primary),var(--accent-secondary),transparent)" }} />
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div>
-              <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#4b5563", fontSize: "0.5rem", letterSpacing: "0.18em", marginBottom: "0.2rem" }}>
-                ТЕРМИНАЛ СНАБЖЕНИЯ v2.4
-              </div>
-              <h2 style={{ margin: 0, color: "#e2e8f0", fontSize: "1.05rem", fontWeight: 800, lineHeight: 1 }}>⛽ Каталог топлива</h2>
-              <p style={{ margin: "0.2rem 0 0", color: "#6b7280", fontSize: "0.68rem" }}>
+              <p style={{ margin: "0 0 2px", fontSize: "0.52rem", color: "var(--text-tertiary)", letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "var(--font-mono)" }}>
+                Топливный терминал
+              </p>
+              <h2 style={{ margin: 0, color: "var(--text-primary)", fontSize: "1.1rem", fontWeight: 800, lineHeight: 1 }}>
+                🎫 Талоны
+              </h2>
+              <p style={{ margin: "4px 0 0", color: "var(--text-secondary)", fontSize: "0.68rem" }}>
                 {stations.length.toLocaleString("ru")} станций · выберите АЗС и тип
               </p>
             </div>
-            <div style={{ textAlign: "right", flexShrink: 0, marginLeft: "0.75rem" }}>
-              <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 8px #22c55e", marginLeft: "auto", marginBottom: "0.25rem" }} />
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e", fontSize: "0.55rem", letterSpacing: "0.08em" }}>ONLINE</span>
+            <div style={{ display: "flex", gap: "6px", alignItems: "center", flexShrink: 0, marginLeft: "8px" }}>
+              <div style={{
+                display: "flex", alignItems: "center", gap: "4px",
+                background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.25)",
+                borderRadius: "999px", padding: "3px 8px",
+              }}>
+                <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: "var(--accent-success)", boxShadow: "0 0 5px var(--accent-success)" }} />
+                <span style={{ fontSize: "0.55rem", color: "var(--accent-success)", fontFamily: "var(--font-mono)", letterSpacing: "0.06em" }}>LIVE</span>
+              </div>
             </div>
           </div>
         </div>
@@ -701,7 +722,9 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
                     }}
                   >
                     <div style={{ position: "absolute", left: 0, top: "15%", bottom: "15%", width: "2px", background: availColor, borderRadius: "0 2px 2px 0", boxShadow: `0 0 6px ${availColor}66` }} />
-                    <div style={{ paddingLeft: "0.6rem" }}>
+                    <div style={{ paddingLeft: "0.6rem", display: "flex", gap: "0.5rem", alignItems: "flex-start" }}>
+                      <StationLogo network={s.network || "АЗС"} size={30} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.3rem" }}>
                         <div style={{ minWidth: 0, flex: 1 }}>
                           <p style={{ margin: "0 0 0.05rem", color: "#e2e8f0", fontSize: "0.85rem", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", letterSpacing: "-0.01em" }}>
@@ -766,6 +789,7 @@ export function CatalogTab({ initialStationId }: CatalogTabProps) {
                           ))}
                         </div>
                       )}
+                      </div>
                     </div>
                   </motion.div>
                 );

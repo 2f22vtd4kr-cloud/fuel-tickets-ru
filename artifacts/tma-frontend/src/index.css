@@ -8,51 +8,84 @@
 
 /* ── CSS Variables ──────────────────────────────────────────────── */
 :root {
-  /* Core palette */
-  --bg:            #050507;
-  --bg-card:       rgba(20, 20, 30, 0.85);
+  /* Core palette (legacy + Phase 0 aliases) */
+  --bg:            #08090f;
+  --bg-base:       #08090f;
+  --bg-card:       rgba(20, 20, 32, 0.88);
   --bg-deep:       #0b0b0f;
-  --bg-glass:      rgba(255, 255, 255, 0.04);
-  --border:        rgba(255, 255, 255, 0.08);
-  --border-bright: rgba(168, 85, 247, 0.35);
 
-  /* Brand accents */
-  --violet:        #a855f7;
-  --violet-dim:    rgba(168, 85, 247, 0.15);
-  --magenta:       #db2777;
+  /* Liquid Glass surfaces */
+  --bg-glass:         rgba(255, 255, 255, 0.07);
+  --bg-glass-hover:   rgba(255, 255, 255, 0.11);
+  --bg-glass-active:  rgba(255, 255, 255, 0.16);
+
+  /* Glass borders */
+  --border:             rgba(255, 255, 255, 0.10);
+  --border-glass:       rgba(255, 255, 255, 0.14);
+  --border-glass-bright:rgba(255, 255, 255, 0.28);
+  --border-bright:      rgba(168, 85, 247, 0.35);
+
+  /* Accent palette */
+  --accent-primary:   #a78bfa;
+  --accent-secondary: #f472b6;
+  --accent-danger:    #fb7185;
+  --accent-success:   #34d399;
+  --accent-fuel:      #fbbf24;
+
+  /* Brand accents (legacy names kept) */
+  --violet:        #a78bfa;
+  --violet-dim:    rgba(167, 139, 250, 0.15);
+  --magenta:       #f472b6;
   --cyan:          #06b6d4;
   --cyan-dim:      rgba(6, 182, 212, 0.15);
 
   /* Semantic colours */
-  --green:         #22c55e;
-  --yellow:        #eab308;
-  --red:           #ef4444;
-  --green-dim:     rgba(34, 197, 94, 0.12);
-  --yellow-dim:    rgba(234, 179, 8, 0.12);
-  --red-dim:       rgba(239, 68, 68, 0.12);
+  --green:         #34d399;
+  --yellow:        #fbbf24;
+  --red:           #fb7185;
+  --green-dim:     rgba(52, 211, 153, 0.12);
+  --yellow-dim:    rgba(251, 191, 36, 0.12);
+  --red-dim:       rgba(251, 113, 133, 0.12);
 
   /* Text */
-  --text:          #e2e8f0;
-  --text-muted:    #94a3b8;
-  --text-dim:      #475569;
+  --text:           rgba(255, 255, 255, 0.95);
+  --text-primary:   rgba(255, 255, 255, 0.95);
+  --text-muted:     rgba(255, 255, 255, 0.60);
+  --text-secondary: rgba(255, 255, 255, 0.60);
+  --text-dim:       rgba(255, 255, 255, 0.35);
+  --text-tertiary:  rgba(255, 255, 255, 0.35);
 
   /* Typography */
   --font-sans:     'Inter', system-ui, -apple-system, sans-serif;
   --font-mono:     'JetBrains Mono', 'Courier New', monospace;
 
-  /* Effects */
+  /* Effects & Blur */
   --glass-blur:    blur(20px) saturate(180%);
-  --glow-violet:   0 0 20px rgba(168, 85, 247, 0.4);
-  --glow-cyan:     0 0 20px rgba(6, 182, 212, 0.4);
-  --glow-green:    0 0 12px rgba(34, 197, 94, 0.4);
-  --glow-red:      0 0 12px rgba(239, 68, 68, 0.4);
+  --blur-glass:    blur(20px) saturate(180%);
+  --blur-overlay:  blur(40px);
 
-  /* Layout */
+  /* Shadows & Glows */
+  --shadow-glass:   0 8px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.12);
+  --glow-primary:   0 0 24px rgba(167,139,250,0.35);
+  --glow-fuel:      0 0 20px rgba(251,191,36,0.30);
+  --glow-violet:    0 0 20px rgba(167, 139, 250, 0.4);
+  --glow-cyan:      0 0 20px rgba(6, 182, 212, 0.4);
+  --glow-green:     0 0 12px rgba(52, 211, 153, 0.4);
+  --glow-red:       0 0 12px rgba(251, 113, 133, 0.4);
+
+  /* Radius */
   --radius-sm:     8px;
   --radius-md:     14px;
   --radius-lg:     20px;
+  --radius-card:   20px;
+  --radius-btn:    14px;
+  --radius-pill:   999px;
   --nav-height:    60px;
   --ticker-height: 40px;
+
+  /* Transitions */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ── Light mode overrides ────────────────────────────────────────── */
@@ -73,7 +106,10 @@ body.light { background: var(--bg); color: var(--text); }
 html, body {
   width: 100%;
   height: 100%;
-  background: var(--bg);
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(88,28,135,0.18) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 20%, rgba(219,39,119,0.12) 0%, transparent 55%),
+    var(--bg-base);
   color: var(--text);
   font-family: var(--font-sans);
   font-size: 16px;
@@ -125,6 +161,41 @@ input, textarea { -webkit-user-select: text; user-select: text; }
   border-radius: var(--radius-md);
   box-shadow: var(--glow-violet);
 }
+
+/* ── Phase 0 — Liquid Glass Panel ───────────────────────────────── */
+.glass-panel {
+  background: var(--bg-glass);
+  backdrop-filter: var(--blur-glass);
+  -webkit-backdrop-filter: var(--blur-glass);
+  border: 1px solid var(--border-glass);
+  border-top-color: rgba(255,255,255,0.22);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-glass);
+}
+
+.btn-glass {
+  background: var(--bg-glass-hover);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-btn);
+  color: var(--text-primary);
+  transition: all 0.2s var(--ease-smooth);
+  cursor: pointer;
+}
+.btn-glass:hover  { background: var(--bg-glass-active); border-color: var(--border-glass-bright); }
+.btn-glass:active { transform: scale(0.97); }
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  box-shadow: var(--glow-primary);
+  border: none;
+  border-radius: var(--radius-btn);
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s var(--ease-smooth);
+}
+.btn-primary:active { transform: scale(0.97); }
 
 /* Inner highlight at the top edge — adds the "glass" depth illusion */
 .glass::before,

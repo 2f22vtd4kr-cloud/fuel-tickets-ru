@@ -3276,6 +3276,145 @@ def empire_prestige(user_id: int, db: Session = Depends(get_db)):
     }
 
 
+# ─── AI Chat ──────────────────────────────────────────────────────────────────
+
+class AiChatRequest(BaseModel):
+    message: str
+    context: dict = {}
+
+
+def _ai_rule_based_reply(message: str, db: Session, context: dict) -> tuple[str, list[str]]:
+    """Rule-based AI reply when no API key is available."""
+    msg = message.lower()
+
+    crisis_stations = context.get("crisis_stations", 0)
+    total_stations  = context.get("total_stations", 236)
+
+    # Fetch live data for context
+    try:
+        from sqlalchemy import func
+        crisis_count = db.query(Station).join(FuelStatus).filter(
+            FuelStatus.availability_pct < 25
+        ).distinct().count()
+        green_count = db.query(Station).join(FuelStatus).filter(
+            FuelStatus.status == "green"
+        ).distinct().count()
+    except Exception:
+        crisis_count = crisis_stations
+        green_count  = int(total_stations * 0.4)
+
+    if any(w in msg for w in ["ближайш", "рядом", "найди", "найти"]):
+        reply = (
+            f"📍 По данным на сейчас: {green_count} из {total_stations} станций работают "
+            f"в штатном режиме.\n\n"
+            f"Откройте вкладку **Карта** — там отображены все станции с цветовой индикацией:\n"
+            f"• 🟢 Зелёный — топливо есть\n"
+            f"• 🟡 Жёлтый — ограниченно\n"
+            f"• 🔴 Красный — нет"
+        )
+        suggestions = ["Открыть карту", "Показать фильтры", "Лучшие станции"]
+
+    elif any(w in msg for w in ["прогноз", "кризис", "ситуация", "дефицит"]):
+        pct = round(crisis_count / max(total_stations, 1) * 100, 1)
+        trend = "ухудшается" if pct > 30 else "стабильна" if pct > 10 else "улучшается"
+        reply = (
+            f"📊 Кризисный анализ:\n\n"
+            f"• {crisis_count} станций в кризисном состоянии ({pct}% от всех)\n"
+            f"• Тренд: {trend}\n"
+            f"• Рекомендуемый запас: {'60 л' if pct > 30 else '40 л' if pct > 10 else '20 л'}\n\n"
+            f"{'⚠️ Рекомендую пополнить запас сегодня!' if pct > 20 else '✅ Ситуация относительно стабильна.'}"
+        )
+        suggestions = ["Купить талон", "Смотреть новости", "Лучшие станции"]
+
+    elif any(w in msg for w in ["купить", "талон", "топлив", "92", "95", "дизель"]):
+        fuel_hint = "АИ-92" if "92" in msg else "АИ-95" if "95" in msg else "ДТ" if "диз" in msg else "АИ-92"
+        reply = (
+            f"⛽ Для покупки талона на **{fuel_hint}**:\n\n"
+            f"1. Перейдите в 🎫 **Талоны**\n"
+            f"2. Выберите станцию с зелёным статусом\n"
+            f"3. Укажите объём (20 / 40 / 60 л)\n"
+            f"4. Оплатите Telegram Stars или CryptoBot\n\n"
+            f"Сейчас доступно для {fuel_hint}: {green_count} станций."
+        )
+        suggestions = ["Перейти в Талоны", "Лучшие станции", "Узнать цены"]
+
+    elif any(w in msg for w in ["бюджет", "рублей", "деньги", "сколько стоит", "цена"]):
+        reply = (
+            f"💰 Актуальные цены (Севастополь/Крым):\n\n"
+            f"• АИ-92:   ~47 ₽/л\n"
+            f"• АИ-95:   ~52 ₽/л\n"
+            f"• АИ-95+:  ~56 ₽/л\n"
+            f"• ДТ:      ~60 ₽/л\n"
+            f"• Газ LPG: ~28 ₽/л\n\n"
+            f"На 1 000 ₽ вы купите ~21 л АИ-92 или ~19 л АИ-95.\n"
+            f"При кризисе цены могут расти на 5-15%."
+        )
+        suggestions = ["Купить по лучшей цене", "Динамика цен", "Сравнить станции"]
+
+    elif any(w in msg for w in ["помощ", "что ты", "что умеешь", "привет", "здравствуй"]):
+        reply = (
+            f"🤖 Я — ИИ-советник Топливного Узла.\n\n"
+            f"Могу помочь с:\n"
+            f"• Поиском АЗС с наличием нужного топлива\n"
+            f"• Анализом кризисной ситуации\n"
+            f"• Рекомендацией оптимального объёма закупки\n"
+            f"• Ценами и прогнозами\n\n"
+            f"Просто напишите ваш вопрос!"
+        )
+        suggestions = ["Найти ближайшую АЗС", "Кризисный прогноз", "Купить талон"]
+
+    else:
+        reply = (
+            f"Я обработал ваш запрос. По текущим данным:\n\n"
+            f"• Работают: {green_count} станций из {total_stations}\n"
+            f"• В кризисе: {crisis_count} станций\n\n"
+            f"Уточните запрос или воспользуйтесь быстрыми подсказками ниже."
+        )
+        suggestions = ["Найти АЗС", "Купить талон", "Прогноз кризиса"]
+
+    return reply, suggestions
+
+
+@app.post("/api/ai/chat")
+def ai_chat(body: AiChatRequest, db: Session = Depends(get_db)):
+    """AI assistant endpoint. Uses rule-based engine (no external API required)."""
+    reply, suggestions = _ai_rule_based_reply(body.message, db, body.context)
+    return {"reply": reply, "suggestions": suggestions}
+
+
+@app.get("/api/ai/crisis-forecast")
+def ai_crisis_forecast(db: Session = Depends(get_db)):
+    """Returns crisis severity forecast per region."""
+    from sqlalchemy import func as sqlfunc
+    regions = db.query(Station.region).distinct().all()
+    result = []
+    for (region,) in regions[:10]:
+        stations_in_region = db.query(Station).filter(Station.region == region).all()
+        if not stations_in_region:
+            continue
+        total_pct = 0.0
+        count = 0
+        for s in stations_in_region:
+            fs = db.query(FuelStatus).filter(FuelStatus.station_id == s.id).all()
+            if fs:
+                avg = sum(f.availability_pct for f in fs) / len(fs)
+                total_pct += avg
+                count += 1
+        avg_region = total_pct / max(count, 1)
+        severity = max(1, min(5, int((100 - avg_region) / 20) + 1))
+        trend = "worsening" if avg_region < 40 else "stable" if avg_region < 70 else "improving"
+        days = max(1, int((avg_region - 20) / 10)) if avg_region < 60 else 30
+        vol = 60 if severity >= 4 else 40 if severity >= 3 else 20
+        result.append({
+            "severity": severity,
+            "trend": trend,
+            "days_until_critical": days,
+            "recommended_volume_liters": vol,
+            "region": region,
+        })
+    return result
+
+
 FRONTEND_DIST = os.path.join(
     os.path.dirname(__file__), "..", "artifacts", "tma-frontend", "dist"
 )

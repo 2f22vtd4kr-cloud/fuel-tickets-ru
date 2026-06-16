@@ -317,3 +317,16 @@ export interface EmpirePrestigeResult {
 }
 export const prestigeEmpire = (userId: number) =>
   req<EmpirePrestigeResult>(`/empire/${userId}/prestige`, { method: "POST" });
+
+// AI Chat
+export const sendAiMessage = (
+  message: string,
+  context?: { crisis_stations?: number; user_id?: number; total_stations?: number },
+) =>
+  req<import("@/types").AiChatResponse>("/ai/chat", {
+    method: "POST",
+    body: JSON.stringify({ message, context: context ?? {} }),
+  });
+
+export const fetchCrisisForecast = () =>
+  req<import("@/types").CrisisForecast[]>("/ai/crisis-forecast");

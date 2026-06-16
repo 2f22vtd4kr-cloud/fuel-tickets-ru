@@ -164,7 +164,26 @@ export interface SubscriptionStatus {
   subscription_id?: number;
 }
 
-export type TabId = "map" | "analytics" | "catalog" | "vault" | "reserve" | "empire";
+export type TabId = "map" | "catalog" | "ai" | "games" | "news";
+
+export interface AiMessage {
+  role: "user" | "bot";
+  text: string;
+  ts: number;
+}
+
+export interface AiChatResponse {
+  reply: string;
+  suggestions?: string[];
+}
+
+export interface CrisisForecast {
+  severity: number;
+  trend: "worsening" | "stable" | "improving";
+  days_until_critical: number;
+  recommended_volume_liters: number;
+  region: string;
+}
 
 export const FUEL_LABELS: Record<string, string> = {
   "АИ-92": "АИ-92",

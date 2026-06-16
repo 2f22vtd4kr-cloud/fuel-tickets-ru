@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { impact } from "@/lib/haptic";
 import type { TabId } from "@/types";
-import { Map, BarChart2, ShoppingCart, Lock, Sparkles, Crown } from "lucide-react";
+import { Map, Ticket, Bot, Gamepad2, Newspaper } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 interface Props {
@@ -12,12 +12,11 @@ interface Props {
 }
 
 const TABS: { id: TabId; Icon: LucideIcon; label: string }[] = [
-  { id: "map",       Icon: Map,          label: "Карта"    },
-  { id: "analytics", Icon: BarChart2,    label: "Данные"   },
-  { id: "catalog",   Icon: ShoppingCart, label: "Каталог"  },
-  { id: "vault",     Icon: Lock,         label: "Сейф"     },
-  { id: "reserve",   Icon: Sparkles,     label: "Луна-парк"},
-  { id: "empire",    Icon: Crown,        label: "Империя"  },
+  { id: "map",     Icon: Map,       label: "Карта"       },
+  { id: "catalog", Icon: Ticket,    label: "Талоны"      },
+  { id: "ai",      Icon: Bot,       label: "ИИ-Советник" },
+  { id: "games",   Icon: Gamepad2,  label: "Игры"        },
+  { id: "news",    Icon: Newspaper, label: "Новости"     },
 ];
 
 export function BottomNav({ active, onChange, visible = true, badges = {} }: Props) {
@@ -32,17 +31,18 @@ export function BottomNav({ active, onChange, visible = true, badges = {} }: Pro
       transition={{ type: "spring", damping: 28, stiffness: 300 }}
       style={{
         position: "fixed",
-        bottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)",
+        bottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)",
         left: "12px",
         right: "12px",
-        background: "rgba(8,8,16,0.88)",
-        backdropFilter: "blur(24px) saturate(160%)",
-        WebkitBackdropFilter: "blur(24px) saturate(160%)",
-        border: "1px solid rgba(168,85,247,0.2)",
-        boxShadow: "0 8px 40px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(168,85,247,0.06)",
+        background: "rgba(8,8,16,0.90)",
+        backdropFilter: "blur(24px) saturate(180%)",
+        WebkitBackdropFilter: "blur(24px) saturate(180%)",
+        border: "1px solid rgba(255,255,255,0.10)",
+        borderTopColor: "rgba(255,255,255,0.18)",
+        boxShadow: "0 8px 40px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08)",
         display: "flex",
         alignItems: "stretch",
-        borderRadius: "99px",
+        borderRadius: "999px",
         height: "64px",
         zIndex: 10000,
         padding: "0 6px",
@@ -64,10 +64,10 @@ export function BottomNav({ active, onChange, visible = true, badges = {} }: Pro
               background: "none", border: "none",
               cursor: "pointer", position: "relative",
               WebkitTapHighlightColor: "transparent",
-              borderRadius: "99px",
+              borderRadius: "999px",
+              minWidth: 0,
             }}
           >
-            {/* Active top pill */}
             {isActive && (
               <motion.div
                 layoutId="nav-pill"
@@ -75,29 +75,27 @@ export function BottomNav({ active, onChange, visible = true, badges = {} }: Pro
                   position: "absolute",
                   top: "8px", left: "20%", right: "20%",
                   height: "2px",
-                  borderRadius: "99px",
-                  background: "linear-gradient(90deg, #a855f7, #db2777)",
-                  boxShadow: "0 0 10px #a855f799, 0 0 20px #a855f744",
+                  borderRadius: "999px",
+                  background: "linear-gradient(90deg, var(--accent-primary), var(--accent-secondary))",
+                  boxShadow: "0 0 10px rgba(167,139,250,0.6), 0 0 20px rgba(167,139,250,0.3)",
                 }}
                 transition={{ type: "spring", damping: 25, stiffness: 300 }}
               />
             )}
 
-            {/* Persistent pulse dot on Sparkles/Reserve tab */}
-            {tab.id === "reserve" && !isActive && (
+            {tab.id === "games" && !isActive && (
               <div style={{
                 position: "absolute",
                 top: "10px", right: "calc(50% - 16px)",
                 width: "6px", height: "6px",
                 borderRadius: "50%",
-                background: "#db2777",
-                boxShadow: "0 0 6px rgba(219,39,119,0.8)",
+                background: "var(--accent-secondary)",
+                boxShadow: "0 0 6px rgba(244,114,182,0.8)",
                 animation: "crisisPulse 1.8s ease-in-out infinite",
                 zIndex: 2,
               }} />
             )}
 
-            {/* Badge */}
             {badge > 0 && (
               <motion.div
                 initial={{ scale: 0 }}
@@ -105,14 +103,14 @@ export function BottomNav({ active, onChange, visible = true, badges = {} }: Pro
                 style={{
                   position: "absolute",
                   top: "8px", right: "calc(50% - 18px)",
-                  background: "linear-gradient(135deg,#ef4444,#dc2626)",
+                  background: "linear-gradient(135deg, var(--accent-danger), #dc2626)",
                   color: "#fff",
-                  borderRadius: "99px",
+                  borderRadius: "999px",
                   minWidth: "16px", height: "16px",
                   fontSize: "0.45rem", fontWeight: 800,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   padding: "0 3px",
-                  boxShadow: "0 0 8px rgba(239,68,68,0.65)",
+                  boxShadow: "0 0 8px rgba(251,113,133,0.65)",
                   border: "1.5px solid rgba(8,8,16,0.9)",
                   zIndex: 2,
                 }}
@@ -121,10 +119,9 @@ export function BottomNav({ active, onChange, visible = true, badges = {} }: Pro
               </motion.div>
             )}
 
-            {/* Icon with circle backdrop for active */}
             <motion.div
               animate={{
-                background: isActive ? "rgba(168,85,247,0.15)" : "transparent",
+                background: isActive ? "rgba(167,139,250,0.15)" : "transparent",
               }}
               transition={{ duration: 0.2 }}
               style={{
@@ -136,10 +133,10 @@ export function BottomNav({ active, onChange, visible = true, badges = {} }: Pro
             >
               <motion.div
                 animate={{
-                  color: isActive ? "#c084fc" : "#555f70",
+                  color: isActive ? "#c4b5fd" : "#4b5563",
                   scale: isActive ? 1.1 : 1,
                   filter: isActive
-                    ? "drop-shadow(0 0 8px rgba(168,85,247,0.6))"
+                    ? "drop-shadow(0 0 8px rgba(167,139,250,0.6))"
                     : "none",
                 }}
                 transition={{ type: "spring", damping: 16, stiffness: 260 }}
@@ -149,19 +146,19 @@ export function BottomNav({ active, onChange, visible = true, badges = {} }: Pro
               </motion.div>
             </motion.div>
 
-            {/* Label — active tab only */}
             <motion.span
               animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 3 }}
               transition={{ duration: 0.15 }}
               style={{
-                fontSize: "0.5rem",
-                letterSpacing: "0.06em",
+                fontSize: "0.48rem",
+                letterSpacing: "0.05em",
                 lineHeight: 1,
-                color: "#c084fc",
+                color: "#c4b5fd",
                 fontWeight: 700,
                 position: "absolute",
                 bottom: "7px",
                 pointerEvents: "none",
+                whiteSpace: "nowrap",
               }}
             >
               {tab.label}
