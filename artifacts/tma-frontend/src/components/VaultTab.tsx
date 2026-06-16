@@ -304,11 +304,6 @@ function PurchaseCard({ purchase }: { purchase: Purchase }) {
             {purchase.qr_hash.slice(0, 20)}…
           </span>
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            {purchase.price > 0 && (
-              <span style={{ color: "#a855f7", fontSize: "0.65rem", fontWeight: 600 }}>
-                {purchase.price.toLocaleString("ru")} {purchase.currency}
-              </span>
-            )}
             <span style={{ color: "#374151", fontSize: "0.62rem" }}>{date}</span>
           </div>
         </div>

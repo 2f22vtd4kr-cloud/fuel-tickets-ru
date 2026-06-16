@@ -64,15 +64,11 @@ export default function FuelTicket() {
           background: "#0b0b0f", border: "1px solid #1e1e2a",
           borderRadius: "12px", padding: "0.6rem 0.9rem",
           marginBottom: "1rem",
-          display: "flex", justifyContent: "space-between", alignItems: "center",
+          display: "flex", alignItems: "center",
         }}>
           <div style={{ textAlign: "left" }}>
             <div style={{ color: "#4b5563", fontSize: "0.55rem", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.1em", marginBottom: "2px" }}>ТОПЛИВО / ОБЪЁМ</div>
             <div style={{ color: "#e2e8f0", fontWeight: 700, fontSize: "0.85rem" }}>АИ-95 · 60 л</div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ color: "#4b5563", fontSize: "0.55rem", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.1em", marginBottom: "2px" }}>СТОИМОСТЬ</div>
-            <div style={{ color: "#a855f7", fontWeight: 700, fontSize: "0.85rem", fontFamily: "'JetBrains Mono',monospace" }}>3 120 ₽</div>
           </div>
         </div>
 
