@@ -413,6 +413,7 @@ export function GamesPage() {
   const [tileH, setTileH] = useState(TILE_H);
   const [offsetX, setOffsetX] = useState(0);
   const [offsetY, setOffsetY] = useState(0);
+  const boardCenteredRef = useRef(false);
   const [selectedTile, setSelectedTile] = useState<{ col: number; row: number } | null>(null);
   const [hoverTile, setHoverTile] = useState<{ col: number; row: number } | null>(null);
   const [selectedBuilding, setSelectedBuilding] = useState<PlacedBuilding | null>(null);
@@ -463,6 +464,14 @@ export function GamesPage() {
     canvas.height = h * dpr;
     canvas.style.width = `${w}px`;
     canvas.style.height = `${h}px`;
+    if (!boardCenteredRef.current && h > 0) {
+      boardCenteredRef.current = true;
+      const gridSize = 4;
+      const boardH = gridSize * TILE_H;
+      const targetCy = h * 0.42;
+      setOffsetY(targetCy - boardH / 2);
+      setOffsetX(0);
+    }
   }, []);
 
   useEffect(() => {

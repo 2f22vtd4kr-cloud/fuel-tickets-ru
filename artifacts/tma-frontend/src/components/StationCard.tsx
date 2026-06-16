@@ -13,6 +13,7 @@ import {
 } from "@/api/client";
 import { useUserStore } from "@/stores/useUserStore";
 import { useStationStore } from "@/stores/useStationStore";
+import { useVaultStore } from "@/stores/useVaultStore";
 import { useToast } from "@/components/Toast";
 import { StationLogo } from "@/components/StationLogo";
 import { impact, notify } from "@/lib/haptic";
@@ -78,6 +79,47 @@ const ZONE_LABEL: Record<string, { label: string; color: string }> = {
 };
 
 const DISPLAY_FUELS = ["АИ-92", "АИ-95", "ДТ"];
+
+function CopyTicketButton({ stationName }: { stationName: string }) {
+  const { purchases } = useVaultStore();
+  const { add: toast } = useToast();
+  const [copied, setCopied] = useState(false);
+
+  const active = purchases.find(p => p.station_name === stationName && p.status === "active");
+  if (!active) return null;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(active.qr_hash).then(() => {
+      setCopied(true);
+      toast("🎫 Код талона скопирован", "success");
+      setTimeout(() => setCopied(false), 2200);
+    }).catch(() => toast("Не удалось скопировать", "error"));
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        width: "100%", padding: "0.5rem 0.75rem",
+        background: copied ? "rgba(34,197,94,0.1)" : "rgba(168,85,247,0.08)",
+        border: `1px solid ${copied ? "#22c55e55" : "#a855f744"}`,
+        borderRadius: "10px", cursor: "pointer",
+        transition: "all 0.2s",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+        <span style={{ fontSize: "0.8rem" }}>{copied ? "✓" : "📋"}</span>
+        <span style={{ color: copied ? "#22c55e" : "#c084fc", fontSize: "0.75rem", fontWeight: 700 }}>
+          {copied ? "Скопировано!" : "Скопировать код талона"}
+        </span>
+      </div>
+      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.58rem", color: "#6b7280", maxWidth: "110px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {active.qr_hash.slice(0, 16)}…
+      </span>
+    </button>
+  );
+}
 
 export function StationCard({ station, onClose }: Props) {
   const { user } = useUserStore();
@@ -303,12 +345,9 @@ export function StationCard({ station, onClose }: Props) {
         </div>
       </div>
 
-      {/* Buy vouchers CTA — pinned at top for immediate visibility */}
-      <div style={{ padding: "0.55rem 1rem 0.4rem" }}>
-        <a
-          href="https://t.me/sev_fuel_ochered_bot?start=buy"
-          target="_blank"
-          rel="noopener noreferrer"
+      {/* Buy vouchers CTA + copy active ticket */}
+      <div style={{ padding: "0.55rem 1rem 0.4rem", display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+        <div
           style={{
             display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
             width: "100%", padding: "0.6rem",
@@ -316,12 +355,12 @@ export function StationCard({ station, onClose }: Props) {
             border: "1px solid rgba(168,85,247,0.35)",
             borderRadius: "12px",
             color: "#c084fc", fontSize: "0.85rem", fontWeight: 700,
-            textDecoration: "none",
             boxShadow: "0 0 16px rgba(168,85,247,0.14)",
           }}
         >
           🎫 Купить талоны
-        </a>
+        </div>
+        <CopyTicketButton stationName={station.name} />
       </div>
 
       {/* Summary row */}
@@ -523,8 +562,7 @@ export function StationCard({ station, onClose }: Props) {
       {/* Footer */}
       <div style={{ padding: "0.35rem 1rem 0.65rem", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem", borderTop: "1px solid #0f0f17" }}>
         <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 5px #22c55e" }} />
-        <span style={{ fontSize: "0.6rem", color: "#374151" }}>Данные синхронизированы ·</span>
-        <a href="https://t.me/sev_fuel_ochered_bot" target="_blank" style={{ color: "#a855f7", textDecoration: "none", fontSize: "0.6rem" }}>@sev_fuel_ochered_bot</a>
+        <span style={{ fontSize: "0.6rem", color: "#374151" }}>Данные синхронизированы</span>
       </div>
     </motion.div>
   );

@@ -65,14 +65,13 @@ function QRModal({ hash, onClose }: { hash: string; onClose: () => void }) {
       doc.setTextColor(100, 100, 130);
       doc.setFontSize(6);
       doc.text("Предъявите QR-код оператору АЗС", 10, 108);
-      doc.text("@fuel_tickets_ru_bot", 10, 114);
       doc.save(`талон_${hash.slice(0, 8)}.pdf`);
     } finally { setSaving(false); }
   };
 
   const handleShareTg = () => {
-    const text = `⛽ Мой топливный талон\n\nКод: ${hash}\nДата: ${now.toLocaleDateString("ru")}\n\nПолучен через @fuel_tickets_ru_bot`;
-    const tgUrl = `https://t.me/share/url?url=${encodeURIComponent("https://t.me/fuel_tickets_ru_bot")}&text=${encodeURIComponent(text)}`;
+    const text = `⛽ Мой топливный талон\n\nКод: ${hash}\nДата: ${now.toLocaleDateString("ru")}\n\n⛽ Топливный Узел — Матрица Снабжения`;
+    const tgUrl = `https://t.me/share/url?text=${encodeURIComponent(text)}`;
     window.open(tgUrl, "_blank");
   };
 
