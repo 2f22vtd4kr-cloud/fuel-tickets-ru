@@ -44,7 +44,7 @@ from tma_backend.schemas import (
 )
 
 INTERNAL_API_SECRET = os.getenv("INTERNAL_API_SECRET", "tma_internal_dev_2026")
-from tma_backend.seed_regions import DAILY_LIMITS, FUEL_PRICES_RUB, XP_TIERS
+from tma_backend.seed_regions import DAILY_LIMITS, FUEL_PRICES_RUB, REGIONAL_PRICES, XP_TIERS
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -4191,6 +4191,25 @@ def ai_crisis_forecast(db: Session = Depends(get_db)):
             "region": region,
         })
     return result
+
+
+@app.get("/api/prices/regional")
+async def get_regional_prices():
+    """Return per-region fuel prices from card-oil.ru (June 2026)."""
+    default = {k: float(v) for k, v in FUEL_PRICES_RUB.items()}
+    result = {}
+    for region, prices in REGIONAL_PRICES.items():
+        entry = {**default}
+        entry.update(prices)
+        # Derive premium grades relative to АИ-92/АИ-95/ДТ
+        ai92 = prices.get("АИ-92", default["АИ-92"])
+        ai95 = prices.get("АИ-95", default["АИ-95"])
+        dt   = prices.get("ДТ",    default["ДТ"])
+        entry["АИ-95+"] = round(ai95 * 1.07, 2)
+        entry["АИ-100"] = round(ai95 * 1.24, 2)
+        entry["ДТ+"]    = round(dt   * 1.06, 2)
+        result[region] = entry
+    return {"prices": result, "source": "card-oil.ru", "updated": "2026-06-17"}
 
 
 FRONTEND_DIST = os.path.join(

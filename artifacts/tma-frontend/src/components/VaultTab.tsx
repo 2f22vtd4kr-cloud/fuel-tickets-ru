@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useVaultStore } from "@/stores/useVaultStore";
 import { useUserStore } from "@/stores/useUserStore";
 import { useFavoritesStore } from "@/stores/useFavoritesStore";
+import { useStationStore } from "@/stores/useStationStore";
 import { fetchReferral, fetchAchievements, fetchUserSubscriptions, unsubscribeFromStation, fetchCreditsBalance, fetchUserNotes, deleteStationNote } from "@/api/client";
 import type { Achievement } from "@/api/client";
 import type { Purchase, ReferralInfo, Subscription, CreditTx, TabId } from "@/types";
@@ -509,7 +510,13 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
                   <p style={{ margin: 0, fontFamily: "'JetBrains Mono',monospace", fontSize: "1rem", fontWeight: 700, color: "#22c55e" }}>
                     {purchases.length}
                   </p>
-                  <p style={{ margin: 0, color: "#374151", fontSize: "0.58rem" }}>всего покупок</p>
+                  <p style={{ margin: 0, color: "#374151", fontSize: "0.58rem" }}>покупок</p>
+                </div>
+                <div style={{ flex: 1, background: "#0b0b0f", borderRadius: "8px", padding: "0.4rem", textAlign: "center" }}>
+                  <p style={{ margin: 0, fontFamily: "'JetBrains Mono',monospace", fontSize: "1rem", fontWeight: 700, color: "#f59e0b" }}>
+                    {purchases.reduce((s, p) => s + (p.volume ?? 0), 0)}л
+                  </p>
+                  <p style={{ margin: 0, color: "#374151", fontSize: "0.58rem" }}>топлива</p>
                 </div>
                 {user.neurocredits > 0 && (
                   <div style={{ flex: 1, background: "#0b0b0f", borderRadius: "8px", padding: "0.4rem", textAlign: "center" }}>
@@ -556,6 +563,38 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
         );
       })()}
 
+      {/* Quick action shortcuts */}
+      {!loading && (
+        <div style={{ margin: "0 1rem 0.75rem", display: "flex", gap: "0.4rem" }}>
+          {[
+            { icon: "🎫", label: "Каталог", tab: "catalog" as const, color: "#a855f7" },
+            { icon: "🎮", label: "Игры", tab: "games" as const, color: "#db2777" },
+            { icon: "🗺️", label: "Карта", tab: "map" as const, color: "#22c55e" },
+            { icon: "📰", label: "Новости", tab: "news" as const, color: "#f59e0b" },
+          ].map(({ icon, label, tab, color }) => (
+            <button
+              key={tab}
+              onClick={() => onNavigate?.(tab)}
+              style={{
+                flex: 1,
+                background: `${color}08`,
+                border: `1px solid ${color}22`,
+                borderRadius: "10px",
+                padding: "0.4rem 0.3rem",
+                color, cursor: "pointer",
+                display: "flex", flexDirection: "column", alignItems: "center", gap: "3px",
+                transition: "background 0.15s, border-color 0.15s",
+              }}
+              onMouseEnter={(e) => { const el = e.currentTarget; el.style.background = `${color}18`; el.style.borderColor = `${color}44`; }}
+              onMouseLeave={(e) => { const el = e.currentTarget; el.style.background = `${color}08`; el.style.borderColor = `${color}22`; }}
+            >
+              <span style={{ fontSize: "1rem" }}>{icon}</span>
+              <span style={{ fontSize: "0.52rem", fontFamily: "'JetBrains Mono',monospace", color, opacity: 0.8 }}>{label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {loading && (
         <div style={{ padding: "0 1rem 1rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
           {[1, 2, 3].map((i) => (
@@ -563,6 +602,35 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
           ))}
         </div>
       )}
+
+      {/* Spending analytics summary */}
+      {purchases.length > 0 && (() => {
+        const totalVolume = purchases.reduce((s, p) => s + (p.volume ?? 0), 0);
+        const totalSpent = purchases.reduce((s, p) => s + (p.price ?? 0), 0);
+        const fuelCounts: Record<string, number> = {};
+        for (const p of purchases) { fuelCounts[p.fuel_type] = (fuelCounts[p.fuel_type] ?? 0) + (p.volume ?? 0); }
+        const topFuel = Object.entries(fuelCounts).sort((a, b) => b[1] - a[1])[0];
+        const FUEL_COLORS: Record<string, string> = { "АИ-92": "#a855f7", "АИ-95": "#db2777", "АИ-95+": "#8b5cf6", "ДТ": "#f59e0b", "Газ": "#14b8a6" };
+        return (
+          <div style={{ margin: "0 1rem 0.75rem", background: "linear-gradient(135deg,#0d0d18,#110a18)", border: "1px solid #a855f722", borderRadius: "14px", padding: "0.75rem", position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#a855f7,#db2777,transparent)" }} />
+            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.4rem", letterSpacing: "0.14em", marginBottom: "0.45rem" }}>СТАТИСТИКА_РАСХОДА · ВСЕГО</div>
+            <div style={{ display: "flex", gap: "0.4rem" }}>
+              {[
+                { label: "Топлива", value: `${totalVolume}л`, color: "#22c55e" },
+                { label: "Потрачено", value: `${totalSpent.toLocaleString("ru")}`, color: "#a855f7", suffix: " ₽" },
+                { label: "Покупок", value: purchases.length, color: "#3b82f6" },
+                topFuel ? { label: "Любимое", value: topFuel[0], color: FUEL_COLORS[topFuel[0]] ?? "#6b7280" } : null,
+              ].filter(Boolean).map((item) => item && (
+                <div key={item.label} style={{ flex: 1, textAlign: "center", background: "#0b0b0f", borderRadius: "8px", padding: "0.4rem 0.2rem" }}>
+                  <div style={{ fontFamily: "'JetBrains Mono',monospace", color: item.color, fontSize: "0.85rem", fontWeight: 800, lineHeight: 1 }}>{item.value}{item.suffix ?? ""}</div>
+                  <div style={{ color: "#374151", fontSize: "0.52rem", marginTop: "2px" }}>{item.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Active vouchers */}
       {active.length > 0 && (
@@ -774,27 +842,42 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
           </p>
           <div style={{ display: "flex", gap: "0.4rem", overflowX: "auto", paddingBottom: "0.25rem" }}>
             {favoriteStations.map((id) => {
+              const st = useStationStore.getState().stations.find(s => s.id === id);
+              const avg = st?.fuel_statuses.length
+                ? Math.round(st.fuel_statuses.reduce((a, f) => a + f.availability_pct, 0) / st.fuel_statuses.length)
+                : null;
+              const dotColor = avg === null ? "#6b7280" : avg >= 60 ? "#22c55e" : avg >= 25 ? "#eab308" : "#ef4444";
               return (
                 <motion.div
                   key={id}
                   whileTap={{ scale: 0.95 }}
                   style={{
-                    flexShrink: 0, minWidth: "100px", maxWidth: "125px",
+                    flexShrink: 0, minWidth: "110px", maxWidth: "140px",
                     background: "linear-gradient(160deg,#0a0a14,#14100a)",
-                    border: "1px solid #f59e0b30",
+                    border: `1px solid ${dotColor}28`,
                     borderRadius: "12px", padding: "0.5rem 0.6rem", cursor: "pointer",
                     position: "relative", overflow: "hidden",
                   }}
                 >
-                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#f59e0b,transparent)" }} />
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: "0.65rem" }}>⭐</span>
+                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: `linear-gradient(90deg,transparent,${dotColor},transparent)` }} />
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.2rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                      <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: dotColor, boxShadow: `0 0 4px ${dotColor}`, display: "inline-block" }} />
+                      {avg !== null && (
+                        <span style={{ fontFamily: "'JetBrains Mono',monospace", color: dotColor, fontSize: "0.6rem", fontWeight: 700 }}>{avg}%</span>
+                      )}
+                    </div>
                     <button
                       onClick={() => toggleStationFavorite(id)}
                       style={{ background: "none", border: "none", cursor: "pointer", color: "#374151", fontSize: "0.55rem", padding: 0 }}
                     >✕</button>
                   </div>
-                  <p style={{ margin: "0.2rem 0 0", color: "#9ca3af", fontSize: "0.62rem", fontFamily: "'JetBrains Mono',monospace" }}>АЗС #{id}</p>
+                  <p style={{ margin: "0.1rem 0 0", color: "#e2e8f0", fontSize: "0.65rem", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {st ? st.name : `АЗС #${id}`}
+                  </p>
+                  {st?.network && (
+                    <p style={{ margin: "0.1rem 0 0", color: "#374151", fontSize: "0.55rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{st.network}</p>
+                  )}
                 </motion.div>
               );
             })}

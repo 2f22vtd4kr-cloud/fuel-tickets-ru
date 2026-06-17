@@ -15,11 +15,11 @@ import type { GasStation, LimitsMap } from "@/types";
 import { FUEL_LABELS } from "@/types";
 
 const FUEL_PRICES: Record<string, number> = {
-  "АИ-92": 47, "АИ-95": 52, "АИ-95+": 56,
-  "АИ-100": 68, "ДТ": 60, "ДТ+": 65, "Газ": 28,
+  "АИ-92": 65, "АИ-95": 71, "АИ-95+": 76,
+  "АИ-100": 88, "ДТ": 79, "ДТ+": 84, "Газ": 35,
 };
 const VOLUMES = [20, 40, 60];
-const STAR_RUB_RATE = 1.84;
+const STAR_RUB_RATE = 2.5; // ~$0.013 per Star × ~90 RUB/USD; adjusted to match real fuel prices
 const PAGE_SIZE = 25;
 const MAX_INLINE = 150;
 
@@ -359,6 +359,7 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
   const [recentlyViewed, setRecentlyViewed] = useState<number[]>(() => {
     try { return JSON.parse(localStorage.getItem(RECENTLY_VIEWED_KEY) || "[]"); } catch { return []; }
   });
+  const [dealFuel, setDealFuel] = useState<"АИ-92" | "АИ-95" | "ДТ">("АИ-92");
 
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -735,6 +736,81 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
         </div>
       )}
 
+      {/* ── Network summary bar ── */}
+      {!selectedStation && !debouncedQuery && stations.length > 0 && (() => {
+        const nets: Record<string, { cnt: number; sum: number }> = {};
+        stations.forEach(s => {
+          const n = s.network || "Другие";
+          const avg = s.fuel_statuses.length ? s.fuel_statuses.reduce((a, b) => a + b.availability_pct, 0) / s.fuel_statuses.length : 0;
+          if (!nets[n]) nets[n] = { cnt: 0, sum: 0 };
+          nets[n].cnt++;
+          nets[n].sum += avg;
+        });
+        const top = Object.entries(nets).sort((a, b) => b[1].cnt - a[1].cnt).slice(0, 5);
+        const green = stations.filter(s => (s.fuel_statuses.reduce((a, b) => a + b.availability_pct, 0) / Math.max(s.fuel_statuses.length, 1)) >= 60).length;
+        return (
+          <div style={{ padding: "0 1rem 0.5rem", display: "flex", gap: "0.3rem", alignItems: "center", overflowX: "auto" }}>
+            <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22222f", fontSize: "0.55rem", flexShrink: 0 }}>СЕТИ:</span>
+            {top.map(([net, { cnt, sum }]) => {
+              const avgAvail = Math.round(sum / cnt);
+              const dotColor = avgAvail >= 60 ? "#22c55e" : avgAvail >= 25 ? "#eab308" : "#ef4444";
+              return (
+                <button key={net} onClick={() => { impact("light"); setSearchQuery(net); }}
+                  style={{
+                    flexShrink: 0, padding: "2px 8px",
+                    background: "rgba(255,255,255,0.03)", border: "1px solid #1a1a24",
+                    borderRadius: "6px", color: "#4b5563", fontSize: "0.58rem", cursor: "pointer",
+                    fontFamily: "'JetBrains Mono',monospace",
+                    display: "flex", alignItems: "center", gap: "4px",
+                  }}
+                >
+                  <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
+                  {net} <span style={{ color: "#374151" }}>{cnt}</span>
+                </button>
+              );
+            })}
+            <div style={{ marginLeft: "auto", flexShrink: 0, display: "flex", alignItems: "center", gap: "4px" }}>
+              <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 4px #22c55e" }} />
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e", fontSize: "0.58rem", fontWeight: 700 }}>{green}</span>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Crisis heat bar ── */}
+      {!selectedStation && stations.length > 0 && (() => {
+        const crisisCount = stations.filter(s => (s.fuel_statuses.reduce((a, b) => a + b.availability_pct, 0) / Math.max(s.fuel_statuses.length, 1)) < 25).length;
+        const lowCount    = stations.filter(s => { const a = s.fuel_statuses.reduce((acc, b) => acc + b.availability_pct, 0) / Math.max(s.fuel_statuses.length, 1); return a >= 25 && a < 60; }).length;
+        const goodCount   = stations.length - crisisCount - lowCount;
+        const crisisP = (crisisCount / stations.length) * 100;
+        const lowP    = (lowCount    / stations.length) * 100;
+        const goodP   = (goodCount   / stations.length) * 100;
+        const heatLevel = crisisP >= 30 ? "КРИТИЧНО" : crisisP >= 15 ? "НАПРЯЖЁННО" : "НОРМА";
+        const heatColor = crisisP >= 30 ? "#ef4444" : crisisP >= 15 ? "#eab308" : "#22c55e";
+        return (
+          <div style={{ padding: "0 1rem 0.4rem" }}>
+            <div style={{ background: "#0b0b10", border: "1px solid #1a1a24", borderRadius: "9px", padding: "0.4rem 0.6rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.25rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                  <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: heatColor, boxShadow: `0 0 5px ${heatColor}` }} />
+                  <span style={{ fontFamily: "'JetBrains Mono',monospace", color: heatColor, fontSize: "0.52rem", fontWeight: 700, letterSpacing: "0.06em" }}>{heatLevel}</span>
+                </div>
+                <div style={{ display: "flex", gap: "0.55rem" }}>
+                  <span style={{ color: "#22c55e88", fontSize: "0.52rem" }}>🟢 {goodCount}</span>
+                  <span style={{ color: "#eab30888", fontSize: "0.52rem" }}>🟡 {lowCount}</span>
+                  <span style={{ color: "#ef444488", fontSize: "0.52rem" }}>🔴 {crisisCount}</span>
+                </div>
+              </div>
+              <div style={{ height: "4px", borderRadius: "2px", overflow: "hidden", background: "#050507", display: "flex", gap: "1px" }}>
+                {goodP   > 0 && <div style={{ width: `${goodP}%`,   background: "#22c55e", transition: "width 0.8s" }} />}
+                {lowP    > 0 && <div style={{ width: `${lowP}%`,    background: "#eab308", transition: "width 0.8s" }} />}
+                {crisisP > 0 && <div style={{ width: `${crisisP}%`, background: "#ef4444", transition: "width 0.8s", animation: crisisP >= 30 ? "tmaPulse 2s infinite" : "none" }} />}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── Quick fuel-type chips ── */}
       {!selectedStation && !matchedFuelType && (
         <div style={{ padding: "0 1rem 0.5rem", display: "flex", gap: "0.35rem", overflowX: "auto", paddingBottom: "0.5rem" }}>
@@ -784,6 +860,56 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
           ))}
         </div>
       )}
+
+      {/* ── Best deals widget ── top-3 cheapest+available stations */}
+      {!selectedStation && !searchQuery && stations.length > 0 && (() => {
+        const DEAL_FUELS = ["АИ-92", "АИ-95", "ДТ"] as const;
+        type DealFuel = typeof DEAL_FUELS[number];
+        const DEAL_COLORS: Record<DealFuel, string> = { "АИ-92": "#a855f7", "АИ-95": "#db2777", "ДТ": "#f59e0b" };
+        const deals = stations
+          .filter((s) => s.fuel_statuses.some((f) => f.fuel_type === dealFuel && f.availability_pct > 0))
+          .map((s) => {
+            const p = getPrice(s.region, dealFuel);
+            const price = p?.effective ?? FUEL_PRICES[dealFuel] ?? 70;
+            const avail = s.fuel_statuses.find((f) => f.fuel_type === dealFuel)?.availability_pct ?? 0;
+            return { s, price, avail };
+          })
+          .sort((a, b) => a.price - b.price || b.avail - a.avail)
+          .slice(0, 3);
+        if (!deals.length) return null;
+        const color = DEAL_COLORS[dealFuel];
+        return (
+          <div style={{ padding: "0 1rem 0.5rem" }}>
+            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.4rem", letterSpacing: "0.14em", marginBottom: "0.35rem" }}>ЛУЧШИЕ_ПРЕДЛОЖЕНИЯ · СЕЙЧАС</div>
+            <div style={{ background: "linear-gradient(135deg,#0d0d18,#0f0c1a)", border: `1px solid ${color}22`, borderRadius: "12px", padding: "0.65rem 0.75rem", position: "relative", overflow: "hidden" }}>
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: `linear-gradient(90deg,transparent,${color},transparent)` }} />
+              <div style={{ display: "flex", gap: "0.3rem", marginBottom: "0.5rem" }}>
+                {DEAL_FUELS.map((f) => (
+                  <button key={f} onClick={() => setDealFuel(f)} style={{ padding: "0.15rem 0.45rem", background: dealFuel === f ? `${DEAL_COLORS[f]}20` : "#0b0b10", border: `1px solid ${dealFuel === f ? DEAL_COLORS[f] : "#1e1e2a"}`, borderRadius: "6px", color: dealFuel === f ? DEAL_COLORS[f] : "#374151", fontSize: "0.62rem", fontWeight: dealFuel === f ? 700 : 400, cursor: "pointer" }}>{f}</button>
+                ))}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.28rem" }}>
+                {deals.map(({ s, price, avail }, i) => {
+                  const medals = ["🥇", "🥈", "🥉"];
+                  return (
+                    <div key={s.id} onClick={() => { setSelectedStation(s); impact("light"); }} style={{ display: "flex", alignItems: "center", gap: "0.4rem", cursor: "pointer", padding: "0.22rem 0.35rem", borderRadius: "7px", background: i === 0 ? `${color}08` : "transparent" }}>
+                      <span style={{ fontSize: "0.75rem", flexShrink: 0 }}>{medals[i] ?? "·"}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ color: "#e2e8f0", fontSize: "0.65rem", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</div>
+                        <div style={{ color: "#374151", fontSize: "0.55rem" }}>{s.network || "АЗС"}</div>
+                      </div>
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <div style={{ fontFamily: "'JetBrains Mono',monospace", color, fontSize: "0.72rem", fontWeight: 700 }}>{price.toFixed(1)}₽</div>
+                        <div style={{ color: avail >= 60 ? "#22c55e" : "#eab308", fontSize: "0.55rem" }}>{avail}%</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Sort row ── */}
       <div style={{ padding: "0 1rem 0.5rem", display: "flex", gap: "0.35rem", alignItems: "center", overflowX: "auto" }}>

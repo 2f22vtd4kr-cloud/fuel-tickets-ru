@@ -582,6 +582,43 @@ export function AiTab({ onNavigate }: Props) {
         </div>
       </div>
 
+      {/* Live context bar */}
+      {stations.length > 0 && (() => {
+        const greenCount = stations.filter(s => {
+          const avg = s.fuel_statuses.length ? s.fuel_statuses.reduce((a, b) => a + b.availability_pct, 0) / s.fuel_statuses.length : 0;
+          return avg >= 60;
+        }).length;
+        const yellowCount = stations.filter(s => {
+          const avg = s.fuel_statuses.length ? s.fuel_statuses.reduce((a, b) => a + b.availability_pct, 0) / s.fuel_statuses.length : 0;
+          return avg >= 25 && avg < 60;
+        }).length;
+        return (
+          <div style={{
+            padding: "5px 12px 6px",
+            borderBottom: "1px solid rgba(255,255,255,0.04)",
+            display: "flex", gap: "0.5rem", alignItems: "center",
+            overflowX: "auto", flexShrink: 0,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
+              <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 4px #22c55e" }} />
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e", fontSize: "0.6rem", fontWeight: 700 }}>{greenCount}</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
+              <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#eab308", boxShadow: "0 0 4px #eab308" }} />
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#eab308", fontSize: "0.6rem", fontWeight: 700 }}>{yellowCount}</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
+              <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#ef4444", boxShadow: "0 0 4px #ef4444" }} />
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#ef4444", fontSize: "0.6rem", fontWeight: 700 }}>{crisisCount}</span>
+            </div>
+            <div style={{ width: "1px", height: "12px", background: "#22222f", flexShrink: 0, marginLeft: "2px" }} />
+            <span style={{ color: "#374151", fontSize: "0.55rem", flexShrink: 0, fontFamily: "'JetBrains Mono',monospace" }}>
+              {stations.length} АЗС · {crisisPct}% кризис
+            </span>
+          </div>
+        );
+      })()}
+
       {/* Messages */}
       <div style={{
         flex: 1, overflowY: "auto", overflowX: "hidden",

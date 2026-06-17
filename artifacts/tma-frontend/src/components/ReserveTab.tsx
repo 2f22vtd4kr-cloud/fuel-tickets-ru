@@ -918,8 +918,22 @@ function PriceGuessGame() {
               <motion.div key="result" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} style={{ textAlign: "center" }}>
                 <div style={{ fontSize: "2rem", marginBottom: "0.4rem" }}>{score >= 8 ? "🏆" : score >= 5 ? "🥈" : "⛽"}</div>
                 <p style={{ margin: "0 0 0.2rem", color: "#e2e8f0", fontWeight: 800, fontSize: "1.1rem" }}>{score} очков</p>
-                <p style={{ margin: "0 0 0.15rem", color: "#6b7280", fontSize: "0.65rem" }}>Сыграно раундов: {totalPlayed}</p>
-                {bestStreak > 0 && <p style={{ margin: "0 0 0.6rem", color: "#f59e0b", fontSize: "0.65rem" }}>🔥 Лучшая серия: {bestStreak}</p>}
+                <div style={{ display: "flex", justifyContent: "center", gap: "1rem", margin: "0 0 0.55rem" }}>
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#6b7280", fontSize: "0.48rem", marginBottom: "1px" }}>РАУНДЫ</div>
+                    <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#e2e8f0", fontSize: "0.85rem", fontWeight: 700 }}>{totalPlayed}</div>
+                  </div>
+                  <div style={{ width: "1px", background: "#1e1e2a" }} />
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#6b7280", fontSize: "0.48rem", marginBottom: "1px" }}>ТОЧНОСТЬ</div>
+                    <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e", fontSize: "0.85rem", fontWeight: 700 }}>{totalPlayed > 0 ? Math.round((score / totalPlayed) * 100) : 0}%</div>
+                  </div>
+                  <div style={{ width: "1px", background: "#1e1e2a" }} />
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#6b7280", fontSize: "0.48rem", marginBottom: "1px" }}>СЕРИЯ</div>
+                    <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#f59e0b", fontSize: "0.85rem", fontWeight: 700 }}>🔥{bestStreak}</div>
+                  </div>
+                </div>
                 <button
                   onClick={startGame}
                   style={{ background: "linear-gradient(135deg,#f59e0b,#d97706)", color: "#000", border: "none", borderRadius: "10px", padding: "0.5rem 1.5rem", fontSize: "0.78rem", fontWeight: 800, cursor: "pointer" }}
@@ -1112,6 +1126,7 @@ function DailyCheckin() {
     : null;
 
   const streakDots = Array.from({ length: 7 }, (_, i) => i < streak);
+  const streakBonus = streak >= 7 ? 100 : streak >= 5 ? 75 : streak >= 3 ? 50 : streak >= 2 ? 25 : 0;
 
   return (
     <div style={{ padding: "0 1rem 1rem" }}>
@@ -1155,7 +1170,9 @@ function DailyCheckin() {
                 ? countdown
                   ? <span>Следующий через <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#a855f7", fontWeight: 700 }}>{countdown}</span></span>
                   : `Получен${nextTime ? ` · следующий в ${nextTime}` : " · до завтра"}`
-                : "Каждые 24 часа. Серия дней = бонусные XP"}
+                : streak < 7
+                  ? <span>Серия <strong style={{ color: "#f59e0b" }}>{streak}</strong> дн · следующий порог <strong style={{ color: "#fde047" }}>{streak < 2 ? 2 : streak < 3 ? 3 : streak < 5 ? 5 : 7} дн</strong> = +{streak < 2 ? 25 : streak < 3 ? 50 : streak < 5 ? 75 : 100}%&nbsp;XP</span>
+                  : "Серия 7+ дней — максимальный бонус +100% XP активен!"}
             </p>
             {/* Streak dots */}
             <div style={{ display: "flex", gap: "5px", alignItems: "center" }}>
@@ -1178,6 +1195,11 @@ function DailyCheckin() {
               {streak > 0 && (
                 <span style={{ color: "#f59e0b", fontSize: "0.62rem", marginLeft: "4px", fontWeight: 700, fontFamily: "'JetBrains Mono',monospace" }}>
                   {streak >= 7 ? "🔥 MAX!" : `🔥 ×${streak}`}
+                </span>
+              )}
+              {streakBonus > 0 && (
+                <span style={{ marginLeft: "4px", background: "#f59e0b18", border: "1px solid #f59e0b44", borderRadius: "5px", color: "#fde047", fontSize: "0.5rem", fontWeight: 700, padding: "1px 5px", fontFamily: "'JetBrains Mono',monospace" }}>
+                  +{streakBonus}%&nbsp;XP
                 </span>
               )}
             </div>

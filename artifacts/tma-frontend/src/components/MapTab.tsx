@@ -16,21 +16,42 @@ import { StationCard } from "@/components/StationCard";
 // bundled asset imports.  No CDN URLs needed here — this file only uses
 // L.divIcon() for custom station markers, so no further setup is required.
 
-function createStationIcon(status: string, starred = false) {
+// Brand accent colors for map markers
+const BRAND_ACCENT: Record<string, string> = {
+  "лукойл": "#dc2626", "роснефть": "#1d4ed8", "газпромнефть": "#4338ca",
+  "газпром": "#1e40af", "татнефть": "#92400e", "сургутнефтегаз": "#6d28d9",
+  "опти": "#0f766e", "тебойл": "#0369a1", "teboil": "#0369a1",
+  "башнефть": "#065f46", "таиф-нк": "#7c2d12", "кнп": "#5b21b6",
+  "птк": "#0c4a6e", "ртк": "#831843", "топлайн": "#4c1d95",
+  "грифон": "#ea580c", "атан": "#a855f7", "тэс": "#db2777",
+};
+
+function getBrandAccent(network = ""): string | null {
+  const n = network.toLowerCase();
+  for (const [key, color] of Object.entries(BRAND_ACCENT)) {
+    if (n.includes(key)) return color;
+  }
+  return null;
+}
+
+function createStationIcon(status: string, starred = false, network = "") {
   const color = STATUS_COLORS[status] ?? "#9ca3af";
+  const brandColor = getBrandAccent(network);
   const pulse = status === "red" ? `<div style="position:absolute;inset:-4px;border-radius:50%;border:1.5px solid ${color};opacity:0.4;animation:mrkPulse 1.8s ease-in-out infinite;"></div>` : "";
   const starBadge = starred ? `<div style="position:absolute;top:-7px;right:-7px;font-size:9px;line-height:1;z-index:2;filter:drop-shadow(0 0 3px #f59e0b);">⭐</div>` : "";
   const size = starred ? 20 : 16;
+  const outerRing = brandColor ? `<div style="position:absolute;inset:-3px;border-radius:50%;border:1.5px solid ${brandColor}99;pointer-events:none;z-index:0;"></div>` : "";
   return L.divIcon({
     html: `<style>@keyframes mrkPulse{0%,100%{transform:scale(1);opacity:0.4}50%{transform:scale(1.55);opacity:0}}</style>
     <div style="position:relative;width:${size}px;height:${size}px;">
       ${pulse}
+      ${outerRing}
       ${starBadge}
       <div style="
         width:${size}px;height:${size}px;border-radius:50%;
         background:radial-gradient(circle at 35% 30%, ${color}ff, ${color}99);
-        border:${starred ? "2px solid #f59e0b" : "1.5px solid rgba(255,255,255,0.35)"};
-        box-shadow:0 0 12px ${color}99,0 0 4px ${color},${starred ? "0 0 8px #f59e0b66," : ""}0 2px 4px #00000066;
+        border:${starred ? "2px solid #f59e0b" : brandColor ? `1.5px solid ${brandColor}cc` : "1.5px solid rgba(255,255,255,0.35)"};
+        box-shadow:0 0 12px ${color}99,0 0 4px ${color},${starred ? "0 0 8px #f59e0b66," : ""}${brandColor ? `0 0 6px ${brandColor}55,` : ""}0 2px 4px #00000066;
         position:relative;z-index:1;
       "></div>
     </div>`,
@@ -132,11 +153,16 @@ function PopupContent({ station }: { station: GasStation }) {
       <div style={{ height: "1px", background: `linear-gradient(90deg,transparent,${color},transparent)`, marginBottom: "0.45rem" }} />
       <strong style={{ display: "block", marginBottom: "0.15rem", color: "#f1f5f9", fontSize: "0.82rem" }}>{station.name}</strong>
       <span style={{ color: "#374151", fontSize: "0.65rem" }}>📍 {station.address.slice(0, 32)}</span>
-      {/* Availability */}
-      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.4rem", marginBottom: "0.35rem" }}>
+      {/* Network badge + availability */}
+      {station.network && (
+        <div style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem", marginTop: "0.3rem", marginBottom: "0.25rem", background: `${getBrandAccent(station.network) ?? "#4b5563"}18`, border: `1px solid ${getBrandAccent(station.network) ?? "#4b5563"}44`, borderRadius: "6px", padding: "0.05rem 0.4rem" }}>
+          <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: getBrandAccent(station.network) ?? "#4b5563", flexShrink: 0 }} />
+          <span style={{ color: getBrandAccent(station.network) ?? "#6b7280", fontSize: "0.62rem", fontWeight: 600 }}>{station.network}</span>
+        </div>
+      )}
+      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.25rem", marginBottom: "0.35rem" }}>
         <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "1.1rem", fontWeight: 800, color, lineHeight: 1 }}>{avg}%</span>
         <span style={{ color: "#374151", fontSize: "0.6rem" }}>🚗 {station.queue_cars} авт.</span>
-        {station.network && <span style={{ color: "#4b5563", fontSize: "0.58rem" }}>{station.network}</span>}
       </div>
       {/* Prices */}
       <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap" }}>
@@ -297,7 +323,15 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
   };
 
   const uniqueRegions = Array.from(new Set(stations.map((s) => s.region))).sort();
-  const uniqueNetworks = Array.from(new Set(stations.map((s) => s.network))).sort();
+  const networkCounts = stations.reduce<Record<string, number>>((acc, s) => {
+    acc[s.network] = (acc[s.network] || 0) + 1;
+    return acc;
+  }, {});
+  const uniqueNetworks = Array.from(new Set(stations.map((s) => s.network)))
+    .sort((a, b) => (networkCounts[b] || 0) - (networkCounts[a] || 0));
+  const TOP_BRAND_NAMES = ["Лукойл", "Газпромнефть", "Роснефть", "Газпром", "Татнефть", "Сургутнефтегаз", "ОПТИ", "Тебойл"];
+  const topNetworks = TOP_BRAND_NAMES.filter((b) => networkCounts[b] > 0);
+  const activeFilterCount = [filterStatus !== "all", !!filterFuel, !!filterNetwork, !!filterRegion, !!filterZone].filter(Boolean).length;
 
   const selectedStation = selectedStationId
     ? stations.find((s) => s.id === selectedStationId)
@@ -352,17 +386,22 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
           }}
         >
           ⬡ Фильтры{" "}
-          {(filterStatus !== "all" || filterFuel || filterNetwork || filterRegion || filterZone) && (
+          {activeFilterCount > 0 && (
             <span
               style={{
                 background: "#a855f7",
-                borderRadius: "50%",
-                width: "6px",
-                height: "6px",
-                display: "inline-block",
+                borderRadius: "8px",
+                color: "#fff",
+                fontSize: "0.62rem",
+                fontWeight: 800,
+                padding: "0.05rem 0.38rem",
+                lineHeight: "1.5",
+                minWidth: "1.1rem",
+                textAlign: "center",
                 boxShadow: "0 0 6px #a855f7",
+                fontFamily: "'JetBrains Mono',monospace",
               }}
-            />
+            >{activeFilterCount}</span>
           )}
         </button>
 
@@ -475,6 +514,49 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
         >
           🌡
         </button>
+
+        {/* Available fuel only toggle */}
+        {(() => {
+          const withFuel = stations.filter((s) => s.fuel_statuses.some((f) => f.availability_pct > 0)).length;
+          const isActive = filterStatus === "green";
+          return (
+            <button
+              onClick={() => setFilter("filterStatus", isActive ? "all" : "green")}
+              title={isActive ? "Показать все АЗС" : "Только с топливом"}
+              style={{
+                background: isActive ? "rgba(34,197,94,0.18)" : "rgba(20,20,28,0.92)",
+                border: `1px solid ${isActive ? "#22c55e55" : "#22222f"}`,
+                borderRadius: "10px",
+                color: isActive ? "#4ade80" : "#6b7280",
+                padding: "0.4rem 0.55rem",
+                fontSize: "0.62rem", fontWeight: 700,
+                cursor: "pointer",
+                backdropFilter: "blur(12px)",
+                display: "flex", alignItems: "center", gap: "0.2rem",
+                transition: "all 0.2s",
+                boxShadow: isActive ? "0 0 8px rgba(34,197,94,0.22)" : "none",
+                fontFamily: "'JetBrains Mono',monospace",
+                letterSpacing: "0.02em",
+                whiteSpace: "nowrap",
+              }}
+            >
+              ⛽ {withFuel}
+            </button>
+          );
+        })()}
+
+        {/* Filtered count pill */}
+        {(activeFilterCount > 0 || showFavoritesOnly || searchQuery) && (
+          <div style={{
+            background: "rgba(168,85,247,0.12)", border: "1px solid #a855f730",
+            borderRadius: "10px", padding: "0.4rem 0.55rem",
+            backdropFilter: "blur(12px)", display: "flex", alignItems: "center", gap: "0.25rem",
+            flexShrink: 0,
+          }}>
+            <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#c084fc", fontSize: "0.62rem", fontWeight: 700 }}>{filtered.length}</span>
+            <span style={{ color: "#6b7280", fontSize: "0.58rem" }}>/ {stations.length}</span>
+          </div>
+        )}
 
         {/* Favorites filter */}
         <button
@@ -756,31 +838,74 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
               })}
             </div>
 
-            {/* Region + Network in a row */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem", marginBottom: "0.5rem" }}>
-              <div>
-                <p style={{ color: "#374151", fontSize: "0.6rem", margin: "0 0 0.3rem", textTransform: "uppercase", letterSpacing: "0.12em" }}>Регион</p>
-                <select
-                  value={filterRegion ?? ""}
-                  onChange={(e) => setFilter("filterRegion", e.target.value || null)}
-                  style={{ width: "100%", background: "#0b0b10", border: `1px solid ${filterRegion ? "#a855f744" : "#1e1e2a"}`, borderRadius: "8px", color: filterRegion ? "#e2e8f0" : "#4b5563", padding: "0.3rem 0.5rem", fontSize: "0.7rem", outline: "none", cursor: "pointer" }}
-                >
-                  <option value="">Все</option>
-                  {uniqueRegions.map((r) => <option key={r} value={r}>{r.split(" ").slice(-2).join(" ").slice(0, 20)}</option>)}
-                </select>
-              </div>
-              <div>
-                <p style={{ color: "#374151", fontSize: "0.6rem", margin: "0 0 0.3rem", textTransform: "uppercase", letterSpacing: "0.12em" }}>Сеть</p>
-                <select
-                  value={filterNetwork ?? ""}
-                  onChange={(e) => setFilter("filterNetwork", e.target.value || null)}
-                  style={{ width: "100%", background: "#0b0b10", border: `1px solid ${filterNetwork ? "#a855f744" : "#1e1e2a"}`, borderRadius: "8px", color: filterNetwork ? "#e2e8f0" : "#4b5563", padding: "0.3rem 0.5rem", fontSize: "0.7rem", outline: "none", cursor: "pointer" }}
-                >
-                  <option value="">Все</option>
-                  {uniqueNetworks.map((n) => <option key={n} value={n}>{n.slice(0, 20)}</option>)}
-                </select>
-              </div>
+            {/* Region */}
+            <div style={{ marginBottom: "0.55rem" }}>
+              <p style={{ color: "#374151", fontSize: "0.6rem", margin: "0 0 0.3rem", textTransform: "uppercase", letterSpacing: "0.12em" }}>Регион</p>
+              <select
+                value={filterRegion ?? ""}
+                onChange={(e) => setFilter("filterRegion", e.target.value || null)}
+                style={{ width: "100%", background: "#0b0b10", border: `1px solid ${filterRegion ? "#a855f744" : "#1e1e2a"}`, borderRadius: "8px", color: filterRegion ? "#e2e8f0" : "#4b5563", padding: "0.3rem 0.5rem", fontSize: "0.7rem", outline: "none", cursor: "pointer" }}
+              >
+                <option value="">Все регионы</option>
+                {uniqueRegions.map((r) => <option key={r} value={r}>{r.slice(0, 30)}</option>)}
+              </select>
             </div>
+
+            {/* Brand / Network chips */}
+            <p style={{ color: "#374151", fontSize: "0.6rem", margin: "0 0 0.35rem", textTransform: "uppercase", letterSpacing: "0.12em" }}>Сеть / Бренд</p>
+            <div style={{ display: "flex", gap: "0.28rem", flexWrap: "wrap", marginBottom: "0.5rem" }}>
+              {topNetworks.map((brand) => {
+                const active = filterNetwork === brand;
+                const cnt = networkCounts[brand] || 0;
+                return (
+                  <button
+                    key={brand}
+                    onClick={() => setFilter("filterNetwork", active ? null : brand)}
+                    style={{
+                      background: active ? "#a855f720" : "#0b0b10",
+                      border: `1px solid ${active ? "#a855f7" : "#1e1e2a"}`,
+                      borderRadius: "7px",
+                      color: active ? "#c084fc" : "#4b5563",
+                      padding: "0.22rem 0.5rem",
+                      fontSize: "0.68rem",
+                      fontWeight: active ? 700 : 400,
+                      cursor: "pointer",
+                      transition: "all 0.15s",
+                      display: "flex", alignItems: "center", gap: "0.28rem",
+                      boxShadow: active ? "0 0 6px #a855f730" : "none",
+                    }}
+                  >
+                    {brand}
+                    <span style={{ fontFamily: "'JetBrains Mono',monospace", color: active ? "#a855f7aa" : "#374151", fontSize: "0.58rem" }}>{cnt}</span>
+                  </button>
+                );
+              })}
+              {/* Any non-top network that is currently selected */}
+              {filterNetwork && !topNetworks.includes(filterNetwork) && (
+                <button
+                  onClick={() => setFilter("filterNetwork", null)}
+                  style={{
+                    background: "#a855f720", border: "1px solid #a855f7", borderRadius: "7px",
+                    color: "#c084fc", padding: "0.22rem 0.5rem", fontSize: "0.68rem", fontWeight: 700,
+                    cursor: "pointer", display: "flex", alignItems: "center", gap: "0.3rem",
+                    boxShadow: "0 0 6px #a855f730",
+                  }}
+                >
+                  {filterNetwork} <span style={{ fontSize: "0.62rem" }}>✕</span>
+                </button>
+              )}
+            </div>
+            {/* Other networks dropdown */}
+            <select
+              value={topNetworks.includes(filterNetwork ?? "") ? "" : (filterNetwork ?? "")}
+              onChange={(e) => setFilter("filterNetwork", e.target.value || null)}
+              style={{ width: "100%", background: "#0b0b10", border: `1px solid ${filterNetwork && !topNetworks.includes(filterNetwork) ? "#a855f744" : "#1e1e2a"}`, borderRadius: "8px", color: filterNetwork && !topNetworks.includes(filterNetwork) ? "#e2e8f0" : "#4b5563", padding: "0.3rem 0.5rem", fontSize: "0.7rem", outline: "none", cursor: "pointer", marginBottom: "0.5rem" }}
+            >
+              <option value="">Другая сеть...</option>
+              {uniqueNetworks.filter((n) => !topNetworks.includes(n)).map((n) => (
+                <option key={n} value={n}>{n.slice(0, 22)} ({networkCounts[n]})</option>
+              ))}
+            </select>
 
             {(filterStatus !== "all" || filterFuel || filterRegion || filterNetwork || filterZone) && (
               <button
@@ -811,25 +936,34 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
       </AnimatePresence>
 
       {/* Map legend — bottom-left, fixed so it never moves with nav bar */}
-      <div style={{
-        position: "fixed",
-        bottom: "calc(env(safe-area-inset-bottom, 0px) + 1rem)",
-        left: "0.75rem",
-        zIndex: 1000,
-        background: "rgba(8,8,20,0.88)",
-        border: "1px solid #1e1e2a",
-        borderRadius: "10px",
-        padding: "0.35rem 0.55rem",
-        backdropFilter: "blur(12px)",
-        display: "flex", flexDirection: "column", gap: "4px",
-      }}>
-        {([["#22c55e","≥60%"],["#eab308","25–60%"],["#ef4444","<25%"]] as [string,string][]).map(([c,l]) => (
-          <div key={c} style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-            <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: c, boxShadow: `0 0 5px ${c}88`, flexShrink: 0 }} />
-            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.42rem", color: "#6b7280" }}>{l}</span>
+      {(() => {
+        const gs = filtered.filter(s => { const a = s.fuel_statuses.length ? s.fuel_statuses.reduce((x,f) => x+f.availability_pct,0)/s.fuel_statuses.length : 0; return a >= 60; }).length;
+        const ys = filtered.filter(s => { const a = s.fuel_statuses.length ? s.fuel_statuses.reduce((x,f) => x+f.availability_pct,0)/s.fuel_statuses.length : 0; return a >= 25 && a < 60; }).length;
+        const rs = filtered.length - gs - ys;
+        const legend: [string,string,number][] = [["#22c55e","≥60%",gs],["#eab308","25–60%",ys],["#ef4444","<25%",rs]];
+        return (
+          <div style={{
+            position: "fixed",
+            bottom: "calc(env(safe-area-inset-bottom, 0px) + 1rem)",
+            left: "0.75rem",
+            zIndex: 1000,
+            background: "rgba(8,8,20,0.88)",
+            border: "1px solid #1e1e2a",
+            borderRadius: "10px",
+            padding: "0.35rem 0.55rem",
+            backdropFilter: "blur(12px)",
+            display: "flex", flexDirection: "column", gap: "4px",
+          }}>
+            {legend.map(([c,l,n]) => (
+              <div key={c} style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: c, boxShadow: `0 0 5px ${c}88`, flexShrink: 0 }} />
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.42rem", color: "#6b7280" }}>{l}</span>
+                {n > 0 && <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.4rem", color: c, opacity: 0.8 }}>{n}</span>}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        );
+      })()}
 
 
       {/* Leaflet Map */}
@@ -904,7 +1038,7 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
             <Marker
               key={station.id}
               position={[station.lat, station.lng]}
-              icon={createStationIcon(dominantStatus(station), isStationFavorite(station.id))}
+              icon={createStationIcon(dominantStatus(station), isStationFavorite(station.id), station.network ?? "")}
               eventHandlers={{ click: () => selectStation(station.id) }}
             >
               <Popup

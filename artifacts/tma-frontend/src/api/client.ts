@@ -376,6 +376,11 @@ export const sendAiMessage = (
 export const fetchCrisisForecast = () =>
   req<import("@/types").CrisisForecast[]>("/ai/crisis-forecast");
 
+export const fetchRegionalPrices = () =>
+  req<{ prices: Record<string, Record<string, number>>; source: string; updated: string }>(
+    "/prices/regional"
+  );
+
 export const fetchStatsSummary = () =>
   req<{
     stations: { total: number; green: number; yellow: number; red: number };

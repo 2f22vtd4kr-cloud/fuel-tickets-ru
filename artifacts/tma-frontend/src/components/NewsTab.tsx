@@ -185,6 +185,7 @@ export function NewsTab({ onNavigate }: Props) {
   const [error, setError] = useState("");
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [severityFilter, setSeverityFilter] = useState<string | null>(null);
+  const [regionFilter, setRegionFilter] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -207,7 +208,12 @@ export function NewsTab({ onNavigate }: Props) {
     return () => clearInterval(id);
   }, [load]);
 
-  const filteredNews = severityFilter ? news.filter(n => n.severity === severityFilter) : news;
+  const filteredNews = news.filter(n => {
+    if (severityFilter && n.severity !== severityFilter) return false;
+    if (regionFilter && n.region !== regionFilter) return false;
+    return true;
+  });
+  const activeRegions = [...new Set(news.filter(n => n.region).map(n => n.region))].sort().slice(0, 6);
   const criticalCount = news.filter(n => n.severity === "critical").length;
   const warningCount  = news.filter(n => n.severity === "warning").length;
   const crisisLevel   = criticalCount >= 3 ? 5 : criticalCount >= 2 ? 4 : criticalCount >= 1 ? 3 : warningCount >= 2 ? 2 : 1;
@@ -252,6 +258,31 @@ export function NewsTab({ onNavigate }: Props) {
         )}
       </AnimatePresence>
 
+      {/* Severity mini-summary bar */}
+      {!loading && news.length > 0 && (
+        <div style={{ display: "flex", gap: "0.35rem", marginBottom: "10px", overflowX: "auto" }}>
+          {(["critical","warning","info","success"] as const).map((sev) => {
+            const cfg = SEVERITY_CONFIG[sev];
+            const cnt = news.filter(n => n.severity === sev).length;
+            if (!cnt) return null;
+            return (
+              <div key={sev} style={{
+                flexShrink: 0,
+                background: `${cfg.color}10`,
+                border: `1px solid ${cfg.color}30`,
+                borderRadius: "8px",
+                padding: "0.22rem 0.55rem",
+                display: "flex", alignItems: "center", gap: "4px",
+              }}>
+                <span style={{ fontSize: "0.6rem" }}>{cfg.emoji}</span>
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", color: cfg.color, fontSize: "0.58rem", fontWeight: 700 }}>{cnt}</span>
+                <span style={{ color: "#374151", fontSize: "0.55rem" }}>{cfg.label.slice(0, 5)}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
         <div>
@@ -287,7 +318,7 @@ export function NewsTab({ onNavigate }: Props) {
         </div>
       </div>
 
-      {/* Severity filter chips */}
+      {/* Severity + region filter chips */}
       {!loading && news.length > 0 && (
         <div style={{ display: "flex", gap: "0.35rem", marginBottom: "12px", overflowX: "auto", paddingBottom: "2px" }}>
           <button
@@ -319,6 +350,23 @@ export function NewsTab({ onNavigate }: Props) {
               </button>
             );
           })}
+          {activeRegions.length > 1 && (
+            <>
+              <div style={{ width: "1px", height: "18px", background: "#22222f", alignSelf: "center", flexShrink: 0 }} />
+              {activeRegions.map(r => (
+                <button key={r}
+                  onClick={() => setRegionFilter(regionFilter === r ? null : (r ?? null))}
+                  style={{
+                    flexShrink: 0, padding: "3px 9px",
+                    background: regionFilter === r ? "rgba(219,39,119,0.15)" : "rgba(255,255,255,0.03)",
+                    border: `1px solid ${regionFilter === r ? "#db2777" : "#1c1c28"}`,
+                    borderRadius: "999px", color: regionFilter === r ? "#db2777" : "#4b5563",
+                    fontSize: "0.58rem", cursor: "pointer", fontWeight: 600,
+                  }}
+                >{r}</button>
+              ))}
+            </>
+          )}
         </div>
       )}
 

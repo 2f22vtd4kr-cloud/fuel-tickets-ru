@@ -25,6 +25,66 @@ interface Props {
   onClose?: () => void;
 }
 
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function NearbyAlternatives({ station }: { station: GasStation }) {
+  const { stations } = useStationStore();
+
+  const alternatives = stations
+    .filter((s) => s.id !== station.id)
+    .map((s) => {
+      const avg = s.fuel_statuses.length
+        ? s.fuel_statuses.reduce((a, f) => a + f.availability_pct, 0) / s.fuel_statuses.length
+        : 0;
+      const dist = haversineKm(station.lat, station.lng, s.lat, s.lng);
+      return { s, avg, dist };
+    })
+    .filter(({ avg }) => avg >= 30)
+    .sort((a, b) => a.dist - b.dist)
+    .slice(0, 3);
+
+  if (!alternatives.length) return null;
+
+  return (
+    <div style={{ padding: "0.5rem 1rem", borderBottom: "1px solid #0f0f17" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.4rem" }}>
+        <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.46rem", letterSpacing: "0.14em" }}>БЛИЖАЙШИЕ_АЛЬТЕРНАТИВЫ</div>
+        <div style={{ flex: 1, height: "1px", background: "linear-gradient(90deg,#1e1e2a,transparent)" }} />
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+        {alternatives.map(({ s, avg, dist }) => {
+          const dotColor = avg >= 60 ? "#22c55e" : avg >= 30 ? "#eab308" : "#ef4444";
+          return (
+            <div
+              key={s.id}
+              onClick={() => window.open(`https://yandex.ru/maps/?rtext=~${s.lat},${s.lng}&rtt=auto`, "_blank")}
+              style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.35rem 0.5rem", background: "#0b0b0f", border: "1px solid #1e1e2a", borderRadius: "8px", cursor: "pointer", transition: "border-color 0.15s" }}
+              onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#a855f733")}
+              onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#1e1e2a")}
+            >
+              <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: dotColor, boxShadow: `0 0 5px ${dotColor}`, flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: "#e2e8f0", fontSize: "0.68rem", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</div>
+                <div style={{ color: "#4b5563", fontSize: "0.58rem" }}>{s.network || "АЗС"}</div>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div style={{ fontFamily: "'JetBrains Mono',monospace", color: dotColor, fontSize: "0.65rem", fontWeight: 700 }}>{Math.round(avg)}%</div>
+                <div style={{ color: "#374151", fontSize: "0.55rem" }}>{dist < 1 ? `${Math.round(dist * 1000)}м` : `${dist.toFixed(1)}км`}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ShareStationButton({ station }: { station: GasStation }) {
   const { add: toast } = useToast();
   const [copied, setCopied] = useState(false);
@@ -584,15 +644,37 @@ export function StationCard({ station, onClose }: Props) {
         </div>
       )}
 
+      {/* Nearby alternatives — closest green/yellow stations */}
+      <NearbyAlternatives station={station} />
+
       {/* Share station button */}
       <div style={{ padding: "0 1rem 0.75rem" }}>
         <ShareStationButton station={station} />
       </div>
 
       {/* Footer */}
-      <div style={{ padding: "0.35rem 1rem 0.65rem", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem", borderTop: "1px solid #0f0f17" }}>
-        <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 5px #22c55e" }} />
-        <span style={{ fontSize: "0.6rem", color: "#374151" }}>Данные синхронизированы</span>
+      <div style={{ padding: "0.35rem 1rem 0.65rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.4rem", borderTop: "1px solid #0f0f17" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+          <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 5px #22c55e" }} />
+          {(() => {
+            const ts = station.fuel_statuses[0]?.last_updated;
+            if (!ts) return <span style={{ fontSize: "0.6rem", color: "#374151" }}>Данные синхронизированы</span>;
+            const diff = Date.now() - new Date(ts).getTime();
+            const m = Math.floor(diff / 60000);
+            const label = m < 1 ? "сейчас" : m < 60 ? `${m}м назад` : `${Math.floor(m / 60)}ч назад`;
+            return <span style={{ fontSize: "0.6rem", color: "#374151" }}>Обновлено: {label}</span>;
+          })()}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+          {station.fuel_statuses.length > 0 && (
+            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.55rem", color: "#374151" }}>
+              ⛽ {station.fuel_statuses.length} видов
+            </span>
+          )}
+          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.52rem", color: "#22222f" }}>
+            #{station.id}
+          </span>
+        </div>
       </div>
     </motion.div>
   );

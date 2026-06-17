@@ -4,7 +4,7 @@ import {
   AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, ReferenceLine,
 } from "recharts";
-import { fetchAnalytics, fetchTrend, fetchNews, fetchSystemStats, fetchPriceHistory } from "@/api/client";
+import { fetchAnalytics, fetchTrend, fetchNews, fetchSystemStats, fetchPriceHistory, fetchRegionalPrices } from "@/api/client";
 import type { SystemStats } from "@/api/client";
 import type { NewsItem } from "@/types";
 import { useFavoritesStore } from "@/stores/useFavoritesStore";
@@ -1209,6 +1209,9 @@ export function AnalyticsTab({ onNavigate }: Props) {
       {/* Fuel price breakdown — min/avg/max per fuel type */}
       <FuelPriceBreakdown />
 
+      {/* Real regional prices from card-oil.ru */}
+      <RegionalPricesTable />
+
       {/* Price history sparkline chart */}
       <PriceHistoryChart />
 
@@ -1537,7 +1540,162 @@ function NewsFeed() {
       )}
 
       {/* Network reliability summary */}
+      <NetworkDistributionChart />
       <NetworkReliabilityWidget />
+      {/* Top networks by availability */}
+      <TopNetworksWidget />
+      {/* Top cheapest stations right now */}
+      <TopCheapestStations />
+      {/* Fuel price savings opportunity */}
+      <FuelSavingsWidget />
+    </div>
+  );
+}
+
+// ── Network distribution chart ─────────────────────────────────────
+function NetworkDistributionChart() {
+  const { stations } = useStationStore();
+  if (!stations.length) return null;
+
+  // Count stations per network
+  const counts: Record<string, number> = {};
+  for (const s of stations) {
+    const net = s.network || "АЗС";
+    counts[net] = (counts[net] ?? 0) + 1;
+  }
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const top = sorted.slice(0, 8);
+  const otherCount = sorted.slice(8).reduce((s, [, c]) => s + c, 0);
+  if (otherCount > 0) top.push(["Остальные", otherCount]);
+
+  const maxCount = top[0][1];
+
+  const NET_COLORS: Record<string, string> = {
+    "Лукойл": "#dc2626", "Роснефть": "#1d4ed8", "Газпромнефть": "#4338ca",
+    "Газпром": "#1e40af", "Татнефть": "#92400e", "АЗС": "#374151",
+    "Сургутнефтегаз": "#6d28d9", "ОПТИ": "#0f766e", "Тебойл": "#0369a1",
+    "Башнефть": "#065f46", "ТАИФ-НК": "#7c2d12", "Остальные": "#4b5563",
+  };
+  function netColor(name: string) {
+    for (const [k, c] of Object.entries(NET_COLORS)) {
+      if (name.toLowerCase().includes(k.toLowerCase())) return c;
+    }
+    return "#4b5563";
+  }
+
+  return (
+    <div style={{ padding: "0 1rem 0.75rem" }}>
+      <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.45rem" }}>
+        СЕТИ_АЗС · РАСПРЕДЕЛЕНИЕ · {stations.length} СТАНЦИЙ
+      </div>
+      <div style={{ background: "linear-gradient(135deg,#0d0d18,#0f0c1a)", border: "1px solid #a855f722", borderRadius: "14px", padding: "0.75rem", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#a855f7,transparent)" }} />
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.32rem" }}>
+          {top.map(([name, count]) => {
+            const pct = Math.round((count / stations.length) * 100);
+            const barWidth = Math.round((count / maxCount) * 100);
+            const color = netColor(name);
+            return (
+              <div key={name} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                <span style={{ color: "#9ca3af", fontSize: "0.62rem", width: "80px", flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+                <div style={{ flex: 1, height: "8px", background: "#0b0b10", borderRadius: "4px", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${barWidth}%`, background: `linear-gradient(90deg, ${color}aa, ${color})`, borderRadius: "4px", transition: "width 0.8s ease" }} />
+                </div>
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", color, fontSize: "0.62rem", fontWeight: 700, width: "28px", textAlign: "right", flexShrink: 0 }}>{count}</span>
+                <span style={{ color: "#374151", fontSize: "0.55rem", width: "28px", flexShrink: 0 }}>{pct}%</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Regional prices from card-oil.ru ──────────────────────────────
+function RegionalPricesTable() {
+  const [data, setData] = useState<Record<string, Record<string, number>>>({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+  const [fuel, setFuel] = useState<"АИ-92" | "АИ-95" | "ДТ">("АИ-95");
+  const [sort, setSort] = useState<"asc" | "desc">("asc");
+
+  useEffect(() => {
+    setLoading(true);
+    setError(false);
+    fetchRegionalPrices()
+      .then((r) => { setData(r.prices); setLoading(false); })
+      .catch(() => { setError(true); setLoading(false); });
+  }, []);
+
+  const FUEL_COLORS: Record<string, string> = { "АИ-92": "#a855f7", "АИ-95": "#db2777", "ДТ": "#f59e0b" };
+  const color = FUEL_COLORS[fuel] ?? "#a855f7";
+
+  const rows = Object.entries(data)
+    .map(([region, prices]) => ({ region, price: prices[fuel] ?? 0 }))
+    .filter((r) => r.price > 0)
+    .sort((a, b) => sort === "asc" ? a.price - b.price : b.price - a.price);
+
+  const minP = rows.length ? rows[sort === "asc" ? 0 : rows.length - 1].price : 0;
+  const maxP = rows.length ? rows[sort === "asc" ? rows.length - 1 : 0].price : 0;
+  const range = maxP - minP || 1;
+
+  return (
+    <div style={{ padding: "0 1rem 0.75rem" }}>
+      <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.45rem" }}>
+        ЦЕНЫ_РЕГИОНОВ · card-oil.ru · {new Date().toLocaleDateString("ru")}
+      </div>
+      <div style={{ background: "linear-gradient(135deg,#0d0d18,#0f0c1a)", border: `1px solid ${color}22`, borderRadius: "14px", padding: "0.75rem", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: `linear-gradient(90deg,transparent,${color},transparent)` }} />
+        {/* Controls */}
+        <div style={{ display: "flex", gap: "0.3rem", marginBottom: "0.65rem", alignItems: "center" }}>
+          {(["АИ-92", "АИ-95", "ДТ"] as const).map((f) => (
+            <button key={f} onClick={() => setFuel(f)} style={{
+              background: fuel === f ? `${FUEL_COLORS[f]}20` : "#0b0b10",
+              border: `1px solid ${fuel === f ? FUEL_COLORS[f] : "#1e1e2a"}`,
+              borderRadius: "7px", color: fuel === f ? FUEL_COLORS[f] : "#4b5563",
+              padding: "0.22rem 0.55rem", fontSize: "0.68rem", fontWeight: fuel === f ? 700 : 400,
+              cursor: "pointer", transition: "all 0.15s",
+            }}>{f}</button>
+          ))}
+          <button onClick={() => setSort(s => s === "asc" ? "desc" : "asc")} style={{
+            marginLeft: "auto", background: "#0b0b10", border: "1px solid #1e1e2a",
+            borderRadius: "7px", color: "#6b7280", padding: "0.22rem 0.45rem",
+            fontSize: "0.68rem", cursor: "pointer",
+          }}>{sort === "asc" ? "↑ Дешевле" : "↓ Дороже"}</button>
+        </div>
+        {loading && (
+          <div style={{ textAlign: "center", padding: "1.5rem", color: "#374151", fontFamily: "'JetBrains Mono',monospace", fontSize: "0.68rem" }}>ЗАГРУЗКА…</div>
+        )}
+        {error && (
+          <div style={{ textAlign: "center", padding: "1rem", color: "#ef4444", fontSize: "0.72rem" }}>Нет данных</div>
+        )}
+        {!loading && !error && rows.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.28rem", maxHeight: "280px", overflowY: "auto" }}>
+            {rows.map(({ region, price }, i) => {
+              const pct = ((price - minP) / range) * 100;
+              const barColor = pct < 33 ? "#22c55e" : pct < 67 ? "#eab308" : "#ef4444";
+              return (
+                <div key={region} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                  <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.52rem", width: "1.2rem", flexShrink: 0, textAlign: "right" }}>{i + 1}</span>
+                  <span style={{ color: "#9ca3af", fontSize: "0.62rem", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{region.replace("Республика ", "Респ. ")}</span>
+                  <div style={{ width: "40px", height: "4px", background: "#111", borderRadius: "2px", flexShrink: 0, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${pct}%`, background: barColor, borderRadius: "2px" }} />
+                  </div>
+                  <span style={{ fontFamily: "'JetBrains Mono',monospace", color, fontSize: "0.66rem", fontWeight: 700, width: "3.2rem", textAlign: "right", flexShrink: 0 }}>{price.toFixed(2)} ₽</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {!loading && rows.length > 0 && (
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "0.5rem", paddingTop: "0.4rem", borderTop: "1px solid #1e1e2a" }}>
+            <span style={{ color: "#22c55e", fontSize: "0.58rem", fontFamily: "'JetBrains Mono',monospace" }}>↓ мин {minP.toFixed(2)} ₽</span>
+            <span style={{ color: "#ef4444", fontSize: "0.58rem", fontFamily: "'JetBrains Mono',monospace" }}>↑ макс {maxP.toFixed(2)} ₽</span>
+            <span style={{ color: "#374151", fontSize: "0.58rem" }}>разброс {(maxP - minP).toFixed(2)} ₽</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1614,6 +1772,208 @@ function NetworkReliabilityWidget() {
             <span style={{ color: "#374151", fontSize: "0.55rem", flexShrink: 0 }}>{count}АЗС</span>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Top Networks by Availability ─────────────────────────────────
+function TopNetworksWidget() {
+  const { stations } = useStationStore();
+  if (!stations.length) return null;
+
+  const nets: Record<string, { total: number; sum: number }> = {};
+  stations.forEach((s) => {
+    const n = s.network || "Другие";
+    const avg = s.fuel_statuses.length
+      ? s.fuel_statuses.reduce((a, f) => a + f.availability_pct, 0) / s.fuel_statuses.length
+      : 0;
+    if (!nets[n]) nets[n] = { total: 0, sum: 0 };
+    nets[n].total++;
+    nets[n].sum += avg;
+  });
+
+  const ranked = Object.entries(nets)
+    .map(([name, { total, sum }]) => ({ name, count: total, avg: Math.round(sum / total) }))
+    .filter((r) => r.count >= 3)
+    .sort((a, b) => b.avg - a.avg)
+    .slice(0, 8);
+
+  if (ranked.length < 3) return null;
+  const maxAvg = ranked[0]?.avg ?? 100;
+
+  return (
+    <div style={{ padding: "0 1rem 1.5rem" }}>
+      <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.45rem" }}>
+        РЕЙТИНГ_СЕТЕЙ · ДОСТУПНОСТЬ · ТОП-8
+      </div>
+      <div style={{ background: "linear-gradient(135deg,#0d0d18,#0f0b18)", border: "1px solid #a855f722", borderRadius: "14px", padding: "0.75rem", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#a855f7,#db2777,transparent)" }} />
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+          {ranked.map(({ name, count, avg }, i) => {
+            const color = avg >= 60 ? "#22c55e" : avg >= 35 ? "#eab308" : "#ef4444";
+            const barPct = maxAvg > 0 ? (avg / maxAvg) * 100 : 0;
+            const medals = ["🥇","🥈","🥉"];
+            return (
+              <div key={name} style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                <span style={{ fontSize: "0.65rem", flexShrink: 0, width: "1.2rem" }}>{medals[i] ?? `${i + 1}.`}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "2px" }}>
+                    <span style={{ color: i < 3 ? "#e2e8f0" : "#9ca3af", fontSize: "0.62rem", fontWeight: i === 0 ? 700 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+                    <span style={{ fontFamily: "'JetBrains Mono',monospace", color, fontSize: "0.62rem", fontWeight: 700, flexShrink: 0, marginLeft: "0.3rem" }}>{avg}%</span>
+                  </div>
+                  <div style={{ height: "4px", background: "#0b0b0f", borderRadius: "2px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${barPct}%`, background: `linear-gradient(90deg,${color}88,${color})`, borderRadius: "2px", transition: "width 0.9s ease" }} />
+                  </div>
+                </div>
+                <span style={{ color: "#374151", fontSize: "0.52rem", flexShrink: 0, fontFamily: "'JetBrains Mono',monospace" }}>{count}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Top 5 cheapest stations right now ──────────────────────────────
+function TopCheapestStations() {
+  const { stations } = useStationStore();
+  const getPrice = usePriceStore((s) => s.getPrice);
+  const [fuel, setFuel] = useState<"АИ-92" | "АИ-95" | "ДТ">("АИ-92");
+
+  if (!stations.length) return null;
+
+  const FUEL_COLORS: Record<string, string> = { "АИ-92": "#a855f7", "АИ-95": "#db2777", "ДТ": "#f59e0b" };
+  const STATIC: Record<string, number> = { "АИ-92": 65, "АИ-95": 71, "ДТ": 79 };
+  const color = FUEL_COLORS[fuel];
+
+  const top5 = stations
+    .filter((s) => s.fuel_statuses.some((f) => f.fuel_type === fuel && f.availability_pct > 20))
+    .map((s) => {
+      const p = getPrice(s.region, fuel);
+      const price = p?.effective ?? STATIC[fuel] ?? 70;
+      const avail = s.fuel_statuses.find((f) => f.fuel_type === fuel)?.availability_pct ?? 0;
+      return { s, price, avail };
+    })
+    .sort((a, b) => a.price - b.price || b.avail - a.avail)
+    .slice(0, 5);
+
+  if (!top5.length) return null;
+  const minP = top5[0].price;
+
+  return (
+    <div style={{ padding: "0 1rem 0.75rem" }}>
+      <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.45rem" }}>
+        ЛУЧШИЕ_ЦЕНЫ · ТОП-5 · СЕЙЧАС
+      </div>
+      <div style={{ background: "linear-gradient(135deg,#0d0d18,#0f0c1a)", border: `1px solid ${color}22`, borderRadius: "14px", padding: "0.75rem", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: `linear-gradient(90deg,transparent,${color},transparent)` }} />
+        <div style={{ display: "flex", gap: "0.3rem", marginBottom: "0.55rem" }}>
+          {(["АИ-92", "АИ-95", "ДТ"] as const).map((f) => (
+            <button key={f} onClick={() => setFuel(f)} style={{
+              padding: "0.18rem 0.45rem", background: fuel === f ? `${FUEL_COLORS[f]}20` : "#0b0b10",
+              border: `1px solid ${fuel === f ? FUEL_COLORS[f] : "#1e1e2a"}`, borderRadius: "6px",
+              color: fuel === f ? FUEL_COLORS[f] : "#374151", fontSize: "0.62rem",
+              fontWeight: fuel === f ? 700 : 400, cursor: "pointer",
+            }}>{f}</button>
+          ))}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+          {top5.map(({ s, price, avail }, i) => {
+            const saving = price - minP;
+            const medals = ["🥇", "🥈", "🥉", "4.", "5."];
+            const availColor = avail >= 60 ? "#22c55e" : avail >= 25 ? "#eab308" : "#ef4444";
+            return (
+              <div key={s.id} style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                <span style={{ fontSize: "0.7rem", flexShrink: 0, width: "1.4rem" }}>{medals[i]}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: i === 0 ? "#f1f5f9" : "#9ca3af", fontSize: "0.62rem", fontWeight: i === 0 ? 700 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</div>
+                  <div style={{ color: "#374151", fontSize: "0.52rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.network || "АЗС"} · {s.region.replace("Республика ", "Респ.").split(" ").slice(-1)[0]}</div>
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ fontFamily: "'JetBrains Mono',monospace", color: i === 0 ? "#22c55e" : color, fontSize: "0.7rem", fontWeight: 700 }}>
+                    {price.toFixed(1)}₽
+                    {saving > 0 && <span style={{ color: "#374151", fontSize: "0.52rem", marginLeft: "0.2rem" }}>+{saving.toFixed(1)}</span>}
+                  </div>
+                  <div style={{ color: availColor, fontSize: "0.52rem" }}>{avail}%</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Fuel price savings opportunity ─────────────────────────────────
+function FuelSavingsWidget() {
+  const { stations } = useStationStore();
+  const getPrice = usePriceStore((s) => s.getPrice);
+
+  if (!stations.length) return null;
+
+  const FUELS = ["АИ-92", "АИ-95", "ДТ", "Газ"] as const;
+  const FUEL_COLORS: Record<string, string> = { "АИ-92": "#a855f7", "АИ-95": "#db2777", "ДТ": "#f59e0b", "Газ": "#14b8a6" };
+  const STATIC: Record<string, number> = { "АИ-92": 65, "АИ-95": 71, "ДТ": 79, "Газ": 35 };
+
+  const spreads = FUELS.map((fuel) => {
+    const prices = stations
+      .filter((s) => s.fuel_statuses.some((f) => f.fuel_type === fuel && f.availability_pct > 20))
+      .map((s) => getPrice(s.region, fuel)?.effective ?? STATIC[fuel] ?? 70)
+      .filter((p) => p > 0);
+    if (prices.length < 2) return null;
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+    return { fuel, min, max, avg, spread: max - min };
+  }).filter(Boolean) as { fuel: string; min: number; max: number; avg: number; spread: number }[];
+
+  if (!spreads.length) return null;
+  const maxSpread = Math.max(...spreads.map((s) => s.spread));
+
+  return (
+    <div style={{ padding: "0 1rem 1.5rem" }}>
+      <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.45rem" }}>
+        РАЗБРОС_ЦЕН · ЭКОНОМИЯ · АНАЛИЗ
+      </div>
+      <div style={{ background: "linear-gradient(135deg,#0a0a14,#0d0a18)", border: "1px solid #22c55e18", borderRadius: "14px", padding: "0.75rem", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#22c55e44,transparent)" }} />
+        <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e", fontSize: "0.6rem", fontWeight: 700, marginBottom: "0.5rem" }}>
+          💰 Потенциальная экономия при выборе АЗС
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+          {spreads.map(({ fuel, min, max, avg, spread }) => {
+            const color = FUEL_COLORS[fuel] ?? "#a855f7";
+            const barPct = maxSpread > 0 ? (spread / maxSpread) * 100 : 0;
+            return (
+              <div key={fuel}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.15rem" }}>
+                  <span style={{ fontFamily: "'JetBrains Mono',monospace", color, fontSize: "0.62rem", fontWeight: 700 }}>{fuel}</span>
+                  <div style={{ display: "flex", gap: "0.6rem" }}>
+                    <span style={{ color: "#22c55e", fontSize: "0.58rem" }}>↓{min.toFixed(1)}₽</span>
+                    <span style={{ color: "#6b7280", fontSize: "0.58rem" }}>ср.{avg.toFixed(1)}₽</span>
+                    <span style={{ color: "#ef4444", fontSize: "0.58rem" }}>↑{max.toFixed(1)}₽</span>
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                  <div style={{ flex: 1, height: "5px", background: "#0b0b0f", borderRadius: "3px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${barPct}%`, background: `linear-gradient(90deg,#22c55e,${color})`, borderRadius: "3px", transition: "width 0.8s" }} />
+                  </div>
+                  <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e", fontSize: "0.58rem", fontWeight: 700, flexShrink: 0 }}>
+                    -{spread.toFixed(1)}₽
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ marginTop: "0.6rem", padding: "0.35rem 0.5rem", background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.12)", borderRadius: "7px" }}>
+          <span style={{ color: "#6b7280", fontSize: "0.58rem" }}>
+            💡 Заправившись на самой дешёвой АЗС, вы экономите до <strong style={{ color: "#22c55e" }}>{Math.max(...spreads.map(s => s.spread * 60)).toFixed(0)} ₽</strong> при заправке 60л
+          </span>
+        </div>
       </div>
     </div>
   );
