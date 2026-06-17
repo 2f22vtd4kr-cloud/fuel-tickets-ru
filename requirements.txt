@@ -28,3 +28,6 @@ sqlalchemy==2.0.41
 telegram
 uvicorn[standard]==0.34.0
 websockets
+beautifulsoup4
+requests
+cloudscraper
