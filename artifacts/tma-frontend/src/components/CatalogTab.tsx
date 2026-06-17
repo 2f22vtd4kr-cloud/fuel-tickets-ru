@@ -1193,8 +1193,8 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
                         </div>
                       )}
                       </div>
-                      {/* Compare button - in else-branch of !selectedStation so it is non-null */}
-                      {selectedStation!.id !== (s as GasStation).id && (
+                      {/* Compare button - only shown when a station is already selected */}
+                      {selectedStation !== null && selectedStation.id !== s.id && (
                         <button
                           onClick={(e) => { e.stopPropagation(); setCompareStation(s as GasStation); setShowCompare(true); }}
                           style={{
