@@ -2,13 +2,13 @@
 type ModuleMap = Record<string, () => Promise<Record<string, unknown>>>;
 export const modules: ModuleMap = {
   "./components/mockups/ai/AiChat.tsx": () => import("../components/mockups/ai/AiChat.tsx"),
-  "./components/mockups/map/MapSearch.tsx": () => import("../components/mockups/map/MapSearch.tsx"),
   "./components/mockups/ticket/FuelTicket.tsx": () => import("../components/mockups/ticket/FuelTicket.tsx"),
   "./components/mockups/ticket/FuelTicketExpiring.tsx": () => import("../components/mockups/ticket/FuelTicketExpiring.tsx"),
   "./components/mockups/ticket/FuelTicketWarning.tsx": () => import("../components/mockups/ticket/FuelTicketWarning.tsx"),
   "./components/mockups/ticket/PostPurchaseReceipt.tsx": () => import("../components/mockups/ticket/PostPurchaseReceipt.tsx"),
   "./components/mockups/ticket/QRTicket.tsx": () => import("../components/mockups/ticket/QRTicket.tsx"),
   "./components/mockups/ticket/SuccessScreen.tsx": () => import("../components/mockups/ticket/SuccessScreen.tsx"),
+  "./components/mockups/map/MapSearch.tsx": () => import("../components/mockups/map/MapSearch.tsx"),
   "./components/mockups/tma-variants/DarkNeon.tsx": () => import("../components/mockups/tma-variants/DarkNeon.tsx"),
   "./components/mockups/tma-variants/DeepField.tsx": () => import("../components/mockups/tma-variants/DeepField.tsx"),
   "./components/mockups/tma-variants/FeedStream.tsx": () => import("../components/mockups/tma-variants/FeedStream.tsx"),
