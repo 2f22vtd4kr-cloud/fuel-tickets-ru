@@ -221,6 +221,10 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [mapRecentSearches, setMapRecentSearches] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem("tma-map-recent-searches") || "[]"); } catch { return []; }
+  });
+  const [mapSearchFocused, setMapSearchFocused] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const dragControls = useDragControls();
@@ -332,6 +336,17 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
     const first = filtered[0];
     mapRef.current?.flyTo([first.lat, first.lng], 14, { duration: 0.9 });
     selectStation(first.id);
+    addMapRecentSearch(searchQuery);
+  };
+
+  const addMapRecentSearch = (q: string) => {
+    const t = q.trim();
+    if (!t || t.length < 2) return;
+    setMapRecentSearches((prev) => {
+      const updated = [t, ...prev.filter((x) => x !== t)].slice(0, 8);
+      localStorage.setItem("tma-map-recent-searches", JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const uniqueRegions = Array.from(new Set(stations.map((s) => s.region))).sort();
@@ -451,15 +466,17 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
                 initial={{ width: 0, opacity: 0 }}
                 animate={{ width: "auto", opacity: 1 }}
                 exit={{ width: 0, opacity: 0 }}
-                style={{ overflow: "hidden", flex: 1 }}
+                style={{ overflow: "hidden", flex: 1, position: "relative" }}
               >
                 <input
                   ref={searchRef}
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setMapSearchFocused(true)}
+                  onBlur={() => setTimeout(() => setMapSearchFocused(false), 160)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") jumpToSearchResult();
+                    if (e.key === "Enter") { jumpToSearchResult(); }
                     if (e.key === "Escape") { setSearchOpen(false); setSearchQuery(""); }
                   }}
                   placeholder="АЗС, сеть, адрес…"
@@ -477,6 +494,53 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
                     boxSizing: "border-box",
                   }}
                 />
+                <AnimatePresence>
+                  {mapSearchFocused && !searchQuery && mapRecentSearches.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                      transition={{ duration: 0.15 }}
+                      style={{
+                        position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
+                        background: "rgba(8,7,16,0.98)", backdropFilter: "blur(24px)",
+                        border: "1px solid #db277733", borderRadius: "12px",
+                        padding: "0.5rem",
+                        boxShadow: "0 12px 32px #00000099",
+                        zIndex: 9999,
+                        minWidth: "200px",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem", padding: "0 0.15rem" }}>
+                        <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.48rem", letterSpacing: "0.12em" }}>НЕДАВНИЕ_ПОИСКИ</span>
+                        <button
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => { setMapRecentSearches([]); localStorage.removeItem("tma-map-recent-searches"); }}
+                          style={{ background: "none", border: "none", color: "#374151", fontSize: "0.65rem", cursor: "pointer", padding: "0 0.15rem", lineHeight: 1 }}
+                        >✕</button>
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
+                        {mapRecentSearches.map((q) => (
+                          <button
+                            key={q}
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => { setSearchQuery(q); setMapSearchFocused(false); setTimeout(() => searchRef.current?.focus(), 0); }}
+                            style={{
+                              background: "rgba(219,39,119,0.07)", border: "1px solid #db277722",
+                              borderRadius: "8px", color: "#9ca3af", fontSize: "0.65rem",
+                              padding: "0.2rem 0.55rem", cursor: "pointer",
+                              display: "flex", alignItems: "center", gap: "0.25rem",
+                              transition: "background 0.15s",
+                            }}
+                          >
+                            <span style={{ color: "#4b5563", fontSize: "0.55rem" }}>🕐</span>
+                            {q}
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </motion.div>
             )}
           </AnimatePresence>

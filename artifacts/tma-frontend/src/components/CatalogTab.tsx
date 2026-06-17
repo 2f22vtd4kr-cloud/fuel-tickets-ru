@@ -351,6 +351,7 @@ function FuelItem({ fuelType, station, limits, userId, payMethod, onBuy }: {
 interface CatalogTabProps { initialStationId?: number; onCalcOpenChange?: (open: boolean) => void; }
 
 const RECENTLY_VIEWED_KEY = "tma-recently-viewed";
+const RECENT_SEARCHES_KEY = "tma-recent-searches";
 
 export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabProps) {
   const { user } = useUserStore();
@@ -381,6 +382,10 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
   const [recentlyViewed, setRecentlyViewed] = useState<number[]>(() => {
     try { return JSON.parse(localStorage.getItem(RECENTLY_VIEWED_KEY) || "[]"); } catch { return []; }
   });
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) || "[]"); } catch { return []; }
+  });
+  const [searchFocused, setSearchFocused] = useState(false);
   const [dealFuel, setDealFuel] = useState<"АИ-92" | "АИ-95" | "ДТ">("АИ-92");
   const [activeNetwork, setActiveNetwork] = useState<string | null>(null);
   const [nvFuel, setNvFuel] = useState<string>("АИ-92");
@@ -433,6 +438,17 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
     setRecentlyViewed((prev) => {
       const updated = [id, ...prev.filter((x) => x !== id)].slice(0, 5);
       localStorage.setItem(RECENTLY_VIEWED_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  // ── Recent search helper ──────────────────────────────────────────────────
+  const addRecentSearch = useCallback((query: string) => {
+    const q = query.trim();
+    if (!q || q.length < 2) return;
+    setRecentSearches((prev) => {
+      const updated = [q, ...prev.filter((x) => x !== q)].slice(0, 8);
+      localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
       return updated;
     });
   }, []);
@@ -686,65 +702,144 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
         )}
       </AnimatePresence>
 
-      {/* ── Header ── */}
-      <div style={{ padding: "12px 12px 8px" }}>
-        <div className="glass-panel" style={{ padding: "14px", position: "relative", overflow: "hidden" }}>
-          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,var(--accent-primary),var(--accent-secondary),transparent)" }} />
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div>
-              <p style={{ margin: "0 0 2px", fontSize: "0.52rem", color: "var(--text-tertiary)", letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "var(--font-mono)" }}>
-                Топливный терминал
-              </p>
-              <h2 style={{ margin: 0, color: "var(--text-primary)", fontSize: "1.1rem", fontWeight: 800, lineHeight: 1 }}>
-                🎫 Талоны
-              </h2>
-              <p style={{ margin: "4px 0 0", color: "var(--text-secondary)", fontSize: "0.68rem" }}>
-                {stations.length.toLocaleString("ru")} станций
-                {lastFetched && (
-                  <span style={{ color: "var(--text-tertiary)", marginLeft: "6px" }}>
-                    · {(() => { const m = Math.floor((Date.now() - lastFetched) / 60000); return m < 1 ? "только что" : `${m} мин назад`; })()}
-                  </span>
-                )}
-              </p>
+      {/* ── FLAGSHIP: Network Vouchers ── */}
+      {!selectedStation && (
+        <div style={{ padding: "0 12px 6px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", marginBottom: "0.5rem" }}>
+            <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#a855f7", fontSize: "0.52rem", letterSpacing: "0.15em", fontWeight: 700 }}>СЕТЕВЫЕ_ТАЛОНЫ</span>
+            <motion.div
+              animate={{ boxShadow: ["0 0 6px #a855f777", "0 0 14px #db277777", "0 0 6px #a855f777"] }}
+              transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+              style={{
+                background: "linear-gradient(135deg,#a855f7,#db2777)",
+                borderRadius: "6px", padding: "0.1rem 0.48rem",
+                fontSize: "0.44rem", fontWeight: 800, color: "#fff",
+                fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.1em", flexShrink: 0,
+              }}
+            >🏆 БЕСТСЕЛЛЕР</motion.div>
+            <div style={{ flex: 1, height: "1px", background: "linear-gradient(90deg,#a855f733,#db277722,transparent)" }} />
+            <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#4b5563", fontSize: "0.44rem", flexShrink: 0 }}>НА ВСЕХ АЗС СЕТИ</span>
+          </div>
+
+          <div style={{
+            background: "linear-gradient(160deg,#100b1e,#130d22,#0d0d18)",
+            border: "1.5px solid #a855f744",
+            borderRadius: "16px", padding: "0.8rem",
+            position: "relative", overflow: "hidden",
+            boxShadow: "0 0 40px #a855f710, 0 0 18px #db27770a, 0 6px 24px #00000066",
+          }}>
+            <motion.div
+              animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+              transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+              style={{
+                position: "absolute", top: 0, left: 0, right: 0, height: "2px",
+                background: "linear-gradient(90deg,#a855f7,#db2777,#a855f7,#9333ea,#a855f7)",
+                backgroundSize: "200% 100%",
+              }}
+            />
+            <div style={{ position: "absolute", top: "-30%", right: "-10%", width: "55%", height: "55%", background: "radial-gradient(circle,#a855f70a,transparent 70%)", pointerEvents: "none" }} />
+            <div style={{ position: "absolute", bottom: "-20%", left: "5%", width: "40%", height: "40%", background: "radial-gradient(circle,#db27770a,transparent 70%)", pointerEvents: "none" }} />
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "0.4rem", marginBottom: activeNetwork ? "0.65rem" : 0 }}>
+              {NETWORK_VOUCHER_NETWORKS.map(({ name, color }) => {
+                const isActive = activeNetwork === name;
+                const price92 = NETWORK_PRICES[name]?.["АИ-92"] ?? 65;
+                return (
+                  <motion.button
+                    key={name}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => { impact("light"); setActiveNetwork(isActive ? null : name); setNvFuel("АИ-92"); setNvVolume(40); }}
+                    style={{
+                      padding: "0.55rem 0.2rem",
+                      background: isActive ? `linear-gradient(160deg,${color}26,${color}14)` : "rgba(255,255,255,0.03)",
+                      border: `1.5px solid ${isActive ? color + "cc" : color + "25"}`,
+                      borderRadius: "12px",
+                      display: "flex", flexDirection: "column", alignItems: "center", gap: "0.22rem",
+                      cursor: "pointer", transition: "all 0.2s",
+                      boxShadow: isActive ? `0 0 18px ${color}38, 0 2px 10px ${color}18` : "none",
+                      position: "relative", overflow: "hidden",
+                    }}
+                  >
+                    {isActive && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1.5px", background: `linear-gradient(90deg,transparent,${color},transparent)` }} />}
+                    <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: color, boxShadow: isActive ? `0 0 9px ${color}` : "none", flexShrink: 0 }} />
+                    <span style={{ fontFamily: "'JetBrains Mono',monospace", color: isActive ? color : "#9ca3af", fontSize: "0.58rem", fontWeight: isActive ? 800 : 500, textAlign: "center", lineHeight: 1.2 }}>{name}</span>
+                    <span style={{ color: isActive ? color : "#4b5563", fontSize: "0.5rem", fontFamily: "'JetBrains Mono',monospace", fontWeight: isActive ? 700 : 400 }}>{price92.toFixed(1)}₽/л</span>
+                  </motion.button>
+                );
+              })}
             </div>
-            <div style={{ display: "flex", gap: "6px", alignItems: "center", flexShrink: 0, marginLeft: "8px" }}>
-              <button
-                onClick={() => { impact("light"); setShowCalculator(true); onCalcOpenChange?.(true); }}
-                title="Калькулятор расхода"
-                style={{ background: "rgba(168,85,247,0.1)", border: "1px solid rgba(168,85,247,0.3)", borderRadius: "10px", color: "#a855f7", fontSize: "1.1rem", padding: "4px 9px", cursor: "pointer", lineHeight: 1 }}
-              >🧮</button>
-              <motion.button
-                onClick={handleRefresh}
-                disabled={refreshing}
-                title="Обновить данные"
-                animate={refreshing ? { rotate: 360 } : { rotate: 0 }}
-                transition={refreshing ? { duration: 0.8, repeat: Infinity, ease: "linear" } : { duration: 0.3 }}
-                style={{ background: "rgba(168,85,247,0.08)", border: "1px solid rgba(168,85,247,0.2)", borderRadius: "10px", color: refreshing ? "#a855f7" : "#6b7280", fontSize: "0.9rem", padding: "4px 9px", cursor: refreshing ? "not-allowed" : "pointer", lineHeight: 1 }}
-              >↻</motion.button>
-              <div style={{
-                display: "flex", alignItems: "center", gap: "4px",
-                background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.25)",
-                borderRadius: "999px", padding: "3px 8px",
-              }}>
-                <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: "var(--accent-success)", boxShadow: "0 0 5px var(--accent-success)" }} />
-                <span style={{ fontSize: "0.55rem", color: "var(--accent-success)", fontFamily: "var(--font-mono)", letterSpacing: "0.06em" }}>LIVE</span>
-              </div>
-            </div>
+
+            <AnimatePresence>
+              {activeNetwork && (() => {
+                const netColor = NETWORK_VOUCHER_NETWORKS.find((n) => n.name === activeNetwork)?.color ?? "#a855f7";
+                return (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2 }}
+                    style={{ overflow: "hidden" }}
+                  >
+                    <div style={{ display: "flex", gap: "0.28rem", marginBottom: "0.4rem", flexWrap: "wrap" }}>
+                      {["АИ-92", "АИ-95", "ДТ", "Газ"].map((ft) => (
+                        <button key={ft} onClick={() => { impact("light"); setNvFuel(ft); }}
+                          style={{ padding: "0.26rem 0.52rem", background: nvFuel === ft ? `${netColor}22` : "#0b0b10", border: `1px solid ${nvFuel === ft ? netColor + "aa" : "#222230"}`, borderRadius: "7px", color: nvFuel === ft ? netColor : "#4b5563", fontSize: "0.6rem", fontWeight: nvFuel === ft ? 700 : 400, cursor: "pointer", transition: "all 0.15s" }}>
+                          {ft} · {(NETWORK_PRICES[activeNetwork]?.[ft] ?? FUEL_PRICES[ft] ?? 65).toFixed(1)}₽
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ display: "flex", gap: "0.28rem", marginBottom: "0.5rem" }}>
+                      {VOLUMES.map((v) => (
+                        <button key={v} onClick={() => { impact("light"); setNvVolume(v); }}
+                          style={{ flex: 1, padding: "0.32rem", background: nvVolume === v ? `${netColor}18` : "#0b0b10", border: `1px solid ${nvVolume === v ? netColor + "99" : "#222230"}`, borderRadius: "8px", color: nvVolume === v ? netColor : "#4b5563", fontSize: "0.65rem", fontWeight: nvVolume === v ? 700 : 400, cursor: "pointer", textAlign: "center", transition: "all 0.15s" }}>
+                          {v}л
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ background: "rgba(8,6,18,0.85)", border: `1px solid ${netColor}25`, borderRadius: "10px", padding: "0.52rem 0.7rem", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                      <div>
+                        <div style={{ color: "#4b5563", fontSize: "0.5rem", marginBottom: "2px" }}>Сетевой талон · 7 дней</div>
+                        <div style={{ color: "#e2e8f0", fontSize: "0.72rem", fontWeight: 700 }}>{activeNetwork} · {nvFuel} · {nvVolume}л</div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontFamily: "'JetBrains Mono',monospace", color: netColor, fontSize: "1rem", fontWeight: 900, lineHeight: 1 }}>
+                          {((NETWORK_PRICES[activeNetwork]?.[nvFuel] ?? FUEL_PRICES[nvFuel] ?? 65) * nvVolume).toFixed(0)}₽
+                        </div>
+                        <div style={{ color: "#374151", fontSize: "0.48rem", marginTop: "2px" }}>≈{Math.ceil((NETWORK_PRICES[activeNetwork]?.[nvFuel] ?? FUEL_PRICES[nvFuel] ?? 65) * nvVolume / STAR_RUB_RATE)}⭐</div>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: "0.4rem" }}>
+                      <motion.button whileTap={{ scale: 0.97 }} onClick={() => handleNetworkVoucher("stars")} disabled={nvLoading}
+                        style={{ flex: 1, padding: "0.55rem", background: `linear-gradient(135deg,${netColor}28,${netColor}16)`, border: `1.5px solid ${netColor}55`, borderRadius: "11px", color: netColor, fontSize: "0.67rem", fontWeight: 800, cursor: nvLoading ? "wait" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.35rem", boxShadow: `0 0 12px ${netColor}22`, transition: "all 0.2s" }}>
+                        ⭐ Оплатить Stars
+                      </motion.button>
+                      <motion.button whileTap={{ scale: 0.97 }} onClick={() => handleNetworkVoucher("cryptobot")} disabled={nvLoading}
+                        style={{ flex: 1, padding: "0.55rem", background: "linear-gradient(135deg,#22c55e18,#16a34a12)", border: "1.5px solid #22c55e44", borderRadius: "11px", color: "#22c55e", fontSize: "0.67rem", fontWeight: 800, cursor: nvLoading ? "wait" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.35rem", boxShadow: "0 0 12px #22c55e18", transition: "all 0.2s" }}>
+                        💎 Crypto
+                      </motion.button>
+                    </div>
+                  </motion.div>
+                );
+              })()}
+            </AnimatePresence>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ── Search bar ── */}
-      <div style={{ padding: "0.5rem 1rem 0.35rem", position: "relative" }}>
-        <div style={{ position: "absolute", left: "1.7rem", top: "50%", transform: "translateY(-50%)", color: "#4b5563", fontSize: "0.8rem", pointerEvents: "none", zIndex: 1 }}>🔍</div>
+      <div style={{ padding: "0.5rem 1rem 0.35rem", position: "relative", zIndex: 20 }}>
+        <div style={{ position: "absolute", left: "1.7rem", top: "1.3rem", color: "#4b5563", fontSize: "0.8rem", pointerEvents: "none", zIndex: 1 }}>🔍</div>
         <input
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setTimeout(() => setSearchFocused(false), 160)}
+          onKeyDown={(e) => { if (e.key === "Enter" && searchQuery.trim().length >= 2) addRecentSearch(searchQuery); }}
           placeholder="Поиск: сеть, регион, 95, дт, дизель…"
           style={{
             width: "100%", boxSizing: "border-box",
             background: "linear-gradient(135deg,#0d0d18,#14141c)",
-            border: `1px solid ${searchQuery ? "#a855f744" : "#1e1e2a"}`,
+            border: `1px solid ${searchQuery || searchFocused ? "#a855f744" : "#1e1e2a"}`,
             borderRadius: "12px", color: "#e2e8f0",
             padding: "0.62rem 0.75rem 0.62rem 2.2rem", fontSize: "0.82rem",
             outline: "none", transition: "border-color 0.2s",
@@ -753,6 +848,52 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
         {searchQuery && (
           <button onClick={() => setSearchQuery("")} style={{ position: "absolute", right: "1.7rem", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#4b5563", cursor: "pointer", fontSize: "0.8rem", padding: "0 0.2rem" }}>✕</button>
         )}
+        <AnimatePresence>
+          {searchFocused && !searchQuery && recentSearches.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -6, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -6, scale: 0.98 }}
+              transition={{ duration: 0.15 }}
+              style={{
+                position: "absolute", top: "calc(100% - 2px)", left: 0, right: 0,
+                background: "rgba(8,7,16,0.97)", backdropFilter: "blur(20px)",
+                border: "1px solid #a855f733", borderRadius: "0 0 14px 14px",
+                padding: "0.5rem 0.5rem 0.55rem",
+                boxShadow: "0 12px 32px #00000099",
+                zIndex: 50,
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem", padding: "0 0.2rem" }}>
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.48rem", letterSpacing: "0.12em" }}>НЕДАВНИЕ_ЗАПРОСЫ</span>
+                <button
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => { setRecentSearches([]); localStorage.removeItem(RECENT_SEARCHES_KEY); impact("light"); }}
+                  style={{ background: "none", border: "none", color: "#374151", fontSize: "0.65rem", cursor: "pointer", padding: "0 0.2rem", lineHeight: 1 }}
+                >✕</button>
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
+                {recentSearches.map((q) => (
+                  <button
+                    key={q}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => { setSearchQuery(q); addRecentSearch(q); impact("light"); }}
+                    style={{
+                      background: "rgba(168,85,247,0.07)", border: "1px solid #a855f722",
+                      borderRadius: "8px", color: "#9ca3af", fontSize: "0.65rem",
+                      padding: "0.22rem 0.6rem", cursor: "pointer",
+                      display: "flex", alignItems: "center", gap: "0.28rem",
+                      transition: "background 0.15s",
+                    }}
+                  >
+                    <span style={{ color: "#4b5563", fontSize: "0.58rem" }}>🕐</span>
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* ── Skeleton loading ── */}
@@ -1136,70 +1277,48 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
         );
       })()}
 
-      {/* ── Network Vouchers ── */}
+      {/* ── Топливный терминал header (moved from top) ── */}
       {!selectedStation && !searchQuery && (
-        <div style={{ padding: "0 1rem 0.75rem" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.45rem" }}>
-            <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#a855f7", fontSize: "0.45rem", letterSpacing: "0.14em" }}>СЕТЕВЫЕ_ТАЛОНЫ</span>
-            <div style={{ flex: 1, height: "1px", background: "linear-gradient(90deg,#a855f722,transparent)" }} />
-            <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.45rem" }}>ДЕЙСТВУЕТ НА ВСЕХ АЗС СЕТИ</span>
-          </div>
-          <div style={{ background: "linear-gradient(135deg,#0d0d18,#0f0c1a)", border: "1px solid #a855f722", borderRadius: "12px", padding: "0.6rem", position: "relative", overflow: "hidden" }}>
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#a855f7,transparent)" }} />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "0.3rem", marginBottom: activeNetwork ? "0.55rem" : 0 }}>
-              {NETWORK_VOUCHER_NETWORKS.map(({ name, color }) => (
-                <button key={name}
-                  onClick={() => { impact("light"); setActiveNetwork(activeNetwork === name ? null : name); setNvFuel("АИ-92"); setNvVolume(40); }}
-                  style={{ padding: "0.45rem 0.2rem", background: activeNetwork === name ? `${color}18` : "rgba(255,255,255,0.025)", border: `1px solid ${activeNetwork === name ? color + "90" : "#1a1a24"}`, borderRadius: "9px", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.18rem", cursor: "pointer", transition: "all 0.15s" }}>
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", color: activeNetwork === name ? color : "#6b7280", fontSize: "0.57rem", fontWeight: activeNetwork === name ? 700 : 400, textAlign: "center", lineHeight: 1.25 }}>{name}</span>
-                  <span style={{ color: "#374151", fontSize: "0.47rem" }}>{(NETWORK_PRICES[name]?.["АИ-92"] ?? 65).toFixed(1)}₽/л</span>
-                </button>
-              ))}
+        <div style={{ padding: "0 12px 8px" }}>
+          <div className="glass-panel" style={{ padding: "14px", position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,var(--accent-primary),var(--accent-secondary),transparent)" }} />
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <p style={{ margin: "0 0 2px", fontSize: "0.52rem", color: "var(--text-tertiary)", letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "var(--font-mono)" }}>
+                  Топливный терминал
+                </p>
+                <h2 style={{ margin: 0, color: "var(--text-primary)", fontSize: "1.1rem", fontWeight: 800, lineHeight: 1 }}>
+                  🎫 Талоны
+                </h2>
+                <p style={{ margin: "4px 0 0", color: "var(--text-secondary)", fontSize: "0.68rem" }}>
+                  {stations.length.toLocaleString("ru")} станций
+                  {lastFetched && (
+                    <span style={{ color: "var(--text-tertiary)", marginLeft: "6px" }}>
+                      · {(() => { const m = Math.floor((Date.now() - lastFetched) / 60000); return m < 1 ? "только что" : `${m} мин назад`; })()}
+                    </span>
+                  )}
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: "6px", alignItems: "center", flexShrink: 0, marginLeft: "8px" }}>
+                <button
+                  onClick={() => { impact("light"); setShowCalculator(true); onCalcOpenChange?.(true); }}
+                  title="Калькулятор расхода"
+                  style={{ background: "rgba(168,85,247,0.1)", border: "1px solid rgba(168,85,247,0.3)", borderRadius: "10px", color: "#a855f7", fontSize: "1.1rem", padding: "4px 9px", cursor: "pointer", lineHeight: 1 }}
+                >🧮</button>
+                <motion.button
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  title="Обновить данные"
+                  animate={refreshing ? { rotate: 360 } : { rotate: 0 }}
+                  transition={refreshing ? { duration: 0.8, repeat: Infinity, ease: "linear" } : { duration: 0.3 }}
+                  style={{ background: "rgba(168,85,247,0.08)", border: "1px solid rgba(168,85,247,0.2)", borderRadius: "10px", color: refreshing ? "#a855f7" : "#6b7280", fontSize: "0.9rem", padding: "4px 9px", cursor: refreshing ? "not-allowed" : "pointer", lineHeight: 1 }}
+                >↻</motion.button>
+                <div style={{ display: "flex", alignItems: "center", gap: "4px", background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.25)", borderRadius: "999px", padding: "3px 8px" }}>
+                  <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: "var(--accent-success)", boxShadow: "0 0 5px var(--accent-success)" }} />
+                  <span style={{ fontSize: "0.55rem", color: "var(--accent-success)", fontFamily: "var(--font-mono)", letterSpacing: "0.06em" }}>LIVE</span>
+                </div>
+              </div>
             </div>
-            <AnimatePresence>
-              {activeNetwork && (
-                <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.16 }}>
-                  <div style={{ display: "flex", gap: "0.25rem", marginBottom: "0.38rem", flexWrap: "wrap" }}>
-                    {["АИ-92", "АИ-95", "ДТ", "Газ"].map((ft) => (
-                      <button key={ft} onClick={() => { impact("light"); setNvFuel(ft); }}
-                        style={{ padding: "0.22rem 0.45rem", background: nvFuel === ft ? "#a855f720" : "#0b0b10", border: `1px solid ${nvFuel === ft ? "#a855f7" : "#222230"}`, borderRadius: "7px", color: nvFuel === ft ? "#a855f7" : "#4b5563", fontSize: "0.58rem", fontWeight: nvFuel === ft ? 700 : 400, cursor: "pointer" }}>
-                        {ft} · {(NETWORK_PRICES[activeNetwork]?.[ft] ?? FUEL_PRICES[ft] ?? 65).toFixed(1)}₽
-                      </button>
-                    ))}
-                  </div>
-                  <div style={{ display: "flex", gap: "0.25rem", marginBottom: "0.45rem" }}>
-                    {VOLUMES.map((v) => (
-                      <button key={v} onClick={() => { impact("light"); setNvVolume(v); }}
-                        style={{ flex: 1, padding: "0.28rem", background: nvVolume === v ? "#db277718" : "#0b0b10", border: `1px solid ${nvVolume === v ? "#db2777" : "#222230"}`, borderRadius: "7px", color: nvVolume === v ? "#db2777" : "#4b5563", fontSize: "0.62rem", fontWeight: nvVolume === v ? 700 : 400, cursor: "pointer", textAlign: "center" }}>
-                        {v}л
-                      </button>
-                    ))}
-                  </div>
-                  <div style={{ background: "#0b0b10", border: "1px solid #1a1a24", borderRadius: "8px", padding: "0.38rem 0.55rem", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
-                    <div>
-                      <div style={{ color: "#6b7280", fontSize: "0.5rem" }}>Сетевой талон · 7 дней</div>
-                      <div style={{ color: "#e2e8f0", fontSize: "0.7rem", fontWeight: 700 }}>{activeNetwork} · {nvFuel} · {nvVolume}л</div>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#a855f7", fontSize: "0.85rem", fontWeight: 800 }}>
-                        {((NETWORK_PRICES[activeNetwork]?.[nvFuel] ?? FUEL_PRICES[nvFuel] ?? 65) * nvVolume).toFixed(0)}₽
-                      </div>
-                      <div style={{ color: "#374151", fontSize: "0.48rem" }}>≈{Math.ceil((NETWORK_PRICES[activeNetwork]?.[nvFuel] ?? FUEL_PRICES[nvFuel] ?? 65) * nvVolume / STAR_RUB_RATE)}⭐</div>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: "0.35rem" }}>
-                    <button onClick={() => handleNetworkVoucher("stars")} disabled={nvLoading}
-                      style={{ flex: 1, padding: "0.46rem", background: "linear-gradient(135deg,#a855f720,#9333ea20)", border: "1px solid #a855f740", borderRadius: "9px", color: "#a855f7", fontSize: "0.63rem", fontWeight: 700, cursor: nvLoading ? "wait" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.3rem" }}>
-                      ⭐ Оплатить Stars
-                    </button>
-                    <button onClick={() => handleNetworkVoucher("cryptobot")} disabled={nvLoading}
-                      style={{ flex: 1, padding: "0.46rem", background: "linear-gradient(135deg,#22c55e15,#16a34a15)", border: "1px solid #22c55e30", borderRadius: "9px", color: "#22c55e", fontSize: "0.63rem", fontWeight: 700, cursor: nvLoading ? "wait" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.3rem" }}>
-                      💎 Crypto
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
         </div>
       )}
