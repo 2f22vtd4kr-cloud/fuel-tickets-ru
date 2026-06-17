@@ -61,6 +61,7 @@ export interface Purchase {
   station_name: string | null;
   region: string | null;
   created_at: string;
+  expires_at: string | null;
 }
 
 export interface PurchaseResult {

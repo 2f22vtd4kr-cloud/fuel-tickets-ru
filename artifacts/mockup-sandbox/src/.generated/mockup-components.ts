@@ -6,6 +6,7 @@ export const modules: ModuleMap = {
   "./components/mockups/ticket/FuelTicket.tsx": () => import("../components/mockups/ticket/FuelTicket.tsx"),
   "./components/mockups/ticket/FuelTicketExpiring.tsx": () => import("../components/mockups/ticket/FuelTicketExpiring.tsx"),
   "./components/mockups/ticket/FuelTicketWarning.tsx": () => import("../components/mockups/ticket/FuelTicketWarning.tsx"),
+  "./components/mockups/ticket/NetworkVoucher.tsx": () => import("../components/mockups/ticket/NetworkVoucher.tsx"),
   "./components/mockups/ticket/PostPurchaseReceipt.tsx": () => import("../components/mockups/ticket/PostPurchaseReceipt.tsx"),
   "./components/mockups/ticket/QRTicket.tsx": () => import("../components/mockups/ticket/QRTicket.tsx"),
   "./components/mockups/ticket/SuccessScreen.tsx": () => import("../components/mockups/ticket/SuccessScreen.tsx"),

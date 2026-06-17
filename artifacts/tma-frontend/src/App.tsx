@@ -125,6 +125,10 @@ export default function App() {
     return avg < 25 ? n + 1 : n;
   }, 0);
 
+  const activeNetworkVoucherCount = purchases.filter(
+    (p) => p.status === "active" && p.station_name?.startsWith("Любая АЗС сети ")
+  ).length;
+
   // ── Price store + WebSocket live feed ───────────────────────────
   useEffect(() => {
     void initPrices();
@@ -580,7 +584,9 @@ export default function App() {
         onChange={handleTabChange}
         visible={navVisible}
         badges={{
-          ...(crisisCount > 0 ? { catalog: crisisCount } : {}),
+          ...(crisisCount > 0 || activeNetworkVoucherCount > 0
+            ? { catalog: (crisisCount > 0 ? crisisCount : 0) + activeNetworkVoucherCount }
+            : {}),
           ...(newsBadgeCount > 0 ? { news: newsBadgeCount } : {}),
         }}
       />

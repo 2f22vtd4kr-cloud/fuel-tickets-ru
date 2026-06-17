@@ -40,6 +40,22 @@ const NETWORK_VOUCHER_NETWORKS = [
   { name: "ННК",          color: "#f59e0b" },
 ];
 
+const NETWORK_BADGES: Record<string, { text: string; bg: string; fg: string }> = {
+  "Лукойл":       { text: "🔥 ТОП",     bg: "#ef444422", fg: "#ef4444" },
+  "Роснефть":     { text: "⚡ PULSAR",   bg: "#0ea5e922", fg: "#0ea5e9" },
+  "Газпромнефть": { text: "✦ G-DRIVE",  bg: "#3b82f622", fg: "#3b82f6" },
+  "Башнефть":     { text: "⚗ ATUM",     bg: "#8b5cf622", fg: "#8b5cf6" },
+  "Татнефть":     { text: "◆ ТАНЕКО",   bg: "#22c55e22", fg: "#22c55e" },
+  "ННК":          { text: "🌿 NEO",      bg: "#f59e0b22", fg: "#f59e0b" },
+};
+
+const POPULAR_COMBOS: { network: string; fuelKey: string; fuelLabel: string; volume: number; badge: string; color: string }[] = [
+  { network: "Лукойл",       fuelKey: "АИ-95+", fuelLabel: "ЭКТО Plus",  volume: 40, badge: "🔥 Хит",     color: "#ef4444" },
+  { network: "Газпромнефть", fuelKey: "АИ-95+", fuelLabel: "G-Drive 95", volume: 40, badge: "✦ Топ",      color: "#3b82f6" },
+  { network: "Роснефть",     fuelKey: "АИ-92",  fuelLabel: "АИ-92",      volume: 60, badge: "⚡ Выгодно", color: "#0ea5e9" },
+  { network: "Татнефть",     fuelKey: "ДТ+",    fuelLabel: "ДТ ТАНЕКО",  volume: 40, badge: "◆ ДТ",       color: "#22c55e" },
+];
+
 const NETWORK_FUELS: Record<string, { key: string; label: string }[]> = {
   "Лукойл": [
     { key: "АИ-92",  label: "АИ-92" },
@@ -410,7 +426,7 @@ const RECENT_SEARCHES_KEY = "tma-recent-searches";
 export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabProps) {
   const { user } = useUserStore();
   const { stations, loading, lastFetched } = useStationStore();
-  useVaultStore();
+  const { purchases: vaultPurchases } = useVaultStore();
   const { add: toast } = useToast();
   const getPrice = usePriceStore((s) => s.getPrice);
 
@@ -441,10 +457,24 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
   });
   const [searchFocused, setSearchFocused] = useState(false);
   const [dealFuel, setDealFuel] = useState<"АИ-92" | "АИ-95" | "ДТ">("АИ-92");
-  const [activeNetwork, setActiveNetwork] = useState<string | null>(null);
-  const [nvFuel, setNvFuel] = useState<string>("АИ-92");
-  const [nvVolume, setNvVolume] = useState<number>(40);
+  const [activeNetwork, setActiveNetworkRaw] = useState<string | null>(() => {
+    try { return localStorage.getItem("tma-last-network") ?? null; } catch { return null; }
+  });
+  const setActiveNetwork = (net: string | null) => {
+    setActiveNetworkRaw(net);
+    try { if (net) localStorage.setItem("tma-last-network", net); } catch {}
+  };
+  const [nvFuel, setNvFuelRaw] = useState<string>(() => {
+    try { return localStorage.getItem("tma-last-nvfuel") ?? "АИ-92"; } catch { return "АИ-92"; }
+  });
+  const setNvFuel = (f: string) => { setNvFuelRaw(f); try { localStorage.setItem("tma-last-nvfuel", f); } catch {} };
+  const [nvVolume, setNvVolumeRaw] = useState<number>(() => {
+    try { return Number(localStorage.getItem("tma-last-nvvolume")) || 40; } catch { return 40; }
+  });
+  const setNvVolume = (v: number) => { setNvVolumeRaw(v); try { localStorage.setItem("tma-last-nvvolume", String(v)); } catch {} };
   const [nvLoading, setNvLoading] = useState(false);
+  const [nvSortByPrice, setNvSortByPrice] = useState(false);
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [cityFilter, setCityFilter] = useState<string | null>(null);
   const [networkFilter, setNetworkFilter] = useState<string | null>(null);
 
@@ -560,6 +590,76 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
     const avg = s.fuel_statuses.length ? s.fuel_statuses.reduce((a, b) => a + b.availability_pct, 0) / s.fuel_statuses.length : 0;
     return avg < 25;
   }).length, [stations]);
+
+  const networkStationCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const s of stations) {
+      if (s.network) counts[s.network] = (counts[s.network] ?? 0) + 1;
+    }
+    return counts;
+  }, [stations]);
+
+  const activeVouchersByNetwork = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const p of vaultPurchases) {
+      if (p.status === "active" && p.station_name) {
+        const net = p.station_name.replace(/^Любая АЗС сети /, "");
+        counts[net] = (counts[net] ?? 0) + 1;
+      }
+    }
+    return counts;
+  }, [vaultPurchases]);
+
+  const networkFuelAvailability = useMemo(() => {
+    const result: Record<string, Record<string, { available: number; total: number }>> = {};
+    for (const s of stations) {
+      const net = s.network;
+      if (!result[net]) result[net] = {};
+      for (const fs of s.fuel_statuses) {
+        if (!result[net][fs.fuel_type]) result[net][fs.fuel_type] = { available: 0, total: 0 };
+        result[net][fs.fuel_type].total++;
+        if (fs.availability_pct > 0) result[net][fs.fuel_type].available++;
+      }
+    }
+    return result;
+  }, [stations]);
+
+  const lastPurchasedByNetwork = useMemo(() => {
+    const latest: Record<string, string> = {};
+    for (const p of vaultPurchases) {
+      if (p.station_name) {
+        const net = p.station_name.replace(/^Любая АЗС сети /, "");
+        if (!latest[net] || p.created_at > latest[net]) {
+          latest[net] = p.created_at;
+        }
+      }
+    }
+    return latest;
+  }, [vaultPurchases]);
+
+  const lastNetworkPurchase = useMemo(() => {
+    let best: (typeof vaultPurchases)[0] | null = null;
+    for (const p of vaultPurchases) {
+      if (p.station_name?.startsWith("Любая АЗС сети ") && p.status === "active") {
+        if (!best || p.created_at > best.created_at) best = p;
+      }
+    }
+    return best;
+  }, [vaultPurchases]);
+
+  const cheapestNetworkPerFuel = useMemo(() => {
+    const result: Record<string, string> = {};
+    for (const fuel of ["АИ-92", "АИ-95", "ДТ"]) {
+      let best = NETWORK_VOUCHER_NETWORKS[0].name;
+      let bestP = NETWORK_PRICES[best]?.[fuel] ?? 999;
+      for (const { name } of NETWORK_VOUCHER_NETWORKS) {
+        const p = NETWORK_PRICES[name]?.[fuel] ?? 999;
+        if (p < bestP) { bestP = p; best = name; }
+      }
+      result[fuel] = best;
+    }
+    return result;
+  }, []);
 
   // ── Fuse.js fuzzy search instance ────────────────────────────────────────
   const fuse = useMemo(() => new Fuse(stations, {
@@ -759,148 +859,616 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
       {/* ── FLAGSHIP: Network Vouchers ── */}
       {!selectedStation && (
         <div style={{ padding: "0 12px 6px" }}>
+
+          {/* Section label row */}
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.55rem" }}>
             <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#a855f7", fontSize: "0.65rem", letterSpacing: "0.15em", fontWeight: 700 }}>СЕТЕВЫЕ_ТАЛОНЫ</span>
             <div style={{ flex: 1, height: "1px", background: "linear-gradient(90deg,#a855f744,transparent)" }} />
-            <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#4b5563", fontSize: "0.44rem", flexShrink: 0 }}>НА ВСЕХ АЗС СЕТИ</span>
+            {Object.values(activeVouchersByNetwork).reduce((s, n) => s + n, 0) > 0 && (
+              <div style={{
+                display: "flex", alignItems: "center", gap: "0.25rem",
+                background: "#22c55e12", border: "1px solid #22c55e44",
+                borderRadius: "6px", padding: "0.06rem 0.3rem",
+                flexShrink: 0,
+              }}>
+                <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 5px #22c55e" }} />
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e", fontSize: "0.42rem", fontWeight: 700 }}>
+                  МОИ: {Object.values(activeVouchersByNetwork).reduce((s, n) => s + n, 0)}
+                </span>
+              </div>
+            )}
+            <button
+              onClick={() => { impact("light"); setNvSortByPrice(v => !v); }}
+              style={{
+                background: nvSortByPrice ? "#22c55e14" : "transparent",
+                border: `1px solid ${nvSortByPrice ? "#22c55e44" : "#1e1e2a"}`,
+                borderRadius: "6px", padding: "0.06rem 0.32rem",
+                cursor: "pointer", display: "flex", alignItems: "center", gap: "0.2rem",
+                flexShrink: 0, transition: "all 0.15s",
+              }}
+            >
+              <span style={{ fontSize: "0.5rem" }}>{nvSortByPrice ? "↑" : "⇅"}</span>
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", color: nvSortByPrice ? "#22c55e" : "#4b5563", fontSize: "0.42rem", fontWeight: nvSortByPrice ? 700 : 400 }}>
+                {nvSortByPrice ? "ЦЕНА" : "СОРТ"}
+              </span>
+            </button>
+            <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#4b5563", fontSize: "0.44rem", flexShrink: 0 }}>НА ВСЕХ АЗС</span>
           </div>
 
+          {/* Quick reorder — last active network voucher */}
+          {lastNetworkPurchase && (() => {
+            const lNet = lastNetworkPurchase.station_name!.replace(/^Любая АЗС сети /, "");
+            const lColor = NETWORK_VOUCHER_NETWORKS.find(n => n.name === lNet)?.color ?? "#a855f7";
+            const lFuel = lastNetworkPurchase.fuel_type;
+            const lVol = lastNetworkPurchase.volume;
+            const lPrice = lastNetworkPurchase.price;
+            return (
+              <motion.div
+                initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}
+                style={{
+                  background: `linear-gradient(135deg,${lColor}10,${lColor}06)`,
+                  border: `1px solid ${lColor}44`,
+                  borderRadius: "12px", padding: "0.55rem 0.75rem",
+                  marginBottom: "0.6rem",
+                  display: "flex", alignItems: "center", gap: "0.6rem",
+                  cursor: "pointer",
+                }}
+                onClick={() => {
+                  impact("light");
+                  setActiveNetwork(lNet);
+                  setNvFuel(lFuel);
+                  setNvVolume(lVol);
+                }}
+              >
+                <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: lColor, boxShadow: `0 0 8px ${lColor}`, flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: "'JetBrains Mono',monospace", color: lColor, fontSize: "0.52rem", fontWeight: 800, letterSpacing: "0.06em" }}>↩ ПОВТОРИТЬ ЗАКАЗ</div>
+                  <div style={{ color: "#6b7280", fontSize: "0.46rem", fontFamily: "'JetBrains Mono',monospace", marginTop: "0.08rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {lNet} · {lFuel} · {lVol}л · {lPrice.toFixed(0)}₽
+                  </div>
+                </div>
+                <div style={{
+                  background: `${lColor}1a`, border: `1px solid ${lColor}55`, borderRadius: "7px",
+                  padding: "0.22rem 0.5rem", fontFamily: "'JetBrains Mono',monospace",
+                  color: lColor, fontSize: "0.44rem", fontWeight: 700, flexShrink: 0,
+                }}>ВЫБРАТЬ</div>
+              </motion.div>
+            );
+          })()}
+
+          {/* Best deal chip */}
+          {(() => {
+            let bestNet = "", bestFuel = "", bestPrice = 999, bestAvail = 0, bestColor = "#a855f7";
+            for (const { name, color } of NETWORK_VOUCHER_NETWORKS) {
+              for (const fuel of ["АИ-92", "АИ-95", "ДТ"]) {
+                const p = NETWORK_PRICES[name]?.[fuel] ?? 999;
+                const avail = networkFuelAvailability[name]?.[fuel];
+                const score = p - (avail ? (avail.available / Math.max(avail.total, 1)) * 2 : 0);
+                if (score < bestPrice || (score === bestPrice && bestAvail < (avail?.available ?? 0))) {
+                  bestNet = name; bestFuel = fuel; bestPrice = score; bestColor = color;
+                  bestAvail = avail?.available ?? 0;
+                }
+              }
+            }
+            if (!bestNet) return null;
+            const actualPrice = NETWORK_PRICES[bestNet]?.[bestFuel] ?? 65;
+            return (
+              <div
+                style={{
+                  display: "flex", alignItems: "center", gap: "0.45rem",
+                  background: `${bestColor}0d`, border: `1px solid ${bestColor}30`,
+                  borderRadius: "9px", padding: "0.3rem 0.6rem", marginBottom: "0.45rem",
+                  cursor: "pointer",
+                }}
+                onClick={() => { impact("light"); setActiveNetwork(bestNet); setNvFuel(bestFuel); setNvSortByPrice(false); }}
+              >
+                <span style={{ fontSize: "0.7rem" }}>🏆</span>
+                <div style={{ flex: 1 }}>
+                  <span style={{ fontFamily: "'JetBrains Mono',monospace", color: bestColor, fontSize: "0.48rem", fontWeight: 800 }}>ЛУЧШАЯ ЦЕНА · </span>
+                  <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#9ca3af", fontSize: "0.46rem" }}>{bestNet} {bestFuel} — {actualPrice.toFixed(1)}₽/л</span>
+                </div>
+                <div style={{ background: `${bestColor}1a`, border: `1px solid ${bestColor}44`, borderRadius: "5px", padding: "0.04rem 0.2rem", fontFamily: "'JetBrains Mono',monospace", color: bestColor, fontSize: "0.4rem", fontWeight: 700, flexShrink: 0 }}>ВЫБРАТЬ</div>
+              </div>
+            );
+          })()}
+
+          {/* "То за чем вы здесь" hero banner */}
           <motion.div
-            animate={{ boxShadow: ["0 0 14px #a855f755", "0 0 28px #db277755", "0 0 14px #a855f755"] }}
+            animate={{ boxShadow: ["0 0 14px #a855f755", "0 0 32px #db277766", "0 0 14px #a855f755"] }}
             transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
             style={{
-              background: "linear-gradient(135deg,#a855f7,#db2777,#9333ea)",
-              borderRadius: "12px",
-              padding: "0.62rem 1rem",
-              marginBottom: "0.65rem",
-              textAlign: "center",
-              position: "relative",
-              overflow: "hidden",
+              background: "linear-gradient(135deg,#7c3aed,#a855f7,#db2777,#9333ea)",
+              borderRadius: "13px", padding: "0.7rem 1rem",
+              marginBottom: "0.7rem", textAlign: "center",
+              position: "relative", overflow: "hidden",
             }}
           >
             <motion.div
-              animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
-              transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+              animate={{ x: ["-100%", "100%"] }}
+              transition={{ duration: 2.2, repeat: Infinity, ease: "linear", repeatDelay: 1.2 }}
               style={{
                 position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
-                background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.08),transparent)",
-                backgroundSize: "200% 100%",
+                background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.12),transparent)",
+                width: "60%",
               }}
             />
-            <span style={{
-              fontFamily: "'JetBrains Mono',monospace",
-              fontSize: "0.8rem", fontWeight: 900, color: "#fff",
-              letterSpacing: "0.08em", textTransform: "uppercase",
-              position: "relative", zIndex: 1,
-              textShadow: "0 0 20px rgba(255,255,255,0.4)",
-            }}>✦ ТО, ЗА ЧЕМ ВЫ ЗДЕСЬ</span>
+            <div style={{ position: "relative", zIndex: 1 }}>
+              <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.85rem", fontWeight: 900, color: "#fff", letterSpacing: "0.06em", textTransform: "uppercase", textShadow: "0 0 24px rgba(255,255,255,0.5)" }}>
+                ✦ ТО, ЗА ЧЕМ ВЫ ЗДЕСЬ
+              </div>
+              <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.48rem", color: "rgba(255,255,255,0.55)", letterSpacing: "0.15em", marginTop: "0.2rem" }}>
+                ТАЛОН НА ТОПЛИВО · ДЕЙСТВУЕТ НА ВСЕЙ СЕТИ
+              </div>
+            </div>
           </motion.div>
 
+          {/* Main card */}
           <div style={{
             background: "linear-gradient(160deg,#100b1e,#130d22,#0d0d18)",
             border: "1.5px solid #a855f755",
             borderRadius: "18px", padding: "1.1rem",
             position: "relative", overflow: "hidden",
-            boxShadow: "0 0 50px #a855f718, 0 0 22px #db27770d, 0 8px 32px #00000077",
+            boxShadow: "0 0 60px #a855f714, 0 0 24px #db27770a, 0 10px 36px #00000088",
           }}>
+            {/* animated top bar */}
             <motion.div
               animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
-              transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+              transition={{ duration: 3.5, repeat: Infinity, ease: "linear" }}
               style={{
                 position: "absolute", top: 0, left: 0, right: 0, height: "2px",
-                background: "linear-gradient(90deg,#a855f7,#db2777,#a855f7,#9333ea,#a855f7)",
+                background: "linear-gradient(90deg,#a855f7,#db2777,#9333ea,#a855f7)",
                 backgroundSize: "200% 100%",
               }}
             />
-            <div style={{ position: "absolute", top: "-30%", right: "-10%", width: "55%", height: "55%", background: "radial-gradient(circle,#a855f70a,transparent 70%)", pointerEvents: "none" }} />
-            <div style={{ position: "absolute", bottom: "-20%", left: "5%", width: "40%", height: "40%", background: "radial-gradient(circle,#db27770a,transparent 70%)", pointerEvents: "none" }} />
+            <div style={{ position: "absolute", top: "-25%", right: "-8%", width: "50%", height: "50%", background: "radial-gradient(circle,#a855f70c,transparent 70%)", pointerEvents: "none" }} />
+            <div style={{ position: "absolute", bottom: "-15%", left: "3%", width: "38%", height: "38%", background: "radial-gradient(circle,#db27770c,transparent 70%)", pointerEvents: "none" }} />
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "0.5rem", marginBottom: activeNetwork ? "0.8rem" : 0 }}>
-              {NETWORK_VOUCHER_NETWORKS.map(({ name, color }) => {
+            {/* Network cards grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "0.5rem", marginBottom: "0.7rem" }}>
+              {(nvSortByPrice
+                ? [...NETWORK_VOUCHER_NETWORKS].sort((a, b) => (NETWORK_PRICES[a.name]?.[nvFuel] ?? 999) - (NETWORK_PRICES[b.name]?.[nvFuel] ?? 999))
+                : NETWORK_VOUCHER_NETWORKS
+              ).map(({ name, color }) => {
                 const isActive = activeNetwork === name;
                 const price92 = NETWORK_PRICES[name]?.["АИ-92"] ?? 65;
+                const stCount = networkStationCounts[name] ?? 0;
+                const fuelCount = NETWORK_FUELS[name]?.length ?? 4;
                 return (
                   <motion.button
                     key={name}
-                    whileTap={{ scale: 0.95 }}
+                    whileTap={{ scale: 0.92 }}
+                    animate={isActive
+                      ? { boxShadow: [`0 0 18px ${color}55`, `0 0 36px ${color}77`, `0 0 18px ${color}55`] }
+                      : { boxShadow: [`0 0 0px ${color}00`, `0 0 10px ${color}25`, `0 0 0px ${color}00`] }
+                    }
+                    transition={{ duration: isActive ? 1.6 : 3.5, repeat: Infinity, ease: "easeInOut" }}
                     onClick={() => { impact("light"); setActiveNetwork(isActive ? null : name); setNvFuel("АИ-92"); setNvVolume(40); }}
                     style={{
-                      padding: "0.8rem 0.3rem",
-                      background: isActive ? `linear-gradient(160deg,${color}26,${color}14)` : "rgba(255,255,255,0.04)",
-                      border: `1.5px solid ${isActive ? color + "cc" : color + "30"}`,
+                      padding: "0.85rem 0.25rem 0.72rem",
+                      background: isActive ? `linear-gradient(160deg,${color}28,${color}14)` : "rgba(255,255,255,0.04)",
+                      border: `1.5px solid ${isActive ? color + "cc" : color + "33"}`,
                       borderRadius: "14px",
-                      display: "flex", flexDirection: "column", alignItems: "center", gap: "0.3rem",
-                      cursor: "pointer", transition: "all 0.2s",
-                      boxShadow: isActive ? `0 0 22px ${color}44, 0 2px 12px ${color}22` : "none",
+                      display: "flex", flexDirection: "column", alignItems: "center", gap: "0.28rem",
+                      cursor: "pointer", transition: "background 0.2s, border-color 0.2s",
                       position: "relative", overflow: "hidden",
                     }}
                   >
-                    {isActive && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg,transparent,${color},transparent)` }} />}
-                    <div style={{ width: "9px", height: "9px", borderRadius: "50%", background: color, boxShadow: isActive ? `0 0 12px ${color}` : "none", flexShrink: 0 }} />
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", color: isActive ? color : "#9ca3af", fontSize: "0.65rem", fontWeight: isActive ? 800 : 500, textAlign: "center", lineHeight: 1.2 }}>{name}</span>
-                    <span style={{ color: isActive ? color : "#4b5563", fontSize: "0.56rem", fontFamily: "'JetBrains Mono',monospace", fontWeight: isActive ? 700 : 400 }}>{price92.toFixed(1)}₽/л</span>
+                    {isActive && (
+                      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg,transparent,${color},transparent)` }} />
+                    )}
+                    {/* Brand badge top-right */}
+                    {NETWORK_BADGES[name] && (
+                      <div style={{
+                        position: "absolute", top: "5px", right: "5px",
+                        background: NETWORK_BADGES[name].bg,
+                        borderRadius: "4px", padding: "0.06rem 0.22rem",
+                        fontSize: "0.38rem", fontWeight: 700,
+                        color: NETWORK_BADGES[name].fg,
+                        fontFamily: "'JetBrains Mono',monospace",
+                        letterSpacing: "0.04em", lineHeight: 1.4,
+                        border: `1px solid ${NETWORK_BADGES[name].fg}33`,
+                      }}>{NETWORK_BADGES[name].text}</div>
+                    )}
+                    <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: color, boxShadow: `0 0 ${isActive ? 16 : 7}px ${color}${isActive ? "" : "88"}`, flexShrink: 0 }} />
+                    <span style={{ fontFamily: "'JetBrains Mono',monospace", color: isActive ? color : "#d1d5db", fontSize: "0.64rem", fontWeight: isActive ? 800 : 600, textAlign: "center", lineHeight: 1.2 }}>{name}</span>
+                    <span style={{ color: isActive ? color : "#6b7280", fontSize: "0.55rem", fontFamily: "'JetBrains Mono',monospace", fontWeight: isActive ? 700 : 400 }}>{price92.toFixed(1)}₽/л</span>
+                    {stCount > 0 && (
+                      <span style={{ fontSize: "0.43rem", color: isActive ? color + "bb" : "#374151", fontFamily: "'JetBrains Mono',monospace", lineHeight: 1 }}>
+                        {stCount} АЗС · {fuelCount}вида
+                      </span>
+                    )}
+                    {/* Active voucher count */}
+                    {(activeVouchersByNetwork[name] ?? 0) > 0 && (
+                      <div style={{
+                        position: "absolute", top: "5px", left: "5px",
+                        background: "#22c55e22", border: "1px solid #22c55e55",
+                        borderRadius: "4px", padding: "0.04rem 0.2rem",
+                        fontSize: "0.38rem", fontWeight: 800, color: "#22c55e",
+                        fontFamily: "'JetBrains Mono',monospace",
+                      }}>✓{activeVouchersByNetwork[name]}</div>
+                    )}
+                    {/* Last purchased timestamp */}
+                    {lastPurchasedByNetwork[name] && (
+                      <div style={{
+                        position: "absolute", bottom: (cheapestNetworkPerFuel["АИ-92"] === name ? "18px" : "4px"), left: "50%", transform: "translateX(-50%)",
+                        whiteSpace: "nowrap",
+                        fontFamily: "'JetBrains Mono',monospace",
+                        fontSize: "0.34rem", color: "#374151",
+                      }}>
+                        {new Date(lastPurchasedByNetwork[name]).toLocaleDateString("ru-RU", { day: "2-digit", month: "short" })}
+                      </div>
+                    )}
+                    {/* Last session badge */}
+                    {(() => {
+                      try {
+                        const last = localStorage.getItem("tma-last-network");
+                        if (last === name && activeNetwork !== name) {
+                          return (
+                            <div style={{
+                              position: "absolute", top: "5px", left: "5px",
+                              background: `${color}18`, border: `1px solid ${color}44`,
+                              borderRadius: "3px", padding: "0.03rem 0.18rem",
+                              fontSize: "0.32rem", fontWeight: 700,
+                              color, fontFamily: "'JetBrains Mono',monospace",
+                              letterSpacing: "0.04em",
+                            }}>↩</div>
+                          );
+                        }
+                      } catch {}
+                      return null;
+                    })()}
+                    {/* Best price badge bottom */}
+                    {cheapestNetworkPerFuel["АИ-92"] === name && (
+                      <div style={{
+                        position: "absolute", bottom: "4px", left: "50%", transform: "translateX(-50%)",
+                        background: "linear-gradient(90deg,#22c55e22,#22c55e33)",
+                        border: "1px solid #22c55e55",
+                        borderRadius: "4px", padding: "0.04rem 0.26rem",
+                        fontSize: "0.35rem", fontWeight: 800, color: "#22c55e",
+                        fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.06em",
+                        whiteSpace: "nowrap",
+                      }}>↓ ЛУЧШАЯ ЦЕНА</div>
+                    )}
                   </motion.button>
                 );
               })}
             </div>
 
+            {/* Popular combos quick-pick */}
+            <div style={{ marginBottom: "0.65rem" }}>
+              <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.4rem", letterSpacing: "0.12em", marginBottom: "0.3rem" }}>ПОПУЛЯРНЫЕ КОМБИНАЦИИ</div>
+              <div style={{ display: "flex", gap: "0.35rem", overflowX: "auto", paddingBottom: "2px" }}>
+                {POPULAR_COMBOS.map((c) => {
+                  const isSelected = activeNetwork === c.network && nvFuel === c.fuelKey && nvVolume === c.volume;
+                  const comboPrice = (NETWORK_PRICES[c.network]?.[c.fuelKey] ?? FUEL_PRICES[c.fuelKey] ?? 65) * c.volume;
+                  return (
+                    <button
+                      key={c.badge}
+                      onClick={() => { impact("light"); setActiveNetwork(c.network); setNvFuel(c.fuelKey); setNvVolume(c.volume); }}
+                      style={{
+                        flexShrink: 0, background: isSelected ? `${c.color}22` : "rgba(255,255,255,0.03)",
+                        border: `1px solid ${isSelected ? c.color + "88" : "#1f2937"}`,
+                        borderRadius: "10px", padding: "0.32rem 0.55rem",
+                        cursor: "pointer", display: "flex", flexDirection: "column", gap: "0.12rem", alignItems: "flex-start",
+                        transition: "background 0.15s, border-color 0.15s",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.28rem" }}>
+                        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.44rem", color: isSelected ? c.color : "#9ca3af", fontWeight: 700 }}>{c.badge}</span>
+                        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.44rem", color: isSelected ? c.color : "#6b7280", fontWeight: 600 }}>{c.network}</span>
+                      </div>
+                      <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#4b5563", fontSize: "0.4rem" }}>{c.fuelLabel} · {c.volume}л · {comboPrice.toFixed(0)}₽</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Stats pills */}
+            <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: activeNetwork ? "0.8rem" : 0 }}>
+              {([
+                { label: "СЕТЕЙ", value: String(NETWORK_VOUCHER_NETWORKS.length) },
+                { label: "АЗС ОХВАЧЕНО", value: String(NETWORK_VOUCHER_NETWORKS.reduce((a, { name }) => a + (networkStationCounts[name] ?? 0), 0)) },
+                { label: "БРЕНДОВ ТОПЛИВА", value: "до 7" },
+                { label: "СРОК", value: "до мес." },
+              ] as { label: string; value: string }[]).map(({ label, value }) => (
+                <div key={label} style={{ background: "rgba(168,85,247,0.08)", border: "1px solid #a855f725", borderRadius: "7px", padding: "0.18rem 0.42rem", display: "flex", gap: "0.28rem", alignItems: "baseline" }}>
+                  <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#a855f7", fontSize: "0.62rem", fontWeight: 800 }}>{value}</span>
+                  <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.4rem", letterSpacing: "0.08em" }}>{label}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Expanded panel */}
             <AnimatePresence>
               {activeNetwork && (() => {
                 const netColor = NETWORK_VOUCHER_NETWORKS.find((n) => n.name === activeNetwork)?.color ?? "#a855f7";
+                const pricePerL = NETWORK_PRICES[activeNetwork]?.[nvFuel] ?? FUEL_PRICES[nvFuel] ?? 65;
+                const totalPrice = pricePerL * nvVolume;
+                const fuels = NETWORK_FUELS[activeNetwork] ?? [
+                  { key: "АИ-92", label: "АИ-92" }, { key: "АИ-95", label: "АИ-95" },
+                  { key: "ДТ", label: "ДТ" }, { key: "Газ", label: "Газ" },
+                ];
                 return (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.2 }}
+                    transition={{ duration: 0.22 }}
                     style={{ overflow: "hidden" }}
                   >
-                    <div style={{ display: "flex", gap: "0.28rem", marginBottom: "0.4rem", flexWrap: "wrap" }}>
-                      {(NETWORK_FUELS[activeNetwork] ?? [
-                        { key: "АИ-92", label: "АИ-92" }, { key: "АИ-95", label: "АИ-95" },
-                        { key: "ДТ", label: "ДТ" }, { key: "Газ", label: "Газ" },
-                      ]).map(({ key: ft, label }) => (
-                        <button key={ft} onClick={() => { impact("light"); setNvFuel(ft); }}
-                          style={{ padding: "0.28rem 0.56rem", background: nvFuel === ft ? `${netColor}22` : "#0b0b10", border: `1px solid ${nvFuel === ft ? netColor + "aa" : "#222230"}`, borderRadius: "7px", color: nvFuel === ft ? netColor : "#4b5563", fontSize: "0.6rem", fontWeight: nvFuel === ft ? 700 : 400, cursor: "pointer", transition: "all 0.15s" }}>
-                          {label} · {(NETWORK_PRICES[activeNetwork]?.[ft] ?? FUEL_PRICES[ft] ?? 65).toFixed(1)}₽
-                        </button>
-                      ))}
-                    </div>
-                    <div style={{ display: "flex", gap: "0.28rem", marginBottom: "0.5rem" }}>
-                      {VOLUMES.map((v) => (
-                        <button key={v} onClick={() => { impact("light"); setNvVolume(v); }}
-                          style={{ flex: 1, padding: "0.32rem", background: nvVolume === v ? `${netColor}18` : "#0b0b10", border: `1px solid ${nvVolume === v ? netColor + "99" : "#222230"}`, borderRadius: "8px", color: nvVolume === v ? netColor : "#4b5563", fontSize: "0.65rem", fontWeight: nvVolume === v ? 700 : 400, cursor: "pointer", textAlign: "center", transition: "all 0.15s" }}>
-                          {v}л
-                        </button>
-                      ))}
-                    </div>
-                    <div style={{ background: "rgba(8,6,18,0.85)", border: `1px solid ${netColor}25`, borderRadius: "10px", padding: "0.52rem 0.7rem", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-                      <div>
-                        <div style={{ color: "#4b5563", fontSize: "0.5rem", marginBottom: "2px" }}>Сетевой талон · 7 дней</div>
-                        <div style={{ color: "#e2e8f0", fontSize: "0.72rem", fontWeight: 700 }}>{activeNetwork} · {nvFuel} · {nvVolume}л</div>
+                    {/* Network name header */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.65rem", padding: "0.42rem 0.65rem", background: `${netColor}12`, borderRadius: "10px", border: `1px solid ${netColor}33` }}>
+                      <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: netColor, boxShadow: `0 0 10px ${netColor}`, flexShrink: 0 }} />
+                      <span style={{ fontFamily: "'JetBrains Mono',monospace", color: netColor, fontSize: "0.75rem", fontWeight: 800 }}>{activeNetwork}</span>
+                      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                        {activeVouchersByNetwork[activeNetwork] > 0 && (
+                          <div style={{ background: "#22c55e1a", border: "1px solid #22c55e44", borderRadius: "4px", padding: "0.04rem 0.22rem", fontFamily: "'JetBrains Mono',monospace", fontSize: "0.38rem", color: "#22c55e", fontWeight: 700 }}>
+                            ✓{activeVouchersByNetwork[activeNetwork]}
+                          </div>
+                        )}
+                        <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#4b5563", fontSize: "0.46rem" }}>
+                          {networkStationCounts[activeNetwork] ?? 0} АЗС · {fuels.length} вида топлива
+                        </span>
                       </div>
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontFamily: "'JetBrains Mono',monospace", color: netColor, fontSize: "1rem", fontWeight: 900, lineHeight: 1 }}>
-                          {((NETWORK_PRICES[activeNetwork]?.[nvFuel] ?? FUEL_PRICES[nvFuel] ?? 65) * nvVolume).toFixed(0)}₽
+                    </div>
+
+                    {/* Fuel chips — horizontal scroll */}
+                    {(() => {
+                      const FUEL_DOTS: Record<string, string> = { "АИ-92": "#22c55e", "АИ-95": "#3b82f6", "АИ-95+": "#a855f7", "ЭКТО Plus": "#6366f1", "АИ-100": "#8b5cf6", "ДТ": "#f59e0b", "ДТ+": "#f97316", "Газ": "#14b8a6", "G-Drive": "#db2777", "Pulsar": "#0ea5e9" };
+                      return (
+                        <div style={{ overflowX: "auto", marginBottom: "0.6rem", paddingBottom: "3px", scrollbarWidth: "none" }}>
+                          <div style={{ display: "flex", gap: "0.32rem", width: "max-content" }}>
+                            {fuels.map(({ key: ft, label }) => {
+                              const ftPrice = NETWORK_PRICES[activeNetwork]?.[ft] ?? FUEL_PRICES[ft] ?? 65;
+                              const isFtActive = nvFuel === ft;
+                              const dotColor = FUEL_DOTS[ft] ?? netColor;
+                              return (
+                                <motion.button key={ft} whileTap={{ scale: 0.93 }} onClick={() => { impact("light"); setNvFuel(ft); }}
+                                  style={{
+                                    padding: "0.34rem 0.65rem",
+                                    background: isFtActive ? `${netColor}28` : "#0b0b10",
+                                    border: `1px solid ${isFtActive ? netColor + "cc" : "#1e1e2a"}`,
+                                    borderRadius: "9px", whiteSpace: "nowrap",
+                                    cursor: "pointer", transition: "all 0.14s",
+                                    boxShadow: isFtActive ? `0 0 12px ${netColor}44` : "none",
+                                    display: "flex", flexDirection: "column", alignItems: "center", gap: "0.1rem",
+                                  }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: "0.2rem" }}>
+                                    <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: dotColor, boxShadow: isFtActive ? `0 0 4px ${dotColor}` : "none", flexShrink: 0 }} />
+                                    <span style={{ fontFamily: "'JetBrains Mono',monospace", color: isFtActive ? netColor : "#9ca3af", fontSize: "0.62rem", fontWeight: isFtActive ? 800 : 500 }}>{label}</span>
+                                  </div>
+                                  <span style={{ color: isFtActive ? netColor + "cc" : "#374151", fontSize: "0.5rem" }}>{ftPrice.toFixed(1)}₽/л</span>
+                                </motion.button>
+                              );
+                            })}
+                          </div>
                         </div>
-                        <div style={{ color: "#374151", fontSize: "0.48rem", marginTop: "2px" }}>≈{Math.ceil((NETWORK_PRICES[activeNetwork]?.[nvFuel] ?? FUEL_PRICES[nvFuel] ?? 65) * nvVolume / STAR_RUB_RATE)}⭐</div>
+                      );
+                    })()}
+
+                    {/* Price comparison bar across all networks for selected fuel */}
+                    <div style={{ marginBottom: "0.65rem" }}>
+                      <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.4rem", letterSpacing: "0.12em", marginBottom: "0.35rem" }}>СРАВНЕНИЕ ЦЕН · {nvFuel}</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.22rem" }}>
+                        {NETWORK_VOUCHER_NETWORKS.map(({ name: n, color: c }) => {
+                          const p = NETWORK_PRICES[n]?.[nvFuel] ?? FUEL_PRICES[nvFuel] ?? 65;
+                          const allPrices = NETWORK_VOUCHER_NETWORKS.map(({ name: nn }) => NETWORK_PRICES[nn]?.[nvFuel] ?? FUEL_PRICES[nvFuel] ?? 65);
+                          const minP = Math.min(...allPrices);
+                          const maxP = Math.max(...allPrices);
+                          const pct = maxP === minP ? 100 : Math.round(((p - minP) / (maxP - minP)) * 100);
+                          const barWidth = 20 + (100 - pct) * 0.8;
+                          const isCur = n === activeNetwork;
+                          const isCheap = p === minP;
+                          return (
+                            <div key={n} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.46rem", color: isCur ? c : "#4b5563", fontWeight: isCur ? 700 : 400, width: "70px", flexShrink: 0 }}>{n}</span>
+                              <div style={{ flex: 1, height: "5px", background: "#0d0d18", borderRadius: "3px", overflow: "hidden" }}>
+                                <div style={{ width: `${barWidth}%`, height: "100%", background: isCur ? c : `${c}66`, borderRadius: "3px", transition: "width 0.3s" }} />
+                              </div>
+                              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.5rem", color: isCheap ? "#22c55e" : (isCur ? c : "#4b5563"), fontWeight: isCheap || isCur ? 700 : 400, width: "38px", textAlign: "right", flexShrink: 0 }}>{p.toFixed(1)}₽</span>
+                              {isCheap && <span style={{ fontSize: "0.38rem", color: "#22c55e", flexShrink: 0 }}>↓МИН</span>}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
-                    <div style={{ display: "flex", gap: "0.4rem" }}>
-                      <motion.button whileTap={{ scale: 0.97 }} onClick={() => handleNetworkVoucher("stars")} disabled={nvLoading}
-                        style={{ flex: 1, padding: "0.55rem", background: `linear-gradient(135deg,${netColor}28,${netColor}16)`, border: `1.5px solid ${netColor}55`, borderRadius: "11px", color: netColor, fontSize: "0.67rem", fontWeight: 800, cursor: nvLoading ? "wait" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.35rem", boxShadow: `0 0 12px ${netColor}22`, transition: "all 0.2s" }}>
-                        ⭐ Оплатить Stars
-                      </motion.button>
-                      <motion.button whileTap={{ scale: 0.97 }} onClick={() => handleNetworkVoucher("cryptobot")} disabled={nvLoading}
-                        style={{ flex: 1, padding: "0.55rem", background: "linear-gradient(135deg,#22c55e18,#16a34a12)", border: "1.5px solid #22c55e44", borderRadius: "11px", color: "#22c55e", fontSize: "0.67rem", fontWeight: 800, cursor: nvLoading ? "wait" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.35rem", boxShadow: "0 0 12px #22c55e18", transition: "all 0.2s" }}>
-                        💎 Crypto
-                      </motion.button>
+
+                    {/* Volume selector — large visual buttons */}
+                    <div style={{ display: "flex", gap: "0.45rem", marginBottom: "0.65rem" }}>
+                      {VOLUMES.map((v) => {
+                        const vPrice = pricePerL * v;
+                        const isVol = nvVolume === v;
+                        return (
+                          <motion.button key={v} whileTap={{ scale: 0.93 }} onClick={() => { impact("light"); setNvVolume(v); }}
+                            style={{
+                              flex: 1, padding: "0.65rem 0.2rem",
+                              background: isVol ? `${netColor}1c` : "#0b0b10",
+                              border: `1.5px solid ${isVol ? netColor + "aa" : "#1e1e2a"}`,
+                              borderRadius: "11px", cursor: "pointer",
+                              transition: "all 0.15s", textAlign: "center",
+                              boxShadow: isVol ? `0 0 14px ${netColor}33` : "none",
+                            }}>
+                            <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "1.05rem", fontWeight: 900, color: isVol ? netColor : "#6b7280", lineHeight: 1 }}>
+                              {v}<span style={{ fontSize: "0.52rem", fontWeight: 600 }}>л</span>
+                            </div>
+                            <div style={{ fontSize: "0.5rem", color: isVol ? netColor + "bb" : "#374151", marginTop: "0.22rem", fontFamily: "'JetBrains Mono',monospace" }}>{vPrice.toFixed(0)}₽</div>
+                            <div style={{ fontSize: "0.4rem", color: isVol ? "#eab308" : "#2a2a36", fontFamily: "'JetBrains Mono',monospace", marginTop: "0.08rem" }}>
+                              ≈{Math.ceil((vPrice * 1.03) / STAR_RUB_RATE)}⭐
+                            </div>
+                          </motion.button>
+                        );
+                      })}
                     </div>
+
+                    {/* Price summary card */}
+                    {(() => {
+                      const platformFee = Math.round(totalPrice * 0.03);
+                      const grandTotal = totalPrice + platformFee;
+                      const starsTotal = Math.ceil(grandTotal / STAR_RUB_RATE);
+                      const usdtTotal = (grandTotal / 92).toFixed(2);
+                      const netStations = networkStationCounts[activeNetwork] ?? 0;
+                      const fuelAvail = networkFuelAvailability[activeNetwork]?.[nvFuel];
+                      const availColor = !fuelAvail ? "#6b7280" : fuelAvail.available >= fuelAvail.total * 0.6 ? "#22c55e" : fuelAvail.available >= fuelAvail.total * 0.3 ? "#eab308" : "#ef4444";
+                      return (
+                        <div style={{
+                          background: `linear-gradient(135deg,${netColor}0e,${netColor}06)`,
+                          border: `1px solid ${netColor}33`,
+                          borderRadius: "13px", padding: "0.75rem 0.9rem",
+                          marginBottom: "0.6rem",
+                        }}>
+                          {/* Header row */}
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.55rem" }}>
+                            <div>
+                              <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.44rem", letterSpacing: "0.12em", marginBottom: "4px" }}>СЕТЕВОЙ_ТАЛОН · ИТОГО</div>
+                              <div style={{ display: "flex", gap: "0.32rem", alignItems: "center" }}>
+                                <span style={{ background: `${netColor}22`, border: `1px solid ${netColor}55`, borderRadius: "5px", padding: "0.06rem 0.32rem", color: netColor, fontSize: "0.56rem", fontWeight: 800, fontFamily: "'JetBrains Mono',monospace" }}>{nvFuel}</span>
+                                <span style={{ color: "#6b7280", fontSize: "0.56rem" }}>{nvVolume}л</span>
+                              </div>
+                              {fuelAvail && (
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", marginTop: "5px" }}>
+                                  <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: availColor, boxShadow: `0 0 5px ${availColor}` }} />
+                                  <span style={{ fontFamily: "'JetBrains Mono',monospace", color: availColor, fontSize: "0.42rem", fontWeight: 700 }}>
+                                    {fuelAvail.available}/{fuelAvail.total} АЗС в наличии
+                                  </span>
+                                </div>
+                              )}
+                              {!fuelAvail && netStations > 0 && (
+                                <div style={{ marginTop: "4px", color: "#374151", fontSize: "0.42rem", fontFamily: "'JetBrains Mono',monospace" }}>
+                                  ⛽ {netStations} АЗС в сети
+                                </div>
+                              )}
+                            </div>
+                            <div style={{ textAlign: "right", flexShrink: 0, paddingLeft: "0.5rem" }}>
+                              <div style={{ fontFamily: "'JetBrains Mono',monospace", color: netColor, fontSize: "1.4rem", fontWeight: 900, lineHeight: 1, textShadow: `0 0 22px ${netColor}66` }}>
+                                {grandTotal.toFixed(0)}₽
+                              </div>
+                              <div style={{ color: "#374151", fontSize: "0.44rem", marginTop: "2px", fontFamily: "'JetBrains Mono',monospace" }}>≈{starsTotal}⭐ · {usdtTotal}$</div>
+                            </div>
+                          </div>
+                          {/* Breakdown rows */}
+                          {(() => {
+                            const marketPricePerL = FUEL_PRICES[nvFuel] ?? 65;
+                            const marketTotal = marketPricePerL * nvVolume;
+                            const savings = Math.round(marketTotal - grandTotal);
+                            return (
+                              <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem", borderTop: `1px solid ${netColor}18`, paddingTop: "0.4rem" }}>
+                                {[
+                                  { label: "Топливо", value: `${nvVolume}л × ${pricePerL.toFixed(1)}₽`, amount: `${totalPrice.toFixed(0)}₽`, dim: false },
+                                  { label: "Сервис (3%)", value: "", amount: `+${platformFee}₽`, dim: true },
+                                ].map(({ label, value, amount, dim }) => (
+                                  <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                    <div style={{ display: "flex", gap: "0.35rem", alignItems: "center" }}>
+                                      <span style={{ fontFamily: "'JetBrains Mono',monospace", color: dim ? "#374151" : "#6b7280", fontSize: "0.46rem" }}>{label}</span>
+                                      {value && <span style={{ color: "#2a2a36", fontSize: "0.4rem", fontFamily: "'JetBrains Mono',monospace" }}>{value}</span>}
+                                    </div>
+                                    <span style={{ fontFamily: "'JetBrains Mono',monospace", color: dim ? "#374151" : "#6b7280", fontSize: "0.5rem", fontWeight: dim ? 400 : 600 }}>{amount}</span>
+                                  </div>
+                                ))}
+                                {savings > 0 && (
+                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "0.18rem", borderTop: `1px solid ${netColor}12` }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                                      <span style={{ fontSize: "0.5rem" }}>💚</span>
+                                      <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e", fontSize: "0.44rem", fontWeight: 700 }}>Экономия vs рынок</span>
+                                    </div>
+                                    <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e", fontSize: "0.5rem", fontWeight: 800 }}>−{savings}₽</span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Payment buttons */}
+                    {(() => {
+                      const platformFee = Math.round(totalPrice * 0.03);
+                      const grandTotal = totalPrice + platformFee;
+                      const starsTotal = Math.ceil(grandTotal / STAR_RUB_RATE);
+                      const usdtTotal = (grandTotal / 92).toFixed(2);
+                      return (
+                        <div style={{ display: "flex", gap: "0.45rem" }}>
+                          <motion.button
+                            whileTap={{ scale: 0.96 }}
+                            animate={!nvLoading ? { boxShadow: [`0 0 18px ${netColor}28`, `0 0 32px ${netColor}50`, `0 0 18px ${netColor}28`] } : {}}
+                            transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+                            onClick={() => handleNetworkVoucher("stars")} disabled={nvLoading}
+                            style={{ flex: 1, padding: "0.65rem 0.5rem", background: `linear-gradient(135deg,${netColor}30,${netColor}18)`, border: `1.5px solid ${netColor}66`, borderRadius: "12px", color: netColor, fontSize: "0.65rem", fontWeight: 800, cursor: nvLoading ? "wait" : "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "0.1rem", transition: "all 0.2s", opacity: nvLoading ? 0.6 : 1 }}>
+                            {nvLoading ? "…" : (
+                              <>
+                                <span>⭐ Telegram Stars</span>
+                                <span style={{ fontSize: "0.55rem", fontWeight: 900, opacity: 0.9 }}>{starsTotal} Stars</span>
+                              </>
+                            )}
+                          </motion.button>
+                          <motion.button
+                            whileTap={{ scale: 0.96 }}
+                            animate={!nvLoading ? { boxShadow: ["0 0 18px #22c55e28", "0 0 32px #22c55e50", "0 0 18px #22c55e28"] } : {}}
+                            transition={{ duration: 2.1, repeat: Infinity, ease: "easeInOut" }}
+                            onClick={() => handleNetworkVoucher("cryptobot")} disabled={nvLoading}
+                            style={{ flex: 1, padding: "0.65rem 0.5rem", background: "linear-gradient(135deg,#22c55e1e,#16a34a12)", border: "1.5px solid #22c55e55", borderRadius: "12px", color: "#22c55e", fontSize: "0.65rem", fontWeight: 800, cursor: nvLoading ? "wait" : "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "0.1rem", transition: "all 0.2s", opacity: nvLoading ? 0.6 : 1 }}>
+                            {nvLoading ? "…" : (
+                              <>
+                                <span>💎 CryptoBot</span>
+                                <span style={{ fontSize: "0.55rem", fontWeight: 900, opacity: 0.9 }}>{usdtTotal} USDT</span>
+                              </>
+                            )}
+                          </motion.button>
+                        </div>
+                      );
+                    })()}
                   </motion.div>
                 );
               })()}
             </AnimatePresence>
           </div>
+
+          {/* ── Как это работает ── */}
+          <div style={{ marginTop: "0.55rem" }}>
+            <button
+              onClick={() => { impact("light"); setShowHowItWorks((v) => !v); }}
+              style={{ width: "100%", background: "transparent", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.3rem 0.2rem" }}
+            >
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#4b5563", fontSize: "0.5rem", letterSpacing: "0.1em" }}>КАК ЭТО РАБОТАЕТ?</span>
+              <motion.span
+                animate={{ rotate: showHowItWorks ? 180 : 0 }}
+                transition={{ duration: 0.2 }}
+                style={{ color: "#4b5563", fontSize: "0.6rem", display: "inline-block" }}
+              >▾</motion.span>
+            </button>
+            <AnimatePresence>
+              {showHowItWorks && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  style={{ overflow: "hidden" }}
+                >
+                  <div style={{ background: "rgba(168,85,247,0.05)", border: "1px solid #a855f720", borderRadius: "12px", padding: "0.75rem", marginTop: "0.3rem", display: "flex", flexDirection: "column", gap: "0.55rem" }}>
+                    {[
+                      { icon: "1", title: "Выбери сеть", desc: "Нажми на карточку нужной сети — Лукойл, Роснефть, Газпромнефть, Башнефть, Татнефть или ННК." },
+                      { icon: "2", title: "Выбери топливо и объём", desc: "Укажи тип топлива (в т.ч. фирменные бренды — ЭКТО, Pulsar, G-Drive и др.) и нужный объём: 20, 40 или 60 литров." },
+                      { icon: "3", title: "Оплати Stars или Crypto", desc: "Оплата через Telegram Stars или CryptoBot. Талон сразу появляется в Сейфе с QR-кодом." },
+                      { icon: "4", title: "Заправляйся на любой АЗС сети", desc: "QR-код действует на любой заправке выбранной сети по всему региону. Точный срок действия указан на талоне." },
+                    ].map(({ icon, title, desc }) => (
+                      <div key={icon} style={{ display: "flex", gap: "0.55rem", alignItems: "flex-start" }}>
+                        <div style={{ width: "18px", height: "18px", borderRadius: "50%", background: "linear-gradient(135deg,#a855f7,#db2777)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: "1px" }}>
+                          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.48rem", fontWeight: 900, color: "#fff" }}>{icon}</span>
+                        </div>
+                        <div>
+                          <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#e2e8f0", fontSize: "0.58rem", fontWeight: 700, marginBottom: "2px" }}>{title}</div>
+                          <div style={{ color: "#6b7280", fontSize: "0.54rem", lineHeight: 1.45 }}>{desc}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
         </div>
       )}
 

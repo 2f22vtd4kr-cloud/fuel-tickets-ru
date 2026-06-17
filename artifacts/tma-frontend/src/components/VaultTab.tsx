@@ -17,11 +17,41 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   expired: { label: "Истёк", color: "#ef4444" },
 };
 
-function QRModal({ hash, onClose }: { hash: string; onClose: () => void }) {
+function expiryInfo(expiresAt: string | null | undefined): { color: string; label: string; pct: number; daysLeft: number } {
+  if (!expiresAt) return { color: "#6b7280", label: "Срок неизвестен", pct: 50, daysLeft: 0 };
+  const now = Date.now();
+  const exp = new Date(expiresAt).getTime();
+  const totalMs = 30 * 24 * 3600 * 1000;
+  const leftMs = exp - now;
+  const daysLeft = Math.max(0, Math.ceil(leftMs / (24 * 3600 * 1000)));
+  const pct = Math.max(0, Math.min(100, (leftMs / totalMs) * 100));
+  if (leftMs <= 0) return { color: "#ef4444", label: "Истёк", pct: 0, daysLeft: 0 };
+  if (daysLeft <= 7)  return { color: "#ef4444", label: `${daysLeft} дн. осталось`, pct, daysLeft };
+  if (daysLeft <= 15) return { color: "#eab308", label: `${daysLeft} дн. осталось`, pct, daysLeft };
+  return { color: "#22c55e", label: `${daysLeft} дн. осталось`, pct, daysLeft };
+}
+
+const VAULT_NET_COLORS: Record<string, string> = {
+  "Роснефть": "#ef4444", "Лукойл": "#f59e0b", "Газпром": "#3b82f6",
+  "Shell": "#eab308", "BP": "#22c55e", "Тотал": "#a855f7",
+  "Татнефть": "#06b6d4",
+};
+
+function QRModal({ hash, onClose, expiresAt, networkName, fuelType, volume, price }: {
+  hash: string;
+  onClose: () => void;
+  expiresAt?: string | null;
+  networkName?: string | null;
+  fuelType?: string | null;
+  volume?: number | null;
+  price?: number | null;
+}) {
   const [dataUrl, setDataUrl] = useState<string>("");
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
   const now = new Date();
+  const expiry = expiryInfo(expiresAt);
+  const netColor = networkName ? (VAULT_NET_COLORS[networkName] ?? "#a855f7") : "#a855f7";
 
   useEffect(() => {
     QRCode.toDataURL(hash, {
@@ -98,8 +128,8 @@ function QRModal({ hash, onClose }: { hash: string; onClose: () => void }) {
         transition={{ type: "spring", stiffness: 300, damping: 25 }}
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: "linear-gradient(160deg, #0d0d18, #120820)",
-          border: "1px solid #a855f755",
+          background: `linear-gradient(160deg, #0d0d18, ${netColor}04)`,
+          border: `1px solid ${netColor}55`,
           borderRadius: "24px",
           padding: "1.5rem",
           textAlign: "center",
@@ -107,20 +137,46 @@ function QRModal({ hash, onClose }: { hash: string; onClose: () => void }) {
           width: "100%",
           position: "relative",
           overflow: "hidden",
-          boxShadow: "0 0 60px #a855f722, 0 0 120px #db277711",
+          boxShadow: `0 0 60px ${netColor}22, 0 0 120px #db277711`,
         }}
       >
         {/* Top glow */}
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg, transparent, #a855f7, #db2777, transparent)" }} />
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: `linear-gradient(90deg, transparent, ${netColor}, #db2777, transparent)` }} />
 
         {/* Header */}
         <div style={{ marginBottom: "1rem" }}>
           <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#a855f7", fontSize: "0.5rem", letterSpacing: "0.2em", marginBottom: "0.25rem" }}>
             ⛽️ ТОПЛИВНЫЙ ВАУЧЕР
           </div>
-          <p style={{ color: "#e2e8f0", fontWeight: 700, fontSize: "0.9rem", margin: 0 }}>
-            Предъявите QR контролёру
-          </p>
+          {networkName && (
+            <div style={{ marginBottom: "0.45rem" }}>
+              <div style={{ color: "#e2e8f0", fontWeight: 800, fontSize: "1.05rem", margin: 0, letterSpacing: "0.02em" }}>
+                {networkName}
+              </div>
+              <div style={{ color: "#a855f7", fontSize: "0.62rem", fontFamily: "'JetBrains Mono',monospace", marginTop: "2px" }}>
+                {fuelType && <span style={{ fontWeight: 700 }}>{fuelType}</span>}
+                {volume && <span style={{ color: "#6b7280" }}> · {volume}л</span>}
+                {price && price > 0 && <span style={{ color: "#4b5563" }}> · ₽{price.toLocaleString("ru")}</span>}
+              </div>
+              <div style={{
+                marginTop: "0.4rem",
+                background: "rgba(168,85,247,0.08)",
+                border: "1px solid #a855f730",
+                borderRadius: "8px",
+                padding: "0.28rem 0.55rem",
+                display: "inline-block",
+              }}>
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#c4b5fd", fontSize: "0.5rem", fontWeight: 700, letterSpacing: "0.06em" }}>
+                  ✓ ДЕЙСТВУЕТ НА ВСЕХ АЗС СЕТИ {networkName.toUpperCase()}
+                </span>
+              </div>
+            </div>
+          )}
+          {!networkName && (
+            <p style={{ color: "#e2e8f0", fontWeight: 700, fontSize: "0.9rem", margin: 0 }}>
+              Предъявите QR контролёру
+            </p>
+          )}
           <p style={{ color: "#4b5563", fontSize: "0.62rem", margin: "0.2rem 0 0" }}>
             {now.toLocaleDateString("ru", { day: "2-digit", month: "long", year: "numeric" })} · {now.toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" })}
           </p>
@@ -131,8 +187,8 @@ function QRModal({ hash, onClose }: { hash: string; onClose: () => void }) {
           <div style={{
             width: "236px", height: "236px", margin: "0 auto",
             borderRadius: "16px", overflow: "hidden",
-            border: "2px solid #a855f744",
-            boxShadow: "0 0 30px #a855f730, inset 0 0 20px #a855f710",
+            border: `2px solid ${netColor}44`,
+            boxShadow: `0 0 30px ${netColor}30, inset 0 0 20px ${netColor}10`,
             position: "relative",
           }}>
             {dataUrl ? (
@@ -142,10 +198,23 @@ function QRModal({ hash, onClose }: { hash: string; onClose: () => void }) {
                 <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1.2, ease: "linear" }} style={{ fontSize: "1.5rem" }}>⟳</motion.div>
               </div>
             )}
+            {/* Animated scanner beam */}
+            {dataUrl && (
+              <motion.div
+                animate={{ y: ["0%", "100%", "0%"] }}
+                transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+                style={{
+                  position: "absolute", left: 0, right: 0, height: "3px",
+                  background: `linear-gradient(90deg,transparent,${netColor}cc,transparent)`,
+                  boxShadow: `0 0 8px ${netColor}88`,
+                  pointerEvents: "none",
+                }}
+              />
+            )}
           </div>
           {/* Corner accents */}
-          {[["top:0,left:0,borderTopWidth:2px,borderLeftWidth:2px", "tl"], ["top:0,right:0,borderTopWidth:2px,borderRightWidth:2px", "tr"], ["bottom:0,left:0,borderBottomWidth:2px,borderLeftWidth:2px", "bl"], ["bottom:0,right:0,borderBottomWidth:2px,borderRightWidth:2px", "br"]].map(([, k]) => (
-            <div key={k} style={{ position: "absolute", width: "16px", height: "16px", borderColor: "#a855f7", borderStyle: "solid", borderWidth: 0, ...(k === "tl" ? { top: 0, left: 0, borderTopWidth: "2px", borderLeftWidth: "2px", borderTopLeftRadius: "4px" } : k === "tr" ? { top: 0, right: 0, borderTopWidth: "2px", borderRightWidth: "2px", borderTopRightRadius: "4px" } : k === "bl" ? { bottom: 0, left: 0, borderBottomWidth: "2px", borderLeftWidth: "2px", borderBottomLeftRadius: "4px" } : { bottom: 0, right: 0, borderBottomWidth: "2px", borderRightWidth: "2px", borderBottomRightRadius: "4px" }) }} />
+          {[["tl"], ["tr"], ["bl"], ["br"]].map(([k]) => (
+            <div key={k} style={{ position: "absolute", width: "16px", height: "16px", borderColor: netColor, borderStyle: "solid", borderWidth: 0, ...(k === "tl" ? { top: 0, left: 0, borderTopWidth: "2px", borderLeftWidth: "2px", borderTopLeftRadius: "4px" } : k === "tr" ? { top: 0, right: 0, borderTopWidth: "2px", borderRightWidth: "2px", borderTopRightRadius: "4px" } : k === "bl" ? { bottom: 0, left: 0, borderBottomWidth: "2px", borderLeftWidth: "2px", borderBottomLeftRadius: "4px" } : { bottom: 0, right: 0, borderBottomWidth: "2px", borderRightWidth: "2px", borderBottomRightRadius: "4px" }) }} />
           ))}
         </div>
 
@@ -167,9 +236,25 @@ function QRModal({ hash, onClose }: { hash: string; onClose: () => void }) {
             {copied ? "✓" : "⎘"}
           </span>
         </div>
-        <p style={{ color: "#374151", fontSize: "0.55rem", margin: "0.3rem 0 0.75rem" }}>
+        <p style={{ color: "#374151", fontSize: "0.55rem", margin: "0.3rem 0 0.5rem" }}>
           {copied ? "✓ Скопировано!" : "Нажмите на код для копирования"}
         </p>
+
+        {/* Expiry bar */}
+        {expiresAt && (
+          <div style={{ marginBottom: "0.75rem", background: "#0b0b0f", border: `1px solid ${expiry.color}30`, borderRadius: "10px", padding: "0.5rem 0.75rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.3rem" }}>
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.48rem", color: "#374151", letterSpacing: "0.1em" }}>СРОК ДЕЙСТВИЯ</span>
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.54rem", color: expiry.color, fontWeight: 700 }}>{expiry.label}</span>
+            </div>
+            <div style={{ height: "5px", background: "#111118", borderRadius: "3px", overflow: "hidden" }}>
+              <div style={{ width: `${expiry.pct}%`, height: "100%", background: expiry.color, borderRadius: "3px", boxShadow: `0 0 6px ${expiry.color}`, transition: "width 0.5s" }} />
+            </div>
+            <p style={{ margin: "0.3rem 0 0", color: "#374151", fontSize: "0.44rem", fontFamily: "'JetBrains Mono',monospace", lineHeight: 1.4 }}>
+              ⚠ Точный срок действия может измениться с момента получения талона
+            </p>
+          </div>
+        )}
 
         {/* Action buttons grid */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "0.75rem" }}>
@@ -218,20 +303,28 @@ const FUEL_ACCENT: Record<string, string> = {
   "Газ":   "#22c55e",
 };
 
-function PurchaseCard({ purchase }: { purchase: Purchase }) {
+function PurchaseCard({ purchase, accentColor }: { purchase: Purchase; accentColor?: string }) {
   const [showQr, setShowQr] = useState(false);
   const st = STATUS_LABELS[purchase.status] ?? { label: purchase.status, color: "#6b7280" };
   const date = new Date(purchase.created_at).toLocaleDateString("ru-RU", {
     day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
   });
-  const fuelColor = FUEL_ACCENT[purchase.fuel_type] ?? "#a855f7";
+  const fuelColor = accentColor ?? FUEL_ACCENT[purchase.fuel_type] ?? "#a855f7";
   const isActive = purchase.status === "active";
 
   return (
     <>
       <AnimatePresence>
         {showQr && (
-          <QRModal hash={purchase.qr_hash} onClose={() => setShowQr(false)} />
+          <QRModal
+            hash={purchase.qr_hash}
+            onClose={() => setShowQr(false)}
+            expiresAt={purchase.expires_at}
+            networkName={purchase.station_name?.replace(/^Любая АЗС сети /, "") ?? null}
+            fuelType={purchase.fuel_type}
+            volume={purchase.volume}
+            price={purchase.price}
+          />
         )}
       </AnimatePresence>
 
@@ -305,7 +398,23 @@ function PurchaseCard({ purchase }: { purchase: Purchase }) {
           <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.58rem", color: "#2a2a36" }}>
             #{purchase.qr_hash.slice(0, 16)}
           </span>
-          <span style={{ color: "#374151", fontSize: "0.6rem" }}>{date}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            {isActive && purchase.expires_at && (() => {
+              const exp = expiryInfo(purchase.expires_at);
+              return (
+                <span style={{
+                  fontFamily: "'JetBrains Mono',monospace",
+                  fontSize: "0.54rem", fontWeight: 700,
+                  color: exp.color, background: `${exp.color}15`,
+                  border: `1px solid ${exp.color}40`,
+                  borderRadius: "5px", padding: "0.06rem 0.35rem",
+                }}>
+                  {exp.label}
+                </span>
+              );
+            })()}
+            <span style={{ color: "#374151", fontSize: "0.6rem" }}>{date}</span>
+          </div>
         </div>
       </motion.div>
     </>
@@ -428,12 +537,30 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
       {/* Quick stats grid (2×2) */}
       {purchases.length > 0 && (
         <div style={{ padding: "0 12px 10px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
-          {[
-            { label: "Всего топлива", value: `${totalLiters.toLocaleString("ru")}л`, icon: "⛽", color: "#a855f7" },
-            { label: "Использовано", value: `${usedLiters.toLocaleString("ru")}л`, icon: "✓", color: "#22c55e" },
-            { label: "Потрачено", value: totalSpent > 0 ? `${totalSpent.toLocaleString("ru")}₽` : "—", icon: "💳", color: "#db2777" },
-            { label: "Ср. объём", value: avgVolume > 0 ? `${avgVolume}л` : "—", icon: "📊", color: "#f59e0b" },
-          ].map(({ label, value, icon, color }) => (
+          {(() => {
+            const networkActiveCount = active.filter(p => p.station_name?.startsWith("Любая АЗС сети ")).length;
+            const MARKET_PRICES: Record<string, number> = { "АИ-92": 65, "АИ-95": 71, "АИ-95+": 76, "АИ-100": 88, "ДТ": 79, "ДТ+": 84, "Газ": 35, "ЭКТО Plus": 76, "G-Drive": 79, "Pulsar": 71 };
+            const totalSaved = purchases
+              .filter(p => p.station_name?.startsWith("Любая АЗС сети "))
+              .reduce((sum, p) => {
+                const market = (MARKET_PRICES[p.fuel_type] ?? 65) * p.volume;
+                const actual = p.price;
+                return sum + Math.max(0, market - actual);
+              }, 0);
+            const items: { label: string; value: string; icon: string; color: string }[] = [
+              { label: "Всего топлива", value: `${totalLiters.toLocaleString("ru")}л`, icon: "⛽", color: "#a855f7" },
+              { label: "Использовано", value: `${usedLiters.toLocaleString("ru")}л`, icon: "✓", color: "#22c55e" },
+              { label: "Потрачено", value: totalSpent > 0 ? `${totalSpent.toLocaleString("ru")}₽` : "—", icon: "💳", color: "#db2777" },
+              { label: "Ср. объём", value: avgVolume > 0 ? `${avgVolume}л` : "—", icon: "📊", color: "#f59e0b" },
+            ];
+            if (networkActiveCount > 0) {
+              items.splice(2, 0, { label: "Сетевых", value: String(networkActiveCount), icon: "🎫", color: "#a855f7" });
+            }
+            if (totalSaved > 0) {
+              items.splice(items.length, 0, { label: "Сэкономлено", value: `${Math.round(totalSaved).toLocaleString("ru")}₽`, icon: "💚", color: "#22c55e" });
+            }
+            return items;
+          })().map(({ label, value, icon, color }) => (
             <div key={label} style={{
               background: `${color}08`,
               border: `1px solid ${color}22`,
@@ -700,18 +827,124 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
         );
       })()}
 
-      {/* Active vouchers */}
-      {active.length > 0 && (
-        <div style={{ padding: "0 1rem 0.5rem" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", margin: "0 0 0.5rem" }}>
-            <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 8px #22c55e", animation: "tmaPulse 2s infinite", flexShrink: 0 }} />
-            <p style={{ color: "#22c55e", fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0, fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>
-              Активные ваучеры · {active.length}
-            </p>
+      {/* Сетевые талоны — grouped by network */}
+      {(() => {
+        const NET_COLORS: Record<string, string> = {
+          "Роснефть": "#ef4444", "Лукойл": "#f59e0b", "Газпромнефть": "#3b82f6",
+          "Газпром": "#3b82f6", "Башнефть": "#f97316", "Татнефть": "#06b6d4",
+          "ННК": "#a855f7", "Shell": "#eab308", "BP": "#22c55e", "Тотал": "#db2777",
+        };
+        const networkVouchers = active.filter((p) => p.station_name?.startsWith("Любая АЗС сети "));
+        if (!networkVouchers.length) return null;
+        const byNetwork: Record<string, typeof networkVouchers> = {};
+        for (const p of networkVouchers) {
+          const net = p.station_name!.replace("Любая АЗС сети ", "");
+          if (!byNetwork[net]) byNetwork[net] = [];
+          byNetwork[net].push(p);
+        }
+        return (
+          <div style={{ padding: "0 1rem 0.5rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", margin: "0 0 0.6rem" }}>
+              <span style={{ fontSize: "0.9rem" }}>🎫</span>
+              <p style={{ color: "#a855f7", fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.1em", margin: 0, fontFamily: "'JetBrains Mono',monospace", fontWeight: 700, flex: 1 }}>
+                Сетевые талоны · {networkVouchers.length}
+              </p>
+              {onNavigate && (
+                <button
+                  onClick={() => onNavigate("catalog")}
+                  style={{
+                    background: "rgba(168,85,247,0.1)", border: "1px solid #a855f733",
+                    borderRadius: "6px", padding: "0.15rem 0.45rem",
+                    color: "#a855f7", fontSize: "0.52rem", fontWeight: 700,
+                    cursor: "pointer", fontFamily: "'JetBrains Mono',monospace",
+                    letterSpacing: "0.04em",
+                  }}
+                >+ Ещё</button>
+              )}
+            </div>
+            {Object.entries(byNetwork).map(([net, vouchers]) => {
+              const netColor = NET_COLORS[net] ?? "#a855f7";
+              return (
+                <div key={net} style={{
+                  background: `linear-gradient(135deg,#0d0d18,${netColor}06)`,
+                  border: `1px solid ${netColor}30`,
+                  borderRadius: "14px",
+                  marginBottom: "0.5rem",
+                  overflow: "hidden",
+                }}>
+                  {/* Network header bar */}
+                  <div style={{ height: "2px", background: `linear-gradient(90deg,${netColor},${netColor}44,transparent)` }} />
+                  <div style={{ padding: "0.5rem 0.75rem 0.35rem", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                      <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: netColor, boxShadow: `0 0 6px ${netColor}` }} />
+                      <span style={{ color: netColor, fontSize: "0.7rem", fontWeight: 800, letterSpacing: "0.04em" }}>{net}</span>
+                      {(() => {
+                        const soonest = vouchers
+                          .filter(v => v.expires_at)
+                          .reduce<string | null>((acc, v) => (!acc || v.expires_at! < acc ? v.expires_at! : acc), null);
+                        if (!soonest) return null;
+                        const daysLeft = Math.ceil((new Date(soonest).getTime() - Date.now()) / 86400000);
+                        const exColor = daysLeft <= 3 ? "#ef4444" : daysLeft <= 7 ? "#eab308" : "#22c55e";
+                        return (
+                          <div style={{ background: `${exColor}12`, border: `1px solid ${exColor}33`, borderRadius: "4px", padding: "0.02rem 0.25rem", fontFamily: "'JetBrains Mono',monospace", fontSize: "0.38rem", color: exColor, fontWeight: 700 }}>
+                            {daysLeft}д
+                          </div>
+                        );
+                      })()}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.4rem", color: "#374151", letterSpacing: "0.1em" }}>ДЕЙСТВУЕТ НА ВСЕХ АЗС</span>
+                      <div style={{ background: `${netColor}18`, border: `1px solid ${netColor}44`, borderRadius: "4px", padding: "0.04rem 0.3rem", fontFamily: "'JetBrains Mono',monospace", fontSize: "0.52rem", color: netColor, fontWeight: 700 }}>
+                        {vouchers.length} шт
+                      </div>
+                    </div>
+                  </div>
+                  {/* Expiry overview bar */}
+                  {(() => {
+                    const withExpiry = vouchers.filter(v => v.expires_at);
+                    if (!withExpiry.length) return null;
+                    const soonest = withExpiry.reduce<string>((acc, v) => (!acc || v.expires_at! < acc ? v.expires_at! : acc), withExpiry[0].expires_at!);
+                    const daysLeft = Math.max(0, Math.ceil((new Date(soonest).getTime() - Date.now()) / 86400000));
+                    const pct = Math.min(100, Math.round((daysLeft / 30) * 100));
+                    const exColor = daysLeft <= 3 ? "#ef4444" : daysLeft <= 7 ? "#eab308" : netColor;
+                    return (
+                      <div style={{ padding: "0 0.75rem 0.5rem" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.2rem" }}>
+                          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.38rem", color: "#2a2a36", letterSpacing: "0.08em" }}>СРОК_ДЕЙСТВИЯ</span>
+                          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.4rem", color: exColor, fontWeight: 700 }}>мин {daysLeft}д</span>
+                        </div>
+                        <div style={{ height: "3px", background: "#0b0b12", borderRadius: "2px", overflow: "hidden" }}>
+                          <div style={{ width: `${pct}%`, height: "100%", background: exColor, borderRadius: "2px", boxShadow: `0 0 4px ${exColor}88`, transition: "width 0.4s" }} />
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  <div style={{ padding: "0 0.5rem 0.5rem" }}>
+                    {vouchers.map((p) => <PurchaseCard key={p.id} purchase={p} accentColor={netColor} />)}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          {active.map((p) => <PurchaseCard key={p.id} purchase={p} />)}
-        </div>
-      )}
+        );
+      })()}
+
+      {/* Active single-station vouchers */}
+      {(() => {
+        const singleVouchers = active.filter((p) => !p.station_name?.startsWith("Любая АЗС сети "));
+        if (!singleVouchers.length) return null;
+        return (
+          <div style={{ padding: "0 1rem 0.5rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", margin: "0 0 0.5rem" }}>
+              <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 8px #22c55e", animation: "tmaPulse 2s infinite", flexShrink: 0 }} />
+              <p style={{ color: "#22c55e", fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0, fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>
+                Активные ваучеры · {singleVouchers.length}
+              </p>
+            </div>
+            {singleVouchers.map((p) => <PurchaseCard key={p.id} purchase={p} />)}
+          </div>
+        );
+      })()}
 
       {/* History with CSV export */}
       {history.length > 0 && (

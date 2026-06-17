@@ -1669,7 +1669,7 @@ def purchase_network_voucher(body: NetworkVoucherIn, db: Session = Depends(get_d
         status="active", qr_hash=result.qr_hash,
         station_name=f"Любая АЗС сети {body.network}",
         region="Вся Россия",
-        expires_at=_now() + timedelta(days=7),
+        expires_at=_now() + timedelta(days=30),
     )
     db.add(purchase)
     old_level = user.xp
@@ -1809,6 +1809,7 @@ def get_vault(user_id: int, db: Session = Depends(get_db)):
             "station_name": p.station_name,
             "region": p.region,
             "created_at": p.created_at.isoformat() if p.created_at else None,
+            "expires_at": p.expires_at.isoformat() if p.expires_at else None,
         }
         for p in purchases
     ]
