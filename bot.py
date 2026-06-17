@@ -708,7 +708,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 f"ID: `{user.id}`",
             ))
 
-    pass
+    await update.message.reply_text(
+        "Менюшечку слева внизу 🎟️ тыц! И выбираешь бензинчик, дизельку там… что хочешь"
+    )
 
 
 async def admin_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
