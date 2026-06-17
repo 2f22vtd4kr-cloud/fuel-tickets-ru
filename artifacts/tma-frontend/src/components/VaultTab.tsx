@@ -321,6 +321,7 @@ interface VaultTabProps {
 export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
   const { user } = useUserStore();
   const { purchases, loading, fetch } = useVaultStore();
+  const { stations } = useStationStore();
   const [highlightedId, setHighlightedId] = useState<number | undefined>(initialPurchaseId);
   const [referral, setReferral] = useState<ReferralInfo | null>(null);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
@@ -357,6 +358,8 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
   const active = purchases.filter((p) => p.status === "active");
   const history = purchases.filter((p) => p.status !== "active");
   const totalLiters = purchases.reduce((sum, p) => sum + (p.volume ?? 0), 0);
+  const usedLiters = history.reduce((sum, p) => sum + (p.volume ?? 0), 0);
+  const avgVolume = purchases.length > 0 ? Math.round(totalLiters / purchases.length) : 0;
 
   if (!user) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#6b7280" }}>
@@ -419,6 +422,64 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
           </div>
         </div>
       </div>
+
+      {/* Quick stats row */}
+      {purchases.length > 0 && (
+        <div style={{ padding: "0 12px 10px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px" }}>
+          {[
+            { label: "Всего топлива", value: `${totalLiters.toLocaleString("ru")}л`, icon: "⛽", color: "#a855f7" },
+            { label: "Использовано", value: `${usedLiters.toLocaleString("ru")}л`, icon: "✓", color: "#22c55e" },
+            { label: "Ср. объём", value: avgVolume > 0 ? `${avgVolume}л` : "—", icon: "⊘", color: "#f59e0b" },
+          ].map(({ label, value, icon, color }) => (
+            <div key={label} style={{
+              background: `${color}08`,
+              border: `1px solid ${color}20`,
+              borderRadius: "10px",
+              padding: "8px 8px 6px",
+              textAlign: "center",
+            }}>
+              <div style={{ fontSize: "1rem", marginBottom: "2px" }}>{icon}</div>
+              <div style={{ fontFamily: "'JetBrains Mono',monospace", color, fontSize: "0.7rem", fontWeight: 800 }}>{value}</div>
+              <div style={{ color: "#4b5563", fontSize: "0.48rem", marginTop: "1px" }}>{label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Fuel type spending breakdown */}
+      {purchases.length > 0 && (() => {
+        const FUEL_COLORS: Record<string, string> = { "АИ-92": "#22c55e", "АИ-95": "#3b82f6", "АИ-98": "#a855f7", "ДТ": "#f59e0b", "Газ": "#06b6d4" };
+        const fuelBreakdown = purchases.reduce<Record<string, number>>((acc, p) => {
+          const f = p.fuel_type ?? "—";
+          acc[f] = (acc[f] ?? 0) + (p.volume ?? 0);
+          return acc;
+        }, {});
+        const fuels = Object.entries(fuelBreakdown).sort((a, b) => b[1] - a[1]);
+        if (!fuels.length) return null;
+        const maxVal = fuels[0][1];
+        return (
+          <div style={{ padding: "0 12px 10px" }}>
+            <div className="glass-panel" style={{ padding: "10px 12px" }}>
+              <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.42rem", letterSpacing: "0.14em", marginBottom: "6px" }}>РАСПРЕДЕЛЕНИЕ_ТОПЛИВА · ОБЪЁМ</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+                {fuels.map(([fuel, vol]) => {
+                  const color = FUEL_COLORS[fuel] ?? "#6b7280";
+                  const pct = maxVal > 0 ? Math.round((vol / maxVal) * 100) : 0;
+                  return (
+                    <div key={fuel} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.58rem", color, width: "38px", flexShrink: 0 }}>{fuel}</span>
+                      <div style={{ flex: 1, height: "5px", background: "#1a1a24", borderRadius: "3px", overflow: "hidden" }}>
+                        <div style={{ width: `${pct}%`, height: "100%", background: `linear-gradient(90deg,${color}88,${color})`, borderRadius: "3px", transition: "width 0.6s ease" }} />
+                      </div>
+                      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.58rem", color: "#6b7280", width: "36px", textAlign: "right", flexShrink: 0 }}>{vol.toLocaleString("ru")}л</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Profile card */}
       {(() => {
@@ -705,7 +766,20 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
               </button>
             )}
           </div>
-          {(showAllSubs ? subscriptions : subscriptions.slice(0, 3)).map((sub) => (
+          {(showAllSubs ? subscriptions : subscriptions.slice(0, 3)).map((sub) => {
+            const liveStation = stations.find((s) => s.id === sub.station_id);
+            const liveAvg = liveStation?.fuel_statuses.length
+              ? Math.round(liveStation.fuel_statuses.reduce((a, f) => a + f.availability_pct, 0) / liveStation.fuel_statuses.length)
+              : null;
+            const liveColor = liveAvg == null ? "#374151" : liveAvg >= 60 ? "#22c55e" : liveAvg >= 25 ? "#eab308" : "#ef4444";
+            const fuelAvg = sub.fuel_type && liveStation
+              ? liveStation.fuel_statuses.find((f) => f.fuel_type === sub.fuel_type)?.availability_pct ?? null
+              : null;
+            const displayPct = fuelAvg != null ? Math.round(fuelAvg) : liveAvg;
+            const displayColor = fuelAvg != null
+              ? (fuelAvg >= 60 ? "#22c55e" : fuelAvg >= 25 ? "#eab308" : "#ef4444")
+              : liveColor;
+            return (
             <motion.div
               key={sub.id}
               layout
@@ -713,8 +787,8 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
               animate={{ opacity: 1, y: 0 }}
               style={{
                 background: "linear-gradient(160deg,#0e0e1a,#110d1a)",
-                border: "1px solid #a855f722",
-                borderLeft: "3px solid #a855f766",
+                border: `1px solid ${displayColor}22`,
+                borderLeft: `3px solid ${displayColor}66`,
                 borderRadius: "10px",
                 padding: "0.55rem 0.75rem",
                 marginBottom: "0.4rem",
@@ -725,12 +799,12 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
                 overflow: "hidden",
               }}
             >
-              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,#a855f733,transparent)" }} />
-              <div style={{ display: "flex", alignItems: "center", gap: "0.55rem", minWidth: 0 }}>
-                <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "26px", height: "26px", borderRadius: "50%", background: "#a855f715", border: "1px solid #a855f730", flexShrink: 0 }}>
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: `linear-gradient(90deg,${displayColor}33,transparent)` }} />
+              <div style={{ display: "flex", alignItems: "center", gap: "0.55rem", minWidth: 0, flex: 1 }}>
+                <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "26px", height: "26px", borderRadius: "50%", background: `${displayColor}15`, border: `1px solid ${displayColor}30`, flexShrink: 0 }}>
                   🔔
                 </span>
-                <div style={{ minWidth: 0 }}>
+                <div style={{ minWidth: 0, flex: 1 }}>
                   <p style={{ margin: 0, color: "#e2e8f0", fontSize: "0.78rem", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {sub.station_name}
                   </p>
@@ -738,6 +812,11 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
                     {sub.station_region}{sub.fuel_type ? ` · ${sub.fuel_type}` : ""}
                   </p>
                 </div>
+                {displayPct != null && (
+                  <span style={{ fontFamily: "'JetBrains Mono',monospace", color: displayColor, fontSize: "0.78rem", fontWeight: 800, flexShrink: 0 }}>
+                    {displayPct}%
+                  </span>
+                )}
               </div>
               <button
                 onClick={() => {
@@ -760,7 +839,8 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
                 ✕
               </button>
             </motion.div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -878,6 +958,12 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
                   {st?.network && (
                     <p style={{ margin: "0.1rem 0 0", color: "#374151", fontSize: "0.55rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{st.network}</p>
                   )}
+                  {st && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onNavigate?.("map"); }}
+                      style={{ marginTop: "0.25rem", background: "none", border: "1px solid #22222f", borderRadius: "5px", color: "#4b5563", fontSize: "0.48rem", padding: "2px 6px", cursor: "pointer", width: "100%" }}
+                    >🗺 На карте</button>
+                  )}
                 </motion.div>
               );
             })}
@@ -927,17 +1013,39 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => removeFav(region)}
-                style={{
-                  background: "none", border: "1px solid #22222f",
-                  borderRadius: "8px", color: "#6b7280",
-                  fontSize: "0.72rem", padding: "0.3rem 0.5rem",
-                  cursor: "pointer", flexShrink: 0,
-                }}
-              >
-                ✕
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexShrink: 0 }}>
+                {(() => {
+                  const regionStations = useStationStore.getState().stations.filter(s => s.region === region);
+                  if (!regionStations.length) return null;
+                  const avgPct = Math.round(regionStations.reduce((acc, s) => {
+                    const a = s.fuel_statuses.length ? s.fuel_statuses.reduce((x, f) => x + f.availability_pct, 0) / s.fuel_statuses.length : 0;
+                    return acc + a;
+                  }, 0) / regionStations.length);
+                  const dotColor = avgPct >= 60 ? "#22c55e" : avgPct >= 25 ? "#eab308" : "#ef4444";
+                  return (
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontFamily: "'JetBrains Mono',monospace", color: dotColor, fontSize: "0.88rem", fontWeight: 700, lineHeight: 1 }}>{avgPct}%</div>
+                      <div style={{ color: "#374151", fontSize: "0.5rem", marginTop: "1px" }}>{regionStations.length} АЗС</div>
+                    </div>
+                  );
+                })()}
+                <button
+                  onClick={() => onNavigate?.("map")}
+                  title="Карта"
+                  style={{ background: "none", border: "1px solid #1e1e2a", borderRadius: "6px", color: "#4b5563", fontSize: "0.7rem", padding: "0.25rem 0.4rem", cursor: "pointer", flexShrink: 0 }}
+                >🗺</button>
+                <button
+                  onClick={() => removeFav(region)}
+                  style={{
+                    background: "none", border: "1px solid #22222f",
+                    borderRadius: "8px", color: "#6b7280",
+                    fontSize: "0.72rem", padding: "0.3rem 0.5rem",
+                    cursor: "pointer", flexShrink: 0,
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
             </motion.div>
           ))}
         </div>

@@ -1717,6 +1717,28 @@ function OperatorConsole() {
           </div>
         )}
 
+        {/* Share XP button */}
+        {user && (
+          <div style={{ marginTop: "0.65rem", borderTop: `1px solid ${color}18`, paddingTop: "0.6rem" }}>
+            <button
+              onClick={() => {
+                const tier = TIERS[Math.max(0, TIERS.findIndex((t) => xp >= t.min && (t.max === null || xp <= t.max)))];
+                const text = encodeURIComponent(`⬡ Топливный Узел\n${tier.name} · ${xp.toLocaleString("ru")} XP\nСерия: ${user.checkin_streak ?? 0} дн 🔥\n\nПрисоединяйся: @ToplivniyUzel_bot`);
+                window.open(`https://t.me/share/url?url=https://t.me/&text=${text}`, "_blank");
+                impact("light");
+              }}
+              style={{
+                width: "100%", background: `${color}12`, border: `1px solid ${color}30`,
+                borderRadius: "10px", color, fontSize: "0.68rem", fontWeight: 700,
+                padding: "0.42rem", cursor: "pointer", transition: "all 0.2s",
+                fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.04em",
+              }}
+            >
+              ✈️ Поделиться достижением
+            </button>
+          </div>
+        )}
+
         {/* Quick stats row */}
         {user && (
           <div style={{

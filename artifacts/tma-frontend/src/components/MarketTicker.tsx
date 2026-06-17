@@ -15,7 +15,7 @@ const SEV_ICON: Record<string, string> = {
   critical: "⚠", warning: "◈", success: "◉", info: "◆",
 };
 
-export function MarketTicker() {
+export function MarketTicker({ stationCount }: { stationCount?: number }) {
   const prices = usePriceStore((s) => s.prices);
   const connected = usePriceStore((s) => s.connected);
   const [news, setNews] = useState<NewsItem[]>([]);
@@ -144,6 +144,17 @@ export function MarketTicker() {
         }}>
           LIVE
         </span>
+        {stationCount != null && stationCount > 0 && (
+          <span style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: "0.48rem",
+            color: "#6b7280",
+            letterSpacing: "0.04em",
+            marginLeft: "2px",
+          }}>
+            {stationCount.toLocaleString("ru")}АЗС
+          </span>
+        )}
         {newsCount > 0 && (
           <div style={{
             background: "linear-gradient(135deg,#ef4444,#dc2626)",

@@ -1,5 +1,5 @@
 """
-Deterministic station seed generator — 500+ stations across 32 regions.
+Deterministic station seed generator — 1000+ stations across 32 regions.
 Named stations from NAMED_STATIONS are injected first, then procedural fill.
 Uses a seeded RNG so results are reproducible across restarts.
 Includes geocoding validation: rejects points in known water zones.
@@ -118,7 +118,7 @@ def _make_fuel_statuses(rng: random.Random, zone: str) -> list[dict]:
 
 
 def generate_stations() -> list[dict]:
-    """Return list of station dicts ready for DB insert. ~500+ stations total."""
+    """Return list of station dicts ready for DB insert. ~1000+ stations total."""
     rng = random.Random(42)
     stations = []
 

@@ -379,6 +379,23 @@ export function StationCard({ station, onClose }: Props) {
               🧭
             </button>
             <button
+              onClick={() => {
+                const addr = `${station.name}, ${station.address}`;
+                navigator.clipboard?.writeText(addr).then(() => {
+                  toast("📋 Адрес скопирован", "success");
+                }).catch(() => {
+                  toast(addr, "info");
+                });
+                impact("light");
+              }}
+              title="Скопировать адрес"
+              style={{ background: "none", border: "none", cursor: "pointer", fontSize: "0.95rem", padding: "0.2rem 0.3rem", opacity: 0.6, transition: "opacity 0.15s" }}
+              onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
+              onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.6")}
+            >
+              📋
+            </button>
+            <button
               onClick={handleToggleSubscription}
               disabled={subLoading}
               title={subStatus?.subscribed ? "Отписаться" : "Подписаться"}

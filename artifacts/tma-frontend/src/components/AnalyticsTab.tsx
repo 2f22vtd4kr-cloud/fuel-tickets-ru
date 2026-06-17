@@ -4,7 +4,7 @@ import {
   AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, ReferenceLine,
 } from "recharts";
-import { fetchAnalytics, fetchTrend, fetchNews, fetchSystemStats, fetchPriceHistory, fetchRegionalPrices } from "@/api/client";
+import { fetchAnalytics, fetchTrend, fetchNews, fetchSystemStats, fetchPriceHistory, fetchRegionalPrices, fetchNetworkPrices, fetchCrisisForecast } from "@/api/client";
 import type { SystemStats } from "@/api/client";
 import type { NewsItem } from "@/types";
 import { useFavoritesStore } from "@/stores/useFavoritesStore";
@@ -1024,6 +1024,7 @@ function AIPricePredictions() {
 }
 
 export function AnalyticsTab({ onNavigate }: Props) {
+  const { stations } = useStationStore();
   const [data, setData] = useState<Analytics | null>(null);
   const [sysStats, setSysStats] = useState<SystemStats | null>(null);
   const [trendData, setTrendData] = useState<TrendPoint[]>([]);
@@ -1093,15 +1094,15 @@ export function AnalyticsTab({ onNavigate }: Props) {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative" }}>
             <div>
               <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#4b5563", fontSize: "0.5rem", letterSpacing: "0.18em", marginBottom: "0.2rem" }}>
-                ЦЕНТР_МОНИТОРИНГА v3.1
+                ЦЕНТР_МОНИТОРИНГА v3.3
               </div>
               <h2 style={{ margin: "0 0 0.1rem", color: "#e2e8f0", fontSize: "1.05rem", fontWeight: 800, lineHeight: 1 }}>
                 📊 Данные
               </h2>
               <p style={{ margin: 0, color: "#4b5563", fontSize: "0.62rem" }}>
                 {lastRefreshed
-                  ? `Синхр: ${lastRefreshed.toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" })} · 500+ станций`
-                  : "Данные в реальном времени · 500+ АЗС"}
+                  ? `Синхр: ${lastRefreshed.toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" })} · ${stations.length > 0 ? stations.length.toLocaleString("ru") : "1000+"} станций`
+                  : `Данные в реальном времени · ${stations.length > 0 ? stations.length.toLocaleString("ru") : "1000+"} АЗС`}
               </p>
             </div>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.3rem" }}>
@@ -1168,6 +1169,52 @@ export function AnalyticsTab({ onNavigate }: Props) {
           </div>
         </div>
       </div>
+
+      {/* City overview cards */}
+      {Object.keys(regions).length > 0 && (() => {
+        const CITY_DEFS = [
+          { label: "Москва",     key: "Москва",           emoji: "🏙", color: "#3b82f6" },
+          { label: "Крым",       key: "Севастополь",      emoji: "🌊", color: "#a855f7" },
+          { label: "Питер",      key: "Санкт-Петербург",  emoji: "⚓", color: "#06b6d4" },
+          { label: "Татарстан",  key: "Татарстан",        emoji: "🛢", color: "#22c55e" },
+        ];
+        const entries = CITY_DEFS
+          .map(({ label, key, emoji, color }) => {
+            const rKey = Object.keys(regions).find(r => r.includes(key));
+            if (!rKey) return null;
+            const rd = regions[rKey];
+            const pct = Math.round(rd.avg_pct);
+            const stationCount = (rd as { avg_pct: number; total_stations?: number; station_count?: number }).total_stations
+              ?? (rd as { avg_pct: number; total_stations?: number; station_count?: number }).station_count
+              ?? 0;
+            const dotColor = pct >= 60 ? "#22c55e" : pct >= 25 ? "#eab308" : "#ef4444";
+            return { label, emoji, color, pct, dotColor, stationCount };
+          })
+          .filter(Boolean) as { label: string; emoji: string; color: string; pct: number; dotColor: string; stationCount: number }[];
+        if (!entries.length) return null;
+        return (
+          <div style={{ padding: "0 1rem 0.75rem" }}>
+            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.4rem" }}>ГОРОДА · ОБЗОР_НАЛИЧИЯ</div>
+            <div style={{ display: "flex", gap: "0.4rem" }}>
+              {entries.map(({ label, emoji, pct, dotColor, stationCount }) => (
+                <div key={label} style={{
+                  flex: 1, background: "#0d0d18", border: `1px solid ${dotColor}22`,
+                  borderTop: `2px solid ${dotColor}66`,
+                  borderRadius: "10px", padding: "0.5rem 0.4rem", textAlign: "center",
+                  position: "relative", overflow: "hidden",
+                }}>
+                  <div style={{ fontSize: "0.9rem", lineHeight: 1, marginBottom: "3px" }}>{emoji}</div>
+                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.88rem", fontWeight: 800, color: dotColor, lineHeight: 1 }}>{pct}<span style={{ fontSize: "0.5rem" }}>%</span></div>
+                  <div style={{ color: "#374151", fontSize: "0.45rem", marginTop: "2px", fontFamily: "'JetBrains Mono',monospace" }}>{label.toUpperCase()}</div>
+                  {stationCount > 0 && (
+                    <div style={{ color: "#4b5563", fontSize: "0.42rem", fontFamily: "'JetBrains Mono',monospace", marginTop: "1px" }}>{stationCount} АЗС</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Live system stats — command center */}
       {sysStats && (
@@ -1243,6 +1290,54 @@ export function AnalyticsTab({ onNavigate }: Props) {
       {/* Region selector */}
       <div style={{ padding: "0 1rem 0.75rem" }}>
         <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.35rem" }}>ФИЛЬТР_РЕГИОНОВ · ЗОНА_ПОИСКА</div>
+        {/* City quick-jump chips */}
+        {Object.keys(regions).length > 0 && (() => {
+          const CITIES = [
+            { label: "Все", key: "", emoji: "🌐" },
+            { label: "Москва", key: "Москва", emoji: "🏙" },
+            { label: "Крым", key: "Севастополь", emoji: "🌊" },
+            { label: "Питер", key: "Санкт-Петербург", emoji: "⚓" },
+            { label: "Татарстан", key: "Татарстан", emoji: "🛢" },
+          ];
+          return (
+            <div style={{ display: "flex", gap: "0.35rem", marginBottom: "0.5rem", overflowX: "auto" }}>
+              {CITIES.map(({ label, key, emoji }) => {
+                const exactMatch = Object.keys(regions).find(r => r.includes(key));
+                const active = key === "" ? selectedRegion === "" : selectedRegion.includes(key);
+                if (key && !exactMatch) return null;
+                const avgPct = key && exactMatch ? regions[exactMatch]?.avg_pct : null;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setSelectedRegion(key === "" ? "" : (exactMatch ?? ""))}
+                    style={{
+                      flexShrink: 0,
+                      background: active ? "linear-gradient(135deg,#a855f7,#db2777)" : "rgba(255,255,255,0.04)",
+                      border: active ? "1px solid #a855f7" : "1px solid rgba(255,255,255,0.09)",
+                      borderRadius: "20px",
+                      padding: "0.2rem 0.6rem",
+                      cursor: "pointer",
+                      display: "flex", alignItems: "center", gap: "4px",
+                      transition: "all 0.18s",
+                    }}
+                  >
+                    <span style={{ fontSize: "0.6rem" }}>{emoji}</span>
+                    <span style={{ color: active ? "#fff" : "#6b7280", fontSize: "0.6rem", fontWeight: active ? 700 : 400 }}>{label}</span>
+                    {avgPct != null && (
+                      <span style={{
+                        background: active ? "rgba(255,255,255,0.25)" : "rgba(168,85,247,0.1)",
+                        borderRadius: "9px", padding: "0 4px",
+                        fontSize: "0.5rem", fontWeight: 700,
+                        color: active ? "#fff" : (avgPct >= 60 ? "#22c55e" : avgPct >= 25 ? "#eab308" : "#ef4444"),
+                        minWidth: "14px", textAlign: "center",
+                      }}>{avgPct}%</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })()}
         <div style={{ position: "relative" }}>
           <div style={{ position: "absolute", left: "0.65rem", top: "50%", transform: "translateY(-50%)", fontFamily: "'JetBrains Mono',monospace", color: "#a855f7", fontSize: "0.6rem", pointerEvents: "none", zIndex: 1 }}>
             ▸
@@ -1344,8 +1439,9 @@ export function AnalyticsTab({ onNavigate }: Props) {
         </div>
       </div>
 
-      {/* Deep market analysis */}
+      {/* Deep market analysis + network widgets */}
       <MarketAnalysis regions={regions} data={data} />
+
     </div>
   );
 }
@@ -1548,6 +1644,12 @@ function NewsFeed() {
       <TopCheapestStations />
       {/* Fuel price savings opportunity */}
       <FuelSavingsWidget />
+      {/* Crisis forecast */}
+      <CrisisForecastWidget />
+      {/* Network price comparison table */}
+      <NetworkPriceTableWidget />
+      {/* Region availability leaderboard */}
+      <RegionLeaderboardWidget />
     </div>
   );
 }
@@ -1972,6 +2074,236 @@ function FuelSavingsWidget() {
         <div style={{ marginTop: "0.6rem", padding: "0.35rem 0.5rem", background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.12)", borderRadius: "7px" }}>
           <span style={{ color: "#6b7280", fontSize: "0.58rem" }}>
             💡 Заправившись на самой дешёвой АЗС, вы экономите до <strong style={{ color: "#22c55e" }}>{Math.max(...spreads.map(s => s.spread * 60)).toFixed(0)} ₽</strong> при заправке 60л
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Network price comparison table ─────────────────────────────────
+function NetworkPriceTableWidget() {
+  const [prices, setPrices] = useState<Record<string, Record<string, number>>>({});
+  const [loading, setLoading] = useState(true);
+  const [activeFuel, setActiveFuel] = useState<"АИ-92" | "АИ-95" | "ДТ">("АИ-92");
+
+  useEffect(() => {
+    fetchNetworkPrices()
+      .then(d => { setPrices(d.networks); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const FUELS = ["АИ-92", "АИ-95", "ДТ"] as const;
+  const FUEL_COLORS: Record<string, string> = { "АИ-92": "#a855f7", "АИ-95": "#db2777", "ДТ": "#f59e0b" };
+
+  const NETWORKS = [
+    { name: "Лукойл",       color: "#ef4444", icon: "🔴" },
+    { name: "Роснефть",     color: "#0ea5e9", icon: "🔵" },
+    { name: "Газпромнефть", color: "#3b82f6", icon: "💙" },
+    { name: "Башнефть",     color: "#8b5cf6", icon: "🟣" },
+    { name: "Татнефть",     color: "#22c55e", icon: "🟢" },
+    { name: "ННК",          color: "#f59e0b", icon: "🟡" },
+  ];
+
+  if (loading || !Object.keys(prices).length) return null;
+
+  const sorted = [...NETWORKS].sort((a, b) => {
+    const pa = prices[a.name]?.[activeFuel] ?? 99;
+    const pb = prices[b.name]?.[activeFuel] ?? 99;
+    return pa - pb;
+  });
+
+  const allPrices = sorted.map(n => prices[n.name]?.[activeFuel] ?? 0).filter(p => p > 0);
+  const minPrice = Math.min(...allPrices);
+  const maxPrice = Math.max(...allPrices);
+
+  return (
+    <div style={{ padding: "0 1rem 1.5rem" }}>
+      <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.45rem" }}>
+        ЦЕНЫ_ПО_СЕТЯМ · СРАВНЕНИЕ · ИЮНЬ 2026
+      </div>
+      <div style={{ background: "linear-gradient(135deg,#0a0a14,#0d0818)", border: "1px solid #a855f718", borderRadius: "14px", padding: "0.75rem", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#a855f744,transparent)" }} />
+        <div style={{ display: "flex", gap: "0.3rem", marginBottom: "0.6rem" }}>
+          {FUELS.map(f => (
+            <button key={f} onClick={() => setActiveFuel(f)} style={{
+              flexShrink: 0, padding: "0.18rem 0.55rem",
+              background: activeFuel === f ? `${FUEL_COLORS[f]}18` : "none",
+              border: `1px solid ${activeFuel === f ? FUEL_COLORS[f] + "50" : "#22222f"}`,
+              borderRadius: "6px", color: activeFuel === f ? FUEL_COLORS[f] : "#4b5563",
+              fontSize: "0.6rem", fontWeight: activeFuel === f ? 700 : 400, cursor: "pointer",
+              fontFamily: "'JetBrains Mono',monospace",
+            }}>{f}</button>
+          ))}
+          <span style={{ marginLeft: "auto", color: "#374151", fontSize: "0.55rem", alignSelf: "center" }}>
+            разброс: <strong style={{ color: "#22c55e" }}>-{(maxPrice - minPrice).toFixed(1)}₽</strong>
+          </span>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+          {sorted.map(({ name, color, icon }, rank) => {
+            const price = prices[name]?.[activeFuel];
+            if (!price) return null;
+            const barPct = maxPrice > minPrice ? ((price - minPrice) / (maxPrice - minPrice)) * 100 : 50;
+            const isCheapest = price === minPrice;
+            return (
+              <div key={name} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.52rem", width: "1rem", flexShrink: 0 }}>#{rank + 1}</span>
+                <span style={{ fontSize: "0.72rem", flexShrink: 0 }}>{icon}</span>
+                <span style={{ color: "#9ca3af", fontSize: "0.62rem", minWidth: "75px", flexShrink: 0 }}>{name}</span>
+                <div style={{ flex: 1, height: "4px", background: "#0b0b0f", borderRadius: "2px", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${Math.max(barPct, 8)}%`, background: `linear-gradient(90deg,${color}88,${color})`, borderRadius: "2px", transition: "width 0.5s" }} />
+                </div>
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", color: isCheapest ? "#22c55e" : color, fontSize: "0.65rem", fontWeight: 700, flexShrink: 0, minWidth: "46px", textAlign: "right" }}>
+                  {price.toFixed(1)}₽{isCheapest ? " ✓" : ""}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ marginTop: "0.55rem", padding: "0.3rem 0.5rem", background: "rgba(168,85,247,0.04)", border: "1px solid #a855f712", borderRadius: "6px" }}>
+          <span style={{ color: "#4b5563", fontSize: "0.55rem" }}>
+            🏆 Выгоднее всего: <strong style={{ color: "#22c55e" }}>{sorted[0]?.name}</strong> — {prices[sorted[0]?.name]?.[activeFuel]?.toFixed(1)}₽/л за {activeFuel}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Region availability leaderboard ────────────────────────────────
+function RegionLeaderboardWidget() {
+  const { stations } = useStationStore();
+  if (stations.length === 0) return null;
+
+  const regionMap = new Map<string, { total: number; sumPct: number }>();
+  for (const s of stations) {
+    const avg = s.fuel_statuses.length
+      ? s.fuel_statuses.reduce((a, b) => a + b.availability_pct, 0) / s.fuel_statuses.length
+      : 0;
+    const prev = regionMap.get(s.region) ?? { total: 0, sumPct: 0 };
+    regionMap.set(s.region, { total: prev.total + 1, sumPct: prev.sumPct + avg });
+  }
+
+  const ranked = Array.from(regionMap.entries())
+    .map(([region, { total, sumPct }]) => ({
+      region,
+      total,
+      avgPct: sumPct / total,
+      short: region.length > 20 ? region.split(" ").slice(-1)[0] : region,
+    }))
+    .sort((a, b) => b.avgPct - a.avgPct);
+
+  const top5 = ranked.slice(0, 5);
+  const bottom3 = ranked.slice(-3).reverse();
+
+  return (
+    <div style={{ padding: "0 1rem 1.5rem" }}>
+      <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.45rem" }}>
+        РЕЙТИНГ_РЕГИОНОВ · НАЛИЧИЕ_ТОПЛИВА · LIVE
+      </div>
+      <div style={{ background: "linear-gradient(135deg,#0a0a14,#0d0818)", border: "1px solid #a855f718", borderRadius: "14px", padding: "0.75rem", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#22c55e44,transparent)" }} />
+
+        {/* Top 5 */}
+        <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e", fontSize: "0.52rem", letterSpacing: "0.1em", marginBottom: "0.4rem" }}>▲ ТОП-5 РЕГИОНОВ</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem", marginBottom: "0.65rem" }}>
+          {top5.map(({ region, total, avgPct, short }, i) => (
+            <div key={region} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.5rem", width: "1rem", flexShrink: 0 }}>#{i + 1}</span>
+              <span style={{ color: "#9ca3af", fontSize: "0.6rem", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{short}</span>
+              <div style={{ width: "55px", height: "3px", background: "#0b0b0f", borderRadius: "2px", flexShrink: 0 }}>
+                <div style={{ height: "100%", width: `${Math.min(avgPct, 100)}%`, background: "linear-gradient(90deg,#16a34a,#22c55e)", borderRadius: "2px" }} />
+              </div>
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e", fontSize: "0.6rem", fontWeight: 700, minWidth: "34px", textAlign: "right", flexShrink: 0 }}>{avgPct.toFixed(0)}%</span>
+              <span style={{ color: "#374151", fontSize: "0.52rem", flexShrink: 0 }}>{total}АЗС</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Bottom 3 */}
+        <div style={{ height: "1px", background: "#1e1e2a", marginBottom: "0.5rem" }} />
+        <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#ef4444", fontSize: "0.52rem", letterSpacing: "0.1em", marginBottom: "0.4rem" }}>▼ КРИТИЧЕСКИЕ ЗОНЫ</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+          {bottom3.map(({ region, total, avgPct, short }, i) => (
+            <div key={region} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.5rem", width: "1rem", flexShrink: 0 }}>#{ranked.length - 2 + i}</span>
+              <span style={{ color: "#9ca3af", fontSize: "0.6rem", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{short}</span>
+              <div style={{ width: "55px", height: "3px", background: "#0b0b0f", borderRadius: "2px", flexShrink: 0 }}>
+                <div style={{ height: "100%", width: `${Math.max(Math.min(avgPct, 100), 4)}%`, background: "linear-gradient(90deg,#991b1b,#ef4444)", borderRadius: "2px" }} />
+              </div>
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#ef4444", fontSize: "0.6rem", fontWeight: 700, minWidth: "34px", textAlign: "right", flexShrink: 0 }}>{avgPct.toFixed(0)}%</span>
+              <span style={{ color: "#374151", fontSize: "0.52rem", flexShrink: 0 }}>{total}АЗС</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: "0.5rem", padding: "0.3rem 0.5rem", background: "rgba(34,197,94,0.04)", border: "1px solid #22c55e12", borderRadius: "6px" }}>
+          <span style={{ color: "#374151", fontSize: "0.52rem" }}>
+            📊 {ranked.length} регионов · {stations.length.toLocaleString("ru")} АЗС в базе
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Crisis forecast widget ──────────────────────────────────────────
+import type { CrisisForecast } from "@/types";
+
+function CrisisForecastWidget() {
+  const [forecasts, setForecasts] = useState<CrisisForecast[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchCrisisForecast()
+      .then(d => { setForecasts(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  if (loading || !forecasts.length) return null;
+
+  const critical = forecasts.filter(f => f.severity >= 7).slice(0, 5);
+  if (!critical.length) return null;
+
+  const trendIcon = (t: CrisisForecast["trend"]) =>
+    t === "worsening" ? "▼" : t === "improving" ? "▲" : "—";
+  const trendColor = (t: CrisisForecast["trend"]) =>
+    t === "worsening" ? "#ef4444" : t === "improving" ? "#22c55e" : "#6b7280";
+
+  return (
+    <div style={{ padding: "0 1rem 1.5rem" }}>
+      <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.45rem" }}>
+        ПРОГНОЗ_ДЕФИЦИТА · AI_АНАЛИЗ · ПРИОРИТЕТ
+      </div>
+      <div style={{ background: "linear-gradient(135deg,#0f0505,#12060a)", border: "1px solid #ef444422", borderRadius: "14px", padding: "0.75rem", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#ef444444,transparent)" }} />
+        <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#ef4444", fontSize: "0.52rem", letterSpacing: "0.1em", marginBottom: "0.5rem" }}>
+          🚨 ЗОНЫ РИСКА · {critical.length} РЕГИОН{critical.length === 1 ? "" : "А"}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.38rem" }}>
+          {critical.map((f) => {
+            const severity = Math.min(f.severity, 10);
+            const barW = (severity / 10) * 100;
+            const short = f.region.length > 22 ? f.region.split(" ").slice(-1)[0] : f.region;
+            return (
+              <div key={f.region} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                <span style={{ color: "#9ca3af", fontSize: "0.6rem", minWidth: "70px", flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{short}</span>
+                <div style={{ flex: 1, height: "4px", background: "#1a0505", borderRadius: "2px", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${barW}%`, background: severity >= 9 ? "linear-gradient(90deg,#991b1b,#ef4444)" : "linear-gradient(90deg,#b45309,#f97316)", borderRadius: "2px", transition: "width 0.5s" }} />
+                </div>
+                <span style={{ color: trendColor(f.trend), fontFamily: "'JetBrains Mono',monospace", fontSize: "0.6rem", fontWeight: 700, flexShrink: 0, minWidth: "20px" }}>{trendIcon(f.trend)}</span>
+                <span style={{ color: "#6b7280", fontSize: "0.55rem", flexShrink: 0, whiteSpace: "nowrap" }}>
+                  {f.days_until_critical <= 1 ? "сегодня" : `≤${f.days_until_critical}д`}
+                </span>
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#f59e0b", fontSize: "0.55rem", flexShrink: 0 }}>
+                  ~{f.recommended_volume_liters}л
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ marginTop: "0.5rem", padding: "0.3rem 0.5rem", background: "rgba(239,68,68,0.04)", border: "1px solid #ef444412", borderRadius: "6px" }}>
+          <span style={{ color: "#4b5563", fontSize: "0.52rem" }}>
+            💡 Рекомендуем заправиться заранее в выделенных регионах
           </span>
         </div>
       </div>

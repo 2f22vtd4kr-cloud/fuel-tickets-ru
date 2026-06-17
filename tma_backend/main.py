@@ -3660,7 +3660,7 @@ def _ai_rule_based_reply(
     except Exception:
         crisis_count   = context.get("crisis_stations", 0)
         green_count    = context.get("green_stations", 45)
-        total_stations = context.get("total_stations", 236)
+        total_stations = context.get("total_stations", 1295)
 
     crisis_pct = round(crisis_count / max(total_stations, 1) * 100, 1)
 
@@ -4236,7 +4236,7 @@ async def ai_chat(body: AiChatRequest, db: Session = Depends(get_db)):
                 green_count    = db.query(GasStation).join(FuelStatus).filter(FuelStatus.status == "green").distinct().count()
                 total_st       = db.query(GasStation).count()
             except Exception:
-                crisis_count = context.get("crisis_stations", 0); green_count = context.get("green_stations", 45); total_st = context.get("total_stations", 236)
+                crisis_count = context.get("crisis_stations", 0); green_count = context.get("green_stations", 45); total_st = context.get("total_stations", 1295)
 
             system_prompt = (
                 "Ты — циничный, полезный и слегка саркастичный ИИ-советник по имени «КризисБот» "

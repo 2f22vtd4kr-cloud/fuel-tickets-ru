@@ -186,6 +186,7 @@ export function NewsTab({ onNavigate }: Props) {
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [severityFilter, setSeverityFilter] = useState<string | null>(null);
   const [regionFilter, setRegionFilter] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<"severity" | "time">("time");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -208,11 +209,17 @@ export function NewsTab({ onNavigate }: Props) {
     return () => clearInterval(id);
   }, [load]);
 
-  const filteredNews = news.filter(n => {
-    if (severityFilter && n.severity !== severityFilter) return false;
-    if (regionFilter && n.region !== regionFilter) return false;
-    return true;
-  });
+  const SEV_ORDER: Record<string, number> = { critical: 0, warning: 1, info: 2, success: 3 };
+  const filteredNews = news
+    .filter(n => {
+      if (severityFilter && n.severity !== severityFilter) return false;
+      if (regionFilter && !n.region?.includes(regionFilter)) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === "severity") return (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9);
+      return new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime();
+    });
   const activeRegions = [...new Set(news.filter(n => n.region).map(n => n.region))].sort().slice(0, 6);
   const criticalCount = news.filter(n => n.severity === "critical").length;
   const warningCount  = news.filter(n => n.severity === "warning").length;
@@ -258,6 +265,53 @@ export function NewsTab({ onNavigate }: Props) {
         )}
       </AnimatePresence>
 
+      {/* City quick-filter chips */}
+      {!loading && news.length > 0 && (() => {
+        const CITY_KEYWORDS: { label: string; emoji: string; key: string }[] = [
+          { label: "Все",   emoji: "🌐",  key: "" },
+          { label: "Москва", emoji: "🏙", key: "Москва" },
+          { label: "Крым",  emoji: "🌊",  key: "Крым" },
+          { label: "Питер", emoji: "⚓",  key: "Петербург" },
+        ];
+        return (
+          <div style={{ display: "flex", gap: "0.35rem", marginBottom: "8px", overflowX: "auto" }}>
+            {CITY_KEYWORDS.map(({ label, emoji, key }) => {
+              const active = (regionFilter ?? "") === key;
+              const count = key ? news.filter(n => n.region?.includes(key)).length : news.length;
+              if (!active && key && !count) return null;
+              return (
+                <button
+                  key={key}
+                  onClick={() => setRegionFilter(key || null)}
+                  style={{
+                    flexShrink: 0,
+                    background: active ? "linear-gradient(135deg,#a855f7,#db2777)" : "rgba(255,255,255,0.04)",
+                    border: active ? "1px solid #a855f7" : "1px solid rgba(255,255,255,0.09)",
+                    borderRadius: "20px",
+                    padding: "0.22rem 0.65rem",
+                    cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: "4px",
+                    transition: "all 0.18s",
+                  }}
+                >
+                  <span style={{ fontSize: "0.6rem" }}>{emoji}</span>
+                  <span style={{ color: active ? "#fff" : "#6b7280", fontSize: "0.62rem", fontWeight: active ? 700 : 400 }}>{label}</span>
+                  {count > 0 && (
+                    <span style={{
+                      background: active ? "rgba(255,255,255,0.25)" : "rgba(168,85,247,0.12)",
+                      borderRadius: "9px", padding: "0 4px",
+                      fontSize: "0.5rem", fontWeight: 700,
+                      color: active ? "#fff" : "#a855f7",
+                      minWidth: "14px", textAlign: "center",
+                    }}>{count}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        );
+      })()}
+
       {/* Severity mini-summary bar */}
       {!loading && news.length > 0 && (
         <div style={{ display: "flex", gap: "0.35rem", marginBottom: "10px", overflowX: "auto" }}>
@@ -292,6 +346,17 @@ export function NewsTab({ onNavigate }: Props) {
           </p>
         </div>
         <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
+          {/* Sort toggle */}
+          <button
+            onClick={() => setSortBy(s => s === "time" ? "severity" : "time")}
+            style={{
+              background: "rgba(168,85,247,0.08)", border: "1px solid #a855f722",
+              borderRadius: "8px", color: sortBy === "severity" ? "#a855f7" : "#6b7280",
+              fontSize: "0.6rem", padding: "0.25rem 0.5rem",
+              cursor: "pointer", whiteSpace: "nowrap",
+            }}
+            title={sortBy === "time" ? "Сортировать по важности" : "Сортировать по времени"}
+          >{sortBy === "time" ? "⏱ Время" : "🔴 Важность"}</button>
           {(criticalCount + warningCount) > 0 && (
             <button
               onClick={() => {

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { impact } from "@/lib/haptic";
 import { MapContainer, TileLayer, useMap, useMapEvents, Rectangle, Tooltip } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
 import { Marker, Popup } from "react-leaflet";
@@ -34,11 +35,12 @@ function getBrandAccent(network = ""): string | null {
   return null;
 }
 
-function createStationIcon(status: string, starred = false, network = "") {
+function createStationIcon(status: string, starred = false, network = "", queue = 0) {
   const color = STATUS_COLORS[status] ?? "#9ca3af";
   const brandColor = getBrandAccent(network);
   const pulse = status === "red" ? `<div style="position:absolute;inset:-4px;border-radius:50%;border:1.5px solid ${color};opacity:0.4;animation:mrkPulse 1.8s ease-in-out infinite;"></div>` : "";
   const starBadge = starred ? `<div style="position:absolute;top:-7px;right:-7px;font-size:9px;line-height:1;z-index:2;filter:drop-shadow(0 0 3px #f59e0b);">⭐</div>` : "";
+  const queueBadge = queue >= 4 ? `<div style="position:absolute;top:-7px;left:-7px;font-size:8px;font-weight:700;line-height:1;z-index:2;background:#ef4444;color:#fff;border-radius:50%;width:13px;height:13px;display:flex;align-items:center;justify-content:center;border:1px solid #0d0d18;">${queue}</div>` : queue >= 2 ? `<div style="position:absolute;top:-7px;left:-7px;font-size:8px;font-weight:700;line-height:1;z-index:2;background:#eab308;color:#000;border-radius:50%;width:13px;height:13px;display:flex;align-items:center;justify-content:center;border:1px solid #0d0d18;">${queue}</div>` : "";
   const size = starred ? 20 : 16;
   const outerRing = brandColor ? `<div style="position:absolute;inset:-3px;border-radius:50%;border:1.5px solid ${brandColor}99;pointer-events:none;z-index:0;"></div>` : "";
   return L.divIcon({
@@ -47,6 +49,7 @@ function createStationIcon(status: string, starred = false, network = "") {
       ${pulse}
       ${outerRing}
       ${starBadge}
+      ${queueBadge}
       <div style="
         width:${size}px;height:${size}px;border-radius:50%;
         background:radial-gradient(circle at 35% 30%, ${color}ff, ${color}99);
@@ -162,7 +165,16 @@ function PopupContent({ station }: { station: GasStation }) {
       )}
       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.25rem", marginBottom: "0.35rem" }}>
         <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "1.1rem", fontWeight: 800, color, lineHeight: 1 }}>{avg}%</span>
-        <span style={{ color: "#374151", fontSize: "0.6rem" }}>🚗 {station.queue_cars} авт.</span>
+        {(() => {
+          const q = station.queue_cars;
+          const qColor = q === 0 ? "#22c55e" : q <= 3 ? "#eab308" : "#ef4444";
+          const waitMin = q <= 1 ? 0 : q <= 3 ? q * 4 : q * 5;
+          return (
+            <span style={{ color: qColor, fontSize: "0.6rem", fontFamily: "'JetBrains Mono',monospace", fontWeight: q > 3 ? 700 : 400 }}>
+              🚗 {q}{waitMin > 0 ? ` ~${waitMin}мин` : " свободно"}
+            </span>
+          );
+        })()}
       </div>
       {/* Prices */}
       <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap" }}>
@@ -579,6 +591,37 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
           ⭐
         </button>
 
+        {/* Clear all filters */}
+        {(activeFilterCount > 0 || showFavoritesOnly || searchQuery) && (
+          <button
+            onClick={() => {
+              setFilter("filterStatus", "all");
+              setFilter("filterFuel", null);
+              setFilter("filterNetwork", null);
+              setFilter("filterRegion", null);
+              setFilter("filterZone", null);
+              setShowFavoritesOnly(false);
+              setSearchQuery("");
+              setSearchOpen(false);
+              impact("light");
+            }}
+            title="Сбросить все фильтры"
+            style={{
+              background: "rgba(239,68,68,0.12)",
+              border: "1px solid #ef444430",
+              borderRadius: "10px",
+              color: "#ef4444",
+              padding: "0.4rem 0.55rem",
+              fontSize: "0.68rem",
+              cursor: "pointer",
+              backdropFilter: "blur(12px)",
+              fontWeight: 700,
+              flexShrink: 0,
+              transition: "all 0.2s",
+            }}
+          >✕</button>
+        )}
+
         {/* Search — expand on click */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", flex: searchOpen ? 1 : "none" }}>
           <button
@@ -693,6 +736,25 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
             flexShrink: 0,
           }} onClick={jumpToSearchResult}>
             {filtered.length > 0 ? `${filtered.length} АЗС →` : "0"}
+          </div>
+        )}
+
+        {/* Total station count — always visible */}
+        {!searchQuery && !showFavoritesOnly && activeFilterCount === 0 && stations.length > 0 && (
+          <div style={{
+            background: "rgba(20,20,28,0.88)",
+            border: "1px solid #1e1e2a",
+            borderRadius: "10px",
+            padding: "0.4rem 0.55rem",
+            fontFamily: "'JetBrains Mono',monospace",
+            fontSize: "0.6rem",
+            color: "#374151",
+            backdropFilter: "blur(12px)",
+            flexShrink: 0,
+            display: "flex", alignItems: "center", gap: "0.25rem",
+          }}>
+            <span style={{ color: "#a855f7", fontWeight: 700 }}>{stations.length.toLocaleString("ru")}</span>
+            <span>АЗС</span>
           </div>
         )}
 
@@ -841,6 +903,31 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
             {/* Region */}
             <div style={{ marginBottom: "0.55rem" }}>
               <p style={{ color: "#374151", fontSize: "0.6rem", margin: "0 0 0.3rem", textTransform: "uppercase", letterSpacing: "0.12em" }}>Регион</p>
+              {/* Quick city chips */}
+              <div style={{ display: "flex", gap: "0.28rem", flexWrap: "wrap", marginBottom: "0.4rem" }}>
+                {[
+                  { label: "🌐 Все",    value: null,                          color: "#6b7280", coords: null as [number,number]|null, zoom: 5  },
+                  { label: "🏙 Москва", value: "г. Москва и Новая Москва",    color: "#3b82f6", coords: [55.75, 37.62] as [number,number], zoom: 11 },
+                  { label: "🌊 Крым",   value: "Севастополь",                 color: "#a855f7", coords: [44.60, 33.52] as [number,number], zoom: 10 },
+                  { label: "⚓ Питер",  value: "г. Санкт-Петербург",          color: "#06b6d4", coords: [59.95, 30.32] as [number,number], zoom: 11 },
+                ].map(({ label, value, color, coords, zoom }) => {
+                  const active = filterRegion === value;
+                  return (
+                    <button key={String(value)} onClick={() => {
+                      setFilter("filterRegion", value);
+                      if (coords) mapRef.current?.flyTo(coords, zoom, { duration: 1.2 });
+                    }}
+                      style={{
+                        flexShrink: 0, padding: "0.18rem 0.45rem",
+                        background: active ? `${color}18` : "#0b0b10",
+                        border: `1px solid ${active ? color + "60" : "#1e1e2a"}`,
+                        borderRadius: "6px", color: active ? color : "#374151",
+                        fontSize: "0.6rem", fontWeight: active ? 700 : 400, cursor: "pointer",
+                      }}
+                    >{label}</button>
+                  );
+                })}
+              </div>
               <select
                 value={filterRegion ?? ""}
                 onChange={(e) => setFilter("filterRegion", e.target.value || null)}
@@ -1038,7 +1125,7 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
             <Marker
               key={station.id}
               position={[station.lat, station.lng]}
-              icon={createStationIcon(dominantStatus(station), isStationFavorite(station.id), station.network ?? "")}
+              icon={createStationIcon(dominantStatus(station), isStationFavorite(station.id), station.network ?? "", station.queue_cars)}
               eventHandlers={{ click: () => selectStation(station.id) }}
             >
               <Popup

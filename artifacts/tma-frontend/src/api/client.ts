@@ -420,6 +420,11 @@ export const fetchRegionalPrices = () =>
     "/prices/regional"
   );
 
+export const fetchNetworkPrices = () =>
+  req<{ networks: Record<string, Record<string, number>>; updated: string }>(
+    "/prices/networks"
+  );
+
 export const fetchStatsSummary = () =>
   req<{
     stations: { total: number; green: number; yellow: number; red: number };

@@ -1,6 +1,6 @@
 # Топливный Узел — Матрица Снабжения
 
-A premium Telegram bot + Telegram Mini App (TMA) fuel availability dashboard for Sevastopol/Crimea region. Features 236 seeded gas stations, real-time availability tracking, gamification, and a cyberpunk UI (#050507 bg, #a855f7 violet, #db2777 magenta). 100% Russian UI.
+A premium Telegram bot + Telegram Mini App (TMA) fuel availability dashboard for Sevastopol/Crimea region. Features 1000+ seeded gas stations (1295 total), real-time availability tracking, gamification, and a cyberpunk UI (#050507 bg, #a855f7 violet, #db2777 magenta). 100% Russian UI.
 
 ## Run & Operate
 

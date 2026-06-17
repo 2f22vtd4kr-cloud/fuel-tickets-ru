@@ -664,6 +664,11 @@ def main_menu_markup() -> InlineKeyboardMarkup:
             InlineKeyboardButton("🎮 Резерв", url=f"https://t.me/{BOT_USERNAME}?startapp=reserve" if BOT_USERNAME else TMA_URL),
         ],
         [InlineKeyboardButton("📊 Аналитика", url=f"https://t.me/{BOT_USERNAME}?startapp=analytics" if BOT_USERNAME else TMA_URL)],
+        [
+            InlineKeyboardButton("🏙 Москва", callback_data="menu_moscow"),
+            InlineKeyboardButton("🌊 Крым", callback_data="menu_crimea"),
+            InlineKeyboardButton("📡 Статус", callback_data="menu_status"),
+        ],
         [InlineKeyboardButton("📂 Бесплатный QR-ваучер (20 л)", callback_data="free_quota")],
         [InlineKeyboardButton("⚡ Доп. объём (платная доза)", callback_data="paid_quota")],
         [InlineKeyboardButton("🗺️ Карта АЗС fuel.sevtech.org", url=MAP_URL)],
@@ -709,7 +714,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             ))
 
     await update.message.reply_text(
-        "Менюшечку слева внизу 🎟️ тыц! И выбираешь бензинчик, дизельку там… что хочешь"
+        "⛽ *Топливный Узел — Матрица Снабжения*\n\n"
+        "🗺 *1000+ АЗС* по всей России\n"
+        "🏙 Москва · 🌊 Крым · ⚓ Питер · 🛢 Татарстан\n\n"
+        "📊 Цены в реальном времени, наличие, очереди\n"
+        "🚨 AI-прогноз дефицита топлива по регионам\n"
+        "🎫 Покупка топливных талонов за Звёзды или крипту\n"
+        "🎮 Ежедневные бонусы, XP и рейтинг операторов\n\n"
+        "👇 Открывай приложение и жми на любую АЗС!",
+        parse_mode="Markdown",
+        reply_markup=main_menu_markup(),
     )
 
 
@@ -908,11 +922,13 @@ async def stats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def news_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show latest crisis/market news from the Matrix feed."""
+    backend = "http://localhost:8000"
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(
-                f"{TMA_URL}/api/news?limit=8",
-                timeout=aiohttp.ClientTimeout(total=6),
+                f"{backend}/api/news",
+                params={"limit": 10},
+                timeout=aiohttp.ClientTimeout(total=8),
             ) as resp:
                 items = await resp.json() if resp.status == 200 else []
     except Exception:
@@ -937,10 +953,24 @@ async def news_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         region = item.get("region", "")
         fuel = item.get("fuel_type", "")
         delta = item.get("price_delta_pct")
+        source = item.get("source", "")
+        created_at = item.get("created_at", "")
+        try:
+            from datetime import datetime as dt
+            ts = dt.fromisoformat(created_at.replace("Z", "+00:00")) if created_at else None
+            time_str = ts.strftime("%d %b %H:%M") if ts else ""
+        except Exception:
+            time_str = ""
         delta_str = f" ({'+' if delta and delta > 0 else ''}{delta:.1f}%)" if delta else ""
-        fuel_str = f" · {fuel}{delta_str}" if fuel else ""
-        lines.append(f"{emoji} *{region}*{fuel_str}")
-        lines.append(f"_{headline}_\n")
+        fuel_str = f" · ⛽{fuel}{delta_str}" if fuel else ""
+        meta = f"`{time_str}`" if time_str else ""
+        if source:
+            meta += f" · _{source}_" if meta else f"_{source}_"
+        lines.append(f"{emoji} *{region or 'Общее'}*{fuel_str}")
+        lines.append(f"_{headline}_")
+        if meta:
+            lines.append(meta)
+        lines.append("")
     lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     lines.append("_Данные обновляются в реальном времени_")
 
@@ -1041,9 +1071,14 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "`/vpn` — защищённый канал за Stars или USDT\n\n"
         "📡 *Новости и рынок*\n"
         "`/news` — лента кризисных событий\n"
-        "`/price` — текущие котировки топлива\n\n"
+        "`/price` — текущие котировки топлива\n"
+        "`/moscow` — АЗС Москвы: наличие и цены\n"
+        "`/crimea` — АЗС Крыма: наличие по городам\n"
+        "`/top` — топ-10 АЗС с лучшим наличием\n"
+        "`/regions` — наличие топлива по всем регионам\n"
+        "`/status` — обзор по всем регионам\n\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "_Департамент цифрового развития · Севастополь_"
+        "_1000+ АЗС · Москва, Крым, регионы России_"
     )
     await update.message.reply_text(
         text,
@@ -1083,7 +1118,7 @@ async def map_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "⬡ *ТОПЛИВО ⛽️ · КАРТА АЗС*\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        "🗺 Интерактивная карта с *236 АЗС* в реальном времени\n\n"
+        "🗺 Интерактивная карта с *1000+ АЗС* в реальном времени\n\n"
         "• Наличие топлива (АИ-92, АИ-95, ДТ)\n"
         "• Цветовая кодировка: 🟢 норма · 🟡 мало · 🔴 нет\n"
         "• Очереди, кластеры, фильтры по сети и топливу\n"
@@ -1188,7 +1223,7 @@ async def tma_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "⬡ *ТОПЛИВО ⛽️ · ОТКРЫТЬ ПРИЛОЖЕНИЕ*\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
         f"🔗 Раздел: *{tab_label}*\n\n"
-        "• 236 АЗС в реальном времени · Карта\n"
+        "• 1000+ АЗС в реальном времени · Карта\n"
         "• Аналитика поставок по регионам\n"
         "• Каталог топлива с ваучерами\n"
         "• Игровые механики и XP-система",
@@ -1212,6 +1247,101 @@ async def menu_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     query = update.callback_query
     await query.answer()
     data = query.data
+
+    # ── Москва быстрый просмотр ───────────────────────────────────
+    if data == "menu_moscow":
+        await query.answer()
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    "http://localhost:8000/api/stations",
+                    params={"region": "г. Москва и Новая Москва", "limit": 200},
+                    timeout=aiohttp.ClientTimeout(total=8),
+                ) as resp:
+                    msk_stations = await resp.json() if resp.status == 200 else []
+        except Exception:
+            msk_stations = []
+        total = len(msk_stations)
+        green = sum(1 for s in msk_stations if s.get("fuel_statuses") and
+                    sum(f.get("availability_pct", 0) for f in s["fuel_statuses"]) / max(len(s["fuel_statuses"]), 1) >= 60)
+        red = sum(1 for s in msk_stations if s.get("fuel_statuses") and
+                  sum(f.get("availability_pct", 0) for f in s["fuel_statuses"]) / max(len(s["fuel_statuses"]), 1) < 25)
+        await query.edit_message_text(
+            "🏙 *МОСКВА И НОВАЯ МОСКВА*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📊 {total} станций в базе\n"
+            f"🟢 {green} норма · 🔴 {red} кризис\n\n"
+            "_Откройте карту для подробной информации и фильтра по Москве_",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🗺 Карта Москвы", web_app=WebAppInfo(url=TMA_URL))],
+                [InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")],
+            ]),
+        )
+        return
+
+    # ── Крым быстрый просмотр ─────────────────────────────────────
+    if data == "menu_crimea":
+        await query.answer()
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    "http://localhost:8000/api/stations",
+                    params={"zone_type": "critical", "limit": 300},
+                    timeout=aiohttp.ClientTimeout(total=8),
+                ) as resp:
+                    cr_stations = await resp.json() if resp.status == 200 else []
+        except Exception:
+            cr_stations = []
+        total_cr = len(cr_stations)
+        green_cr = sum(1 for s in cr_stations if s.get("fuel_statuses") and
+                       sum(f.get("availability_pct", 0) for f in s["fuel_statuses"]) / max(len(s["fuel_statuses"]), 1) >= 60)
+        red_cr = sum(1 for s in cr_stations if s.get("fuel_statuses") and
+                     sum(f.get("availability_pct", 0) for f in s["fuel_statuses"]) / max(len(s["fuel_statuses"]), 1) < 25)
+        await query.edit_message_text(
+            "🌊 *КРЫМ И СЕВАСТОПОЛЬ*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📊 {total_cr} станций в кризисной зоне\n"
+            f"🟢 {green_cr} норма · 🔴 {red_cr} кризис\n\n"
+            "_Используйте /crimea для подробного отчёта_",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🗺 Карта Крыма", web_app=WebAppInfo(url=TMA_URL))],
+                [InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")],
+            ]),
+        )
+        return
+
+    # ── Статус сети (быстрый) ─────────────────────────────────────
+    if data == "menu_status":
+        await query.answer()
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    "http://localhost:8000/api/stats",
+                    timeout=aiohttp.ClientTimeout(total=8),
+                ) as resp:
+                    sys_stats = await resp.json() if resp.status == 200 else {}
+        except Exception:
+            sys_stats = {}
+        total_st = sys_stats.get("total_stations", "1000+")
+        avg_pct  = sys_stats.get("avg_availability_pct", "—")
+        sb       = sys_stats.get("station_breakdown", {})
+        g, y, r  = sb.get("green", 0), sb.get("yellow", 0), sb.get("red", 0)
+        idx_color = "🟢" if int(avg_pct or 0) >= 60 else "🟡" if int(avg_pct or 0) >= 25 else "🔴"
+        await query.edit_message_text(
+            f"📡 *СТАТУС СЕТИ · РЕАЛЬНОЕ ВРЕМЯ*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"{idx_color} Индекс наличия: *{avg_pct}%* · {total_st} АЗС\n"
+            f"🟢 {g} норма · 🟡 {y} мало · 🔴 {r} нет\n\n"
+            "_Открыть карту для подробного просмотра_",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🗺 Открыть карту", web_app=WebAppInfo(url=TMA_URL))],
+                [InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")],
+            ]),
+        )
+        return
 
     # ── Главное меню ──────────────────────────────────────────────
     if data == "main_menu":
@@ -1937,8 +2067,12 @@ async def post_init(application: Application) -> None:
         BotCommand("nearest",       "Ближайшие АЗС — отправьте геолокацию"),
         BotCommand("checkin",       "Ежедневный бонус XP — получить прямо здесь"),
         BotCommand("news",          "Лента кризисных событий — последние новости рынка"),
+        BotCommand("regions",       "Наличие топлива по всем регионам России"),
+        BotCommand("top",           "Топ-10 АЗС с лучшим наличием прямо сейчас"),
         BotCommand("help",          "Полная справка по командам бота"),
         BotCommand("price",         "Текущие котировки ГСМ по регионам"),
+        BotCommand("moscow",        "АЗС Москвы — наличие топлива и лучшие цены"),
+        BotCommand("crimea",        "АЗС Крыма и Севастополя — наличие по городам"),
     ])
     logger.info("Командное меню Telegram зарегистрировано.")
     asyncio.create_task(_invoice_cleanup_loop(application.bot))
@@ -2131,6 +2265,10 @@ async def mystats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 lb = await resp.json() if resp.status == 200 else {}
             async with session.get(f"{backend}/api/referral/{user_id}") as resp:
                 ref = await resp.json() if resp.status == 200 else {}
+            async with session.get(f"{backend}/api/achievements/{user_id}") as resp:
+                ach_data = await resp.json() if resp.status == 200 else {}
+            async with session.get(f"{backend}/api/subscriptions/{user_id}") as resp:
+                sub_data = await resp.json() if resp.status == 200 else {}
     except Exception:
         await update.message.reply_text("⚠️ Не удалось получить данные. Возможно, сервер временно недоступен.")
         return
@@ -2143,6 +2281,10 @@ async def mystats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     total_lb = lb.get("total_users", "—")
     ref_code = ref.get("code", "—")
     ref_uses = ref.get("uses", 0)
+    achievements = ach_data.get("achievements", [])
+    ach_unlocked = len([a for a in achievements if a.get("unlocked")])
+    ach_total = len(achievements)
+    sub_count = len(sub_data.get("subscriptions", []))
 
     # XP tier label
     tier_label = "Новичок"
@@ -2159,22 +2301,26 @@ async def mystats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     pct = min(100, int((xp - t_min) / max(1, t_max - t_min) * 10))
     bar = "█" * pct + "░" * (10 - pct)
 
-    streak_line = f"🔥 Серия чекинов: *{streak}* дн.\n" if streak else ""
+    streak_dots = "🟡" * min(streak, 7) + "⬛" * max(0, 7 - min(streak, 7))
+    streak_line = f"🔥 Серия: *{streak}* дн. {streak_dots}\n" if streak else ""
     nc_line = f"⬡ НейроКредиты: *{nc:,}* NC\n".replace(",", "\u202f")
+    ach_line = f"🏅 Достижения: *{ach_unlocked}/{ach_total}*\n" if ach_total else ""
+    sub_line = f"🔔 Подписки: *{sub_count}* АЗС\n" if sub_count else ""
 
     text = (
         f"⬡ *ТОПЛИВО ⛽️ · ПРОФИЛЬ*\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"👤 {tg_user.first_name}\n"
+        f"👤 *{tg_user.first_name}*\n"
         f"🎖 Уровень: *{tier_label}*\n"
-        f"⚡ XP: *{xp:,}*\n".replace(",", "\u202f") +
+        f"⚡ XP: *{xp:,}* · 🏆 Рейтинг: *#{rank}* из {total_lb}\n".replace(",", "\u202f") +
         f"`[{bar}]` → {t_max:,}\n".replace(",", "\u202f") +
-        f"🏆 Рейтинг: *#{rank}* из {total_lb}\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"{nc_line}"
         f"{streak_line}"
+        f"{ach_line}"
+        f"{sub_line}"
         f"🔗 Код агента: `{ref_code}`\n"
-        f"📨 Рекрутировано: {ref_uses} чел.\n"
+        f"📨 Рекрутировано: *{ref_uses}* чел.\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"_Полный архив в Матрице Снабжения_"
     )
@@ -2234,7 +2380,7 @@ async def price_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     import aiohttp
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(f"{TMA_URL}/api/prices", timeout=aiohttp.ClientTimeout(total=6)) as resp:
+            async with session.get(f"http://localhost:8000/api/prices", timeout=aiohttp.ClientTimeout(total=6)) as resp:
                 if resp.status != 200:
                     raise ValueError(f"HTTP {resp.status}")
                 data = await resp.json()
@@ -2247,27 +2393,63 @@ async def price_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
         return
 
+    # City highlights: pick one representative region per city
+    CITY_PICKS = [
+        ("🏙 Москва",    "г. Москва"),
+        ("🌊 Крым",      "Севастополь"),
+        ("⚓ Питер",     "Санкт-Петербург"),
+        ("🛢 Татарстан", "Татарстан"),
+    ]
+    FUELS_ORDER = ["АИ-92", "АИ-95", "ДТ"]
+
     lines = [
         "⬡ *ТОПЛИВО ⛽️ · КОТИРОВКИ ГСМ*",
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
     ]
+
+    # City-level summary
+    city_rows = []
+    for city_label, city_key in CITY_PICKS:
+        matched_key = next((k for k in data if city_key.lower() in k.lower()), None)
+        if not matched_key:
+            continue
+        fuels_d = data[matched_key]
+        parts = []
+        for ft in FUELS_ORDER:
+            pd = fuels_d.get(ft, {})
+            if not isinstance(pd, dict):
+                continue
+            eff = pd.get("effective")
+            if eff:
+                mark = "⚠" if pd.get("is_crisis") else ""
+                parts.append(f"{ft}:`{eff}₽`{mark}")
+        if parts:
+            city_rows.append(f"  {city_label}: {' · '.join(parts)}")
+    if city_rows:
+        lines.append("🏙 *Города:*")
+        lines.extend(city_rows)
+        lines.append("")
+
+    # Full region table
     crisis_count = 0
-    regions_list = list(data.items())[:8]
+    regions_list = list(data.items())[:10]
+    lines.append("📍 *По регионам:*")
     for ri, (region, fuels) in enumerate(regions_list):
         region_short = region.split()[-1] if len(region) > 22 else region
         fuel_parts = []
-        for fuel, price_data in list(fuels.items())[:4]:
-            if not isinstance(price_data, dict):
+        for fuel in FUELS_ORDER:
+            pd = fuels.get(fuel, {})
+            if not isinstance(pd, dict):
                 continue
-            eff = price_data.get("effective", "—")
-            is_crisis = price_data.get("is_crisis", False)
+            eff = pd.get("effective", "—")
+            is_crisis = pd.get("is_crisis", False)
             if is_crisis:
                 crisis_count += 1
             crisis_mark = "⚠" if is_crisis else ""
             fuel_parts.append(f"{fuel}:`{eff}₽`{crisis_mark}")
         if fuel_parts:
             prefix = "└─" if ri == len(regions_list) - 1 else "├─"
-            lines.append(f"`{prefix}` 📍 *{region_short}* — {' · '.join(fuel_parts)}")
+            lines.append(f"`{prefix}` *{region_short}* — {' · '.join(fuel_parts)}")
 
     lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     if crisis_count:
@@ -2478,7 +2660,7 @@ async def find_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"🔍 Запрос: «{query}»\n",
     ]
     buttons: list[list[InlineKeyboardButton]] = []
-    for s in stations[:5]:
+    for idx, s in enumerate(stations[:5], 1):
         sid = s.get("id")
         name = s.get("name", f"АЗС #{sid}")
         region = s.get("region", "")
@@ -2486,14 +2668,22 @@ async def find_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         queue = s.get("queue_cars", 0)
         fuels = s.get("fuel_statuses", [])
         fuel_parts = []
-        for fs in fuels[:3]:
-            emoji = {"green": "🟢", "yellow": "🟡", "red": "🔴"}.get(fs.get("status", ""), "⚪")
-            fuel_parts.append(f"{emoji}{fs.get('fuel_type', '?')}")
-        fuel_str = " ".join(fuel_parts) or "нет данных"
+        for fs in fuels[:4]:
+            dot = {"green": "🟢", "yellow": "🟡", "red": "🔴"}.get(fs.get("status", ""), "⚪")
+            pct = fs.get("availability_pct", 0)
+            fuel_parts.append(f"{dot}{fs.get('fuel_type','?')} `{pct:.0f}%`")
+        fuel_str = " · ".join(fuel_parts) or "нет данных"
+        overall_avail = (
+            sum(f.get("availability_pct", 0) for f in fuels) / len(fuels)
+            if fuels else 0
+        )
+        overall_dot = "🟢" if overall_avail >= 60 else "🟡" if overall_avail >= 25 else "🔴"
+        addr_str = f"\n  📮 {addr[:40]}" if addr else ""
         lines.append(
-            f"⛽ *{name}*\n"
-            f"  📍 {region}{' · ' + addr if addr else ''}\n"
-            f"  {fuel_str} · 🚗 очередь: {queue}"
+            f"{idx}. {overall_dot} *{name}*\n"
+            f"  📍 {region}{addr_str}\n"
+            f"  {fuel_str}\n"
+            f"  🚗 Очередь: {queue} авто · 📊 `{overall_avail:.0f}%`"
         )
         if sid:
             buttons.append([tma_btn(f"📍 {name[:32]}", "map", sid)])
@@ -2531,15 +2721,22 @@ async def leaderboard_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         "⬡ *ТОПЛИВО ⛽️ · РЕЙТИНГ АГЕНТОВ*",
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
     ]
+    TIER_ICONS = {
+        "Легенда Тавриды": "👑",
+        "Ветеран": "⚡",
+        "Агент": "🛡",
+        "Новичок": "🚶",
+    }
     for e in entries:
         rank = e.get("rank", 0)
         icon = medals.get(rank, f"`{rank:2d}.`")
         name = e.get("username") or f"Агент-{str(e.get('user_id', '?'))[-4:]}"
         xp = e.get("xp", 0)
         level = e.get("level", "—")
+        tier_icon = TIER_ICONS.get(level, "")
         is_me = e.get("user_id") == user_id
         marker = " *← вы*" if is_me else ""
-        line = f"{icon} {name} — `{xp:,} XP`".replace(",", "\u202f")
+        line = f"{icon} {tier_icon} {name} — `{xp:,} XP`".replace(",", "\u202f")
         if is_me:
             line = f"*{line}*"
         lines.append(line + marker)
@@ -2619,13 +2816,299 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             prefix = "└─" if i == len(top_regions) - 1 else "├─"
             lines.append(f"`{prefix}` {icon} {short_name}: `{pct:.0f}%`")
 
+    # City highlights
+    CITY_KEYS = [
+        ("🏙 Москва",    ["Москва",        "московск"]),
+        ("🌊 Крым",      ["Севастополь",   "Симферополь", "Ялта", "Керч"]),
+        ("⚓ Питер",     ["Санкт-Петербург", "Петербург",  "Ленинград"]),
+        ("🛢 Татарстан", ["Татарстан",     "Казань"]),
+    ]
+    city_lines = []
+    for city_label, keys in CITY_KEYS:
+        matched = [(n, i) for n, i in regional.items() if any(k.lower() in n.lower() for k in keys)]
+        if matched:
+            avg = sum(i.get("avg_pct", 0) for _, i in matched) / len(matched)
+            total_city = sum(i.get("total_stations", i.get("station_count", 0)) for _, i in matched)
+            icon = "🟢" if avg >= 60 else "🟡" if avg >= 25 else "🔴"
+            st_str = f" · {total_city} АЗС" if total_city > 0 else f" · {len(matched)} зон"
+            city_lines.append(f"  {icon} {city_label}: `{avg:.0f}%`{st_str}")
+    if city_lines:
+        lines.append("")
+        lines.append("🏙 *Города:*")
+        lines.extend(city_lines)
+
     lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    lines.append("_Данные в реальном времени · Матрица Снабжения · Россия_")
+    lines.append(f"_Данные в реальном времени · 1000+ АЗС · Москва, Крым, регионы_")
+    await update.message.reply_text(
+        "\n".join(lines),
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🗺 Открыть карту АЗС", web_app=WebAppInfo(url=TMA_URL))],
+            [
+                InlineKeyboardButton("🏙 Москва", callback_data="menu_moscow"),
+                InlineKeyboardButton("🌊 Крым", callback_data="menu_crimea"),
+                InlineKeyboardButton("📊 Аналитика", web_app=WebAppInfo(url=TMA_URL + "?tab=analytics")),
+            ],
+        ]),
+    )
+
+
+async def top_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show top 10 best-stocked stations across all regions."""
+    backend = "http://localhost:8000"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{backend}/api/stations",
+                params={"limit": 500},
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as resp:
+                all_stations = await resp.json() if resp.status == 200 else []
+    except Exception as exc:
+        await update.message.reply_text(f"⚠️ Ошибка: {exc}")
+        return
+
+    scored = []
+    for s in all_stations:
+        if not s.get("fuel_statuses"):
+            continue
+        avg = sum(f.get("availability_pct", 0) for f in s["fuel_statuses"]) / len(s["fuel_statuses"])
+        scored.append((s, avg))
+    scored.sort(key=lambda x: x[1], reverse=True)
+    top10 = scored[:10]
+
+    if not top10:
+        await update.message.reply_text("Нет данных по АЗС.")
+        return
+
+    lines = [
+        "🏆 *ТОП-10 АЗС · ЛУЧШЕЕ НАЛИЧИЕ*",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    ]
+    medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
+    for i, (s, avg) in enumerate(top10):
+        name = s.get("name", f"АЗС #{s.get('id')}")[:25]
+        region = s.get("region", "")
+        region_short = region.split()[-1] if len(region) > 15 else region
+        queue = s.get("queue_cars", 0)
+        network = s.get("network", "")
+        queue_icon = "🟢" if queue == 0 else "🟡" if queue <= 3 else "🔴"
+        net_str = f" · {network}" if network and i < 5 else ""
+        lines.append(f"{medals[i]} *{name}* · `{avg:.0f}%`")
+        lines.append(f"   📍 {region_short}{net_str} · {queue_icon} {queue} авто")
+    lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    lines.append("_Обновляется каждые 30 минут_")
+
     await update.message.reply_text(
         "\n".join(lines),
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("🗺 Открыть карту АЗС", web_app=WebAppInfo(url=TMA_URL))
+            InlineKeyboardButton("🗺 Открыть карту", web_app=WebAppInfo(url=TMA_URL)),
+        ]]),
+    )
+
+
+async def crimea_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show Crimea/Sevastopol fuel availability and top stations."""
+    backend = "http://localhost:8000"
+    CRIMEA_REGIONS = ["Севастополь", "Симферополь", "Ялта", "Керчь", "Феодосия", "Евпатория", "Крым"]
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{backend}/api/stations",
+                params={"zone_type": "critical", "limit": 300},
+                timeout=aiohttp.ClientTimeout(total=8),
+            ) as resp:
+                stations = await resp.json() if resp.status == 200 else []
+            async with session.get(
+                f"{backend}/api/analytics",
+                timeout=aiohttp.ClientTimeout(total=8),
+            ) as resp:
+                analytics = await resp.json() if resp.status == 200 else {}
+    except Exception as exc:
+        await update.message.reply_text(
+            f"⚠️ Ошибка: {exc}",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🗺 Открыть карту", web_app=WebAppInfo(url=TMA_URL))
+            ]]),
+        )
+        return
+
+    total = len(stations)
+    green = sum(1 for s in stations if s.get("fuel_statuses") and
+                sum(f.get("availability_pct", 0) for f in s["fuel_statuses"]) / max(len(s["fuel_statuses"]), 1) >= 60)
+    yellow = sum(1 for s in stations if s.get("fuel_statuses") and
+                 0 < sum(f.get("availability_pct", 0) for f in s["fuel_statuses"]) / max(len(s["fuel_statuses"]), 1) < 60)
+    red = total - green - yellow
+    idx_icon = "🟢" if green > red else "🟡" if yellow >= red else "🔴"
+
+    regional = analytics.get("regional_supply", {})
+    crimea_regions = {n: d for n, d in regional.items()
+                      if any(c.lower() in n.lower() for c in CRIMEA_REGIONS)}
+    avg_pct = (sum(d.get("avg_pct", 0) for d in crimea_regions.values()) / len(crimea_regions)) if crimea_regions else 0
+
+    lines = [
+        "🌊 *КРЫМ И СЕВАСТОПОЛЬ · АЗС*",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        f"{idx_icon} Ср. наличие: *{avg_pct:.0f}%* · {total} станций",
+        f"🟢 {green} норма · 🟡 {yellow} мало · 🔴 {red} пусто",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    ]
+
+    if crimea_regions:
+        lines.append("📍 *По городам:*")
+        for region, data in sorted(crimea_regions.items(), key=lambda x: x[1].get("avg_pct", 0), reverse=True)[:6]:
+            pct = data.get("avg_pct", 0)
+            icon = "🟢" if pct >= 60 else "🟡" if pct >= 25 else "🔴"
+            short = region.split()[-1]
+            lines.append(f"  {icon} {short}: `{pct:.0f}%`")
+        lines.append("")
+
+    best = sorted(
+        [s for s in stations if s.get("fuel_statuses")],
+        key=lambda s: sum(f.get("availability_pct", 0) for f in s["fuel_statuses"]) / max(len(s["fuel_statuses"]), 1),
+        reverse=True
+    )[:5]
+    if best:
+        lines.append("🏆 *Лучшие АЗС сейчас:*")
+        for s in best:
+            name = s.get("name", f"АЗС #{s.get('id')}")
+            pct = sum(f.get("availability_pct", 0) for f in s["fuel_statuses"]) / max(len(s["fuel_statuses"]), 1)
+            queue = s.get("queue_cars", 0)
+            lines.append(f"  🟢 *{name[:28]}* · {pct:.0f}% · 🚗{queue}")
+
+    lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    lines.append("_Крымский полуостров · кризисная зона_")
+    await update.message.reply_text(
+        "\n".join(lines),
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("🗺 Открыть карту", web_app=WebAppInfo(url=TMA_URL)),
+            InlineKeyboardButton("🏙 Москва", callback_data="menu_moscow"),
+        ]]),
+    )
+
+
+async def moscow_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show Moscow-specific fuel availability and top stations."""
+    backend = "http://localhost:8000"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{backend}/api/stations",
+                params={"region": "г. Москва и Новая Москва", "limit": 200},
+                timeout=aiohttp.ClientTimeout(total=8),
+            ) as resp:
+                stations = await resp.json() if resp.status == 200 else []
+            async with session.get(
+                f"{backend}/api/prices/networks",
+                timeout=aiohttp.ClientTimeout(total=8),
+            ) as resp:
+                price_data = await resp.json() if resp.status == 200 else {}
+    except Exception as exc:
+        await update.message.reply_text(
+            f"⚠️ Ошибка: {exc}",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🗺 Открыть карту", web_app=WebAppInfo(url=TMA_URL))
+            ]]),
+        )
+        return
+
+    total = len(stations)
+    green = sum(1 for s in stations if s.get("fuel_statuses") and
+                sum(f.get("availability_pct", 0) for f in s["fuel_statuses"]) / max(len(s["fuel_statuses"]), 1) >= 60)
+    yellow = sum(1 for s in stations if s.get("fuel_statuses") and
+                 0 < sum(f.get("availability_pct", 0) for f in s["fuel_statuses"]) / max(len(s["fuel_statuses"]), 1) < 60)
+    red = total - green - yellow
+
+    lines = [
+        "🏙 *МОСКВА И НОВАЯ МОСКВА · АЗС*",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        f"📊 {total} станций в базе",
+        f"🟢 {green} норма · 🟡 {yellow} мало · 🔴 {red} пусто",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    ]
+
+    networks_data = price_data.get("networks", {})
+    if networks_data:
+        ai92_prices = [(net, p.get("АИ-92", 0)) for net, p in networks_data.items() if p.get("АИ-92")]
+        ai92_sorted = sorted(ai92_prices, key=lambda x: x[1])
+        lines.append("⛽ *Котировки АИ-92 по сетям:*")
+        for net, price in ai92_sorted[:6]:
+            lines.append(f"  • {net}: `{price:.1f}₽/л`")
+        lines.append("")
+
+    # Top available stations
+    best = sorted(
+        [s for s in stations if s.get("fuel_statuses")],
+        key=lambda s: sum(f.get("availability_pct", 0) for f in s["fuel_statuses"]) / max(len(s["fuel_statuses"]), 1),
+        reverse=True
+    )[:5]
+    if best:
+        lines.append("🏆 *Лучшие АЗС сейчас:*")
+        for s in best:
+            name = s.get("name", f"АЗС #{s.get('id')}")
+            pct = sum(f.get("availability_pct", 0) for f in s["fuel_statuses"]) / max(len(s["fuel_statuses"]), 1)
+            queue = s.get("queue_cars", 0)
+            lines.append(f"  🟢 *{name[:28]}* · {pct:.0f}% · 🚗{queue}")
+
+    lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    lines.append("_Открыть карту → фильтр по Москве_")
+    await update.message.reply_text(
+        "\n".join(lines),
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("🗺 Карта Москвы", web_app=WebAppInfo(url=TMA_URL)),
+        ]]),
+    )
+
+
+async def regions_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """List all regions with their availability stats."""
+    backend = "http://localhost:8000"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{backend}/api/regions",
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as resp:
+                data = await resp.json() if resp.status == 200 else {}
+    except Exception as exc:
+        await update.message.reply_text(f"⚠️ Ошибка: {exc}")
+        return
+
+    regions = data if isinstance(data, dict) else {}
+    if not regions:
+        await update.message.reply_text("Нет данных по регионам.")
+        return
+
+    sorted_regions = sorted(
+        regions.items(),
+        key=lambda x: x[1].get("avg_pct", 0),
+        reverse=True,
+    )
+
+    lines = [
+        "🗺 *РЕГИОНЫ · НАЛИЧИЕ ТОПЛИВА*",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    ]
+    for region, rd in sorted_regions[:20]:
+        pct = round(rd.get("avg_pct", 0))
+        total = rd.get("total_stations", rd.get("station_count", 0))
+        dot = "🟢" if pct >= 60 else "🟡" if pct >= 25 else "🔴"
+        bar_len = max(1, round(pct / 10))
+        bar = "█" * bar_len + "░" * (10 - bar_len)
+        short = region.split()[-1][:18]
+        lines.append(f"{dot} *{short}* `{bar}` `{pct}%` _{total} АЗС_")
+    lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    lines.append("_Полная карта в приложении_")
+
+    await update.message.reply_text(
+        "\n".join(lines),
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("🗺 Открыть карту", web_app=WebAppInfo(url=TMA_URL)),
+            tma_btn("📊 Аналитика", "analytics"),
         ]]),
     )
 
@@ -2715,16 +3198,43 @@ async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     msg_text = " ".join(context.args)
+
+    # Collect chat IDs from both vouchers.db (bot) and TMA backend (all registered users)
+    chat_ids_set: set[int] = set()
+
+    # Source 1: SQLite vouchers DB
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     try:
         cur.execute("SELECT DISTINCT chat_id FROM vouchers WHERE chat_id IS NOT NULL")
-        chat_ids = [r[0] for r in cur.fetchall()]
+        for (cid,) in cur.fetchall():
+            if cid:
+                chat_ids_set.add(int(cid))
+    except Exception:
+        pass
     finally:
         conn.close()
 
+    # Source 2: TMA backend users (have Telegram IDs that equal their chat IDs)
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                "http://localhost:8000/api/stats",
+                timeout=aiohttp.ClientTimeout(total=5),
+            ) as resp:
+                if resp.status == 200:
+                    stats = await resp.json()
+                    # TMA user IDs == Telegram user IDs == can receive DMs if they started the bot
+                    tma_user_ids = stats.get("registered_user_ids", [])
+                    for uid in tma_user_ids:
+                        if uid:
+                            chat_ids_set.add(int(uid))
+    except Exception:
+        pass
+
+    chat_ids = list(chat_ids_set)
     if not chat_ids:
-        await update.message.reply_text("⚠️ Нет получателей (таблица ваучеров пуста).")
+        await update.message.reply_text("⚠️ Нет получателей.")
         return
 
     sent = 0
@@ -2735,13 +3245,20 @@ async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                 chat_id=cid,
                 text=f"📢 *Топливо ⛽️ — оповещение*\n\n{msg_text}",
                 parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("⛽ Открыть Матрицу", web_app=WebAppInfo(url=TMA_URL))
+                ]]),
             )
             sent += 1
         except Exception:
             failed += 1
 
     await update.message.reply_text(
-        f"✅ Рассылка завершена.\nОтправлено: {sent}\nОшибок: {failed}"
+        f"✅ Рассылка завершена.\n"
+        f"📬 Отправлено: *{sent}*\n"
+        f"❌ Ошибок: *{failed}*\n"
+        f"👥 Охват: *{len(chat_ids)}* получателей",
+        parse_mode="Markdown",
     )
 
 
@@ -2973,6 +3490,9 @@ def main() -> None:
     app.add_handler(CommandHandler("mystats",       mystats_cmd))
     app.add_handler(CommandHandler("refer",         refer_cmd))
     app.add_handler(CommandHandler("price",         price_cmd))
+    app.add_handler(CommandHandler("moscow",        moscow_cmd))
+    app.add_handler(CommandHandler("crimea",        crimea_cmd))
+    app.add_handler(CommandHandler("top",           top_cmd))
     app.add_handler(CommandHandler("broadcast",     broadcast_cmd))
     app.add_handler(CommandHandler("status",        status_cmd))
     app.add_handler(CommandHandler("digest",        digest_cmd))
@@ -2981,6 +3501,7 @@ def main() -> None:
     app.add_handler(CommandHandler("nearest",       nearest_cmd))
     app.add_handler(CommandHandler("checkin",       checkin_cmd))
     app.add_handler(CommandHandler("news",          news_cmd))
+    app.add_handler(CommandHandler("regions",       regions_cmd))
     app.add_handler(CommandHandler("help",          help_cmd))
     app.add_handler(InlineQueryHandler(inline_query_handler))
     app.add_handler(MessageHandler(filters.LOCATION, handle_location))

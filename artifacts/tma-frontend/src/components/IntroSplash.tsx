@@ -7,7 +7,7 @@ interface Props {
 
 const TAGLINES = [
   "⛽️ ТОПЛИВНАЯ СЕТЬ АКТИВИРОВАНА",
-  "СКАНИРОВАНИЕ 500+ СТАНЦИЙ...",
+  "СКАНИРОВАНИЕ 1000+ СТАНЦИЙ...",
   "ДАННЫЕ ОБНОВЛЯЮТСЯ В РЕАЛЬНОМ ВРЕМЕНИ",
   "ДОБРО ПОЖАЛОВАТЬ В СЕТЬ",
 ];
@@ -267,7 +267,7 @@ export function IntroSplash({ onDone }: Props) {
                       transition={{ delay: 0.4 }}
                       style={{ color: "#9ca3af", fontSize: "0.8rem", marginBottom: "1.5rem" }}
                     >
-                      500+ станций · 23 региона · данные в реальном времени
+                      1000+ станций · 23 региона · данные в реальном времени
                     </motion.p>
                     <motion.button
                       initial={{ opacity: 0, scale: 0.9 }}

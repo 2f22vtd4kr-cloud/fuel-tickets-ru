@@ -372,6 +372,7 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
   const [sortMode, setSortMode] = useState<"name" | "availability" | "queue" | "price" | "nearest">("availability");
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [zoneFilter, setZoneFilter] = useState<"critical" | "standard" | "eastern" | null>(null);
+  const [availFilter, setAvailFilter] = useState<"green" | "yellow" | "red" | null>(null);
   const [payMethod, setPayMethod] = useState<PayMethod>("stars");
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
   const [purchasing, setPurchasing] = useState(false);
@@ -385,6 +386,8 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
   const [nvFuel, setNvFuel] = useState<string>("АИ-92");
   const [nvVolume, setNvVolume] = useState<number>(40);
   const [nvLoading, setNvLoading] = useState(false);
+  const [cityFilter, setCityFilter] = useState<string | null>(null);
+  const [networkFilter, setNetworkFilter] = useState<string | null>(null);
 
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -407,7 +410,7 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
   }, [searchQuery]);
 
   // Reset pagination when search/sort changes
-  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [debouncedQuery, sortMode]);
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [debouncedQuery, sortMode, cityFilter, networkFilter, availFilter]);
 
   // IntersectionObserver auto-load-more
   useEffect(() => {
@@ -533,23 +536,40 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
 
   const filteredStations = useMemo(() => {
     const applyZone = (arr: GasStation[]) => zoneFilter ? arr.filter(s => s.zone_type === zoneFilter) : arr;
-    if (!debouncedQuery) return applyZone(sortStations(stations));
+    const applyCity = (arr: GasStation[]) => {
+      if (!cityFilter) return arr;
+      if (cityFilter === "__CRIMEA__") return arr.filter(s => s.zone_type === "critical");
+      return arr.filter(s => s.region === cityFilter);
+    };
+    const applyNetwork = (arr: GasStation[]) =>
+      networkFilter ? arr.filter(s => s.network === networkFilter) : arr;
+    const applyAvail = (arr: GasStation[]) => {
+      if (!availFilter) return arr;
+      return arr.filter(s => {
+        if (!s.fuel_statuses.length) return availFilter === "red";
+        const avg = s.fuel_statuses.reduce((a, f) => a + f.availability_pct, 0) / s.fuel_statuses.length;
+        if (availFilter === "green") return avg >= 60;
+        if (availFilter === "yellow") return avg >= 25 && avg < 60;
+        return avg < 25;
+      });
+    };
+    const apply = (arr: GasStation[]) => applyAvail(applyNetwork(applyCity(applyZone(arr))));
+    if (!debouncedQuery) return apply(sortStations(stations));
     if (matchedFuelType) {
-      return applyZone(sortStations(stations.filter(s => s.fuel_statuses.some(f => f.fuel_type === matchedFuelType))));
+      return apply(sortStations(stations.filter(s => s.fuel_statuses.some(f => f.fuel_type === matchedFuelType))));
     }
-    // Fuse.js fuzzy search (falls back to substring if query is too short)
     if (debouncedQuery.trim().length < 2) {
       const q = debouncedQuery.toLowerCase();
-      return applyZone(sortStations(stations.filter(s =>
+      return apply(sortStations(stations.filter(s =>
         s.name.toLowerCase().includes(q) ||
         s.network.toLowerCase().includes(q) ||
         s.region.toLowerCase().includes(q)
       )));
     }
     const results = fuse.search(debouncedQuery);
-    return applyZone(sortStations(results.map(r => r.item)));
+    return apply(sortStations(results.map(r => r.item)));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stations, debouncedQuery, sortMode, matchedFuelType, fuse, userCoords, zoneFilter]);
+  }, [stations, debouncedQuery, sortMode, matchedFuelType, fuse, userCoords, zoneFilter, cityFilter, networkFilter, availFilter]);
 
   const visibleStations = filteredStations.slice(0, Math.min(visibleCount, MAX_INLINE));
   const hasMore = filteredStations.length > visibleCount && visibleCount < MAX_INLINE;
@@ -800,6 +820,78 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
         </div>
       )}
 
+      {/* ── Availability status filter chips ── */}
+      {!selectedStation && (
+        <div style={{ padding: "0 1rem 0.4rem", display: "flex", gap: "0.3rem", alignItems: "center" }}>
+          <span style={{ color: "#374151", fontSize: "0.58rem", flexShrink: 0 }}>Статус:</span>
+          {([
+            { key: null,     label: "Все",      color: "#6b7280", dot: "#6b7280" },
+            { key: "green",  label: "🟢 Норма", color: "#22c55e", dot: "#22c55e" },
+            { key: "yellow", label: "🟡 Мало",  color: "#eab308", dot: "#eab308" },
+            { key: "red",    label: "🔴 Нет",   color: "#ef4444", dot: "#ef4444" },
+          ] as const).map(({ key, label, color }) => {
+            const isActive = availFilter === key;
+            return (
+              <button key={String(key)} onClick={() => { impact("light"); setAvailFilter(key); }}
+                style={{
+                  flexShrink: 0, padding: "0.18rem 0.5rem",
+                  background: isActive ? `${color}18` : "none",
+                  border: `1px solid ${isActive ? color : "#1a1a24"}`,
+                  borderRadius: "6px", color: isActive ? color : "#374151",
+                  fontSize: "0.6rem", cursor: "pointer", fontWeight: isActive ? 700 : 400,
+                  transition: "all 0.15s",
+                }}
+              >{label}</button>
+            );
+          })}
+          {availFilter && (
+            <span style={{ marginLeft: "auto", color: "#374151", fontSize: "0.57rem", flexShrink: 0 }}>
+              {filteredStations.length} АЗС
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* ── City quick filter chips ── */}
+      {!selectedStation && (() => {
+          const mskCount = stations.filter(s => s.region === "г. Москва и Новая Москва").length;
+          const crimeaCount = stations.filter(s => s.zone_type === "critical").length;
+          const spbCount = stations.filter(s => s.region === "г. Санкт-Петербург").length;
+          const tatCount = stations.filter(s => s.region === "Республика Татарстан").length;
+          const chips = [
+            { key: null,                          label: "🌐 Все",       count: stations.length, color: "#6b7280", bg: "none",                    border: "#22222f" },
+            { key: "г. Москва и Новая Москва",    label: "🏙 Москва",    count: mskCount,        color: "#3b82f6", bg: "rgba(59,130,246,0.1)",   border: "#3b82f630" },
+            { key: "__CRIMEA__",                  label: "🌊 Крым",      count: crimeaCount,     color: "#a855f7", bg: "rgba(168,85,247,0.1)",   border: "#a855f730" },
+            { key: "г. Санкт-Петербург",          label: "⚓ Питер",     count: spbCount,        color: "#06b6d4", bg: "rgba(6,182,212,0.1)",   border: "#06b6d430" },
+            { key: "Республика Татарстан",        label: "🟢 Татарстан", count: tatCount,        color: "#22c55e", bg: "rgba(34,197,94,0.1)",   border: "#22c55e30" },
+          ] as { key: string | null; label: string; count: number; color: string; bg: string; border: string }[];
+          return (
+            <div style={{ padding: "0 1rem 0.4rem", display: "flex", gap: "0.3rem", alignItems: "center", overflowX: "auto" }}>
+              <span style={{ color: "#374151", fontSize: "0.58rem", flexShrink: 0 }}>Город:</span>
+              {chips.map(({ key, label, count, color, bg, border }) => {
+                const isActive = cityFilter === key;
+                return (
+                  <button key={String(key)} onClick={() => { impact("light"); setCityFilter(key); }}
+                    style={{
+                      flexShrink: 0, padding: "0.18rem 0.5rem",
+                      background: isActive ? bg : "none",
+                      border: `1px solid ${isActive ? border : "#1a1a24"}`,
+                      borderRadius: "6px", color: isActive ? color : "#374151",
+                      fontSize: "0.6rem", cursor: "pointer", fontWeight: isActive ? 700 : 400,
+                      whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: "0.25rem",
+                    }}
+                  >
+                    {label}
+                    {count > 0 && key !== null && (
+                      <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.5rem", opacity: 0.7 }}>{count}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })()}
+
       {/* ── Network summary bar ── */}
       {!selectedStation && !debouncedQuery && stations.length > 0 && (() => {
         const nets: Record<string, { cnt: number; sum: number }> = {};
@@ -814,25 +906,32 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
         const green = stations.filter(s => (s.fuel_statuses.reduce((a, b) => a + b.availability_pct, 0) / Math.max(s.fuel_statuses.length, 1)) >= 60).length;
         return (
           <div style={{ padding: "0 1rem 0.5rem", display: "flex", gap: "0.3rem", alignItems: "center", overflowX: "auto" }}>
-            <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22222f", fontSize: "0.55rem", flexShrink: 0 }}>СЕТИ:</span>
+            <span style={{ fontFamily: "'JetBrains Mono',monospace", color: networkFilter ? "#a855f7" : "#22222f", fontSize: "0.55rem", flexShrink: 0 }}>СЕТИ:</span>
             {top.map(([net, { cnt, sum }]) => {
               const avgAvail = Math.round(sum / cnt);
               const dotColor = avgAvail >= 60 ? "#22c55e" : avgAvail >= 25 ? "#eab308" : "#ef4444";
+              const isActive = networkFilter === net;
               return (
-                <button key={net} onClick={() => { impact("light"); setSearchQuery(net); }}
+                <button key={net} onClick={() => { impact("light"); setNetworkFilter(isActive ? null : net); }}
                   style={{
                     flexShrink: 0, padding: "2px 8px",
-                    background: "rgba(255,255,255,0.03)", border: "1px solid #1a1a24",
-                    borderRadius: "6px", color: "#4b5563", fontSize: "0.58rem", cursor: "pointer",
+                    background: isActive ? `${dotColor}18` : "rgba(255,255,255,0.03)",
+                    border: `1px solid ${isActive ? dotColor : "#1a1a24"}`,
+                    borderRadius: "6px", color: isActive ? dotColor : "#4b5563",
+                    fontSize: "0.58rem", cursor: "pointer", fontWeight: isActive ? 700 : 400,
                     fontFamily: "'JetBrains Mono',monospace",
                     display: "flex", alignItems: "center", gap: "4px",
+                    transition: "all 0.18s",
                   }}
                 >
                   <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
-                  {net} <span style={{ color: "#374151" }}>{cnt}</span>
+                  {net} <span style={{ color: isActive ? dotColor : "#374151", opacity: 0.8 }}>{cnt}</span>
                 </button>
               );
             })}
+            {networkFilter && (
+              <button onClick={() => { impact("light"); setNetworkFilter(null); }} style={{ flexShrink: 0, background: "rgba(239,68,68,0.08)", border: "1px solid #ef444430", borderRadius: "6px", color: "#ef4444", fontSize: "0.6rem", padding: "2px 6px", cursor: "pointer" }}>✕</button>
+            )}
             <div style={{ marginLeft: "auto", flexShrink: 0, display: "flex", alignItems: "center", gap: "4px" }}>
               <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 4px #22c55e" }} />
               <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e", fontSize: "0.58rem", fontWeight: 700 }}>{green}</span>
@@ -874,6 +973,63 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
           </div>
         );
       })()}
+
+      {/* ── Active filters clear-all bar ── */}
+      {!selectedStation && (cityFilter || networkFilter || zoneFilter || availFilter) && (
+        <div style={{ padding: "0 1rem 0.4rem", display: "flex", gap: "0.3rem", alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#a855f7", fontSize: "0.52rem", letterSpacing: "0.06em" }}>ФИЛЬТРЫ:</span>
+          {cityFilter && (
+            <span style={{
+              background: "rgba(59,130,246,0.12)", border: "1px solid #3b82f630",
+              borderRadius: "6px", padding: "1px 7px",
+              color: "#3b82f6", fontSize: "0.58rem",
+              display: "flex", alignItems: "center", gap: "4px",
+            }}>
+              🏙 {cityFilter === "__CRIMEA__" ? "Крым" : cityFilter.split(" ").slice(-1)[0]}
+              <button onClick={() => { impact("light"); setCityFilter(null); }} style={{ background: "none", border: "none", color: "#3b82f6", cursor: "pointer", fontSize: "0.6rem", padding: "0", lineHeight: 1 }}>✕</button>
+            </span>
+          )}
+          {networkFilter && (
+            <span style={{
+              background: "rgba(168,85,247,0.12)", border: "1px solid #a855f730",
+              borderRadius: "6px", padding: "1px 7px",
+              color: "#a855f7", fontSize: "0.58rem",
+              display: "flex", alignItems: "center", gap: "4px",
+            }}>
+              🏭 {networkFilter}
+              <button onClick={() => { impact("light"); setNetworkFilter(null); }} style={{ background: "none", border: "none", color: "#a855f7", cursor: "pointer", fontSize: "0.6rem", padding: "0", lineHeight: 1 }}>✕</button>
+            </span>
+          )}
+          {zoneFilter && (
+            <span style={{
+              background: "rgba(245,158,11,0.12)", border: "1px solid #f59e0b30",
+              borderRadius: "6px", padding: "1px 7px",
+              color: "#f59e0b", fontSize: "0.58rem",
+              display: "flex", alignItems: "center", gap: "4px",
+            }}>
+              🗺 {zoneFilter}
+              <button onClick={() => { impact("light"); setZoneFilter(null); }} style={{ background: "none", border: "none", color: "#f59e0b", cursor: "pointer", fontSize: "0.6rem", padding: "0", lineHeight: 1 }}>✕</button>
+            </span>
+          )}
+          {availFilter && (
+            <span style={{
+              background: availFilter === "green" ? "rgba(34,197,94,0.12)" : availFilter === "yellow" ? "rgba(234,179,8,0.12)" : "rgba(239,68,68,0.12)",
+              border: `1px solid ${availFilter === "green" ? "#22c55e30" : availFilter === "yellow" ? "#eab30830" : "#ef444430"}`,
+              borderRadius: "6px", padding: "1px 7px",
+              color: availFilter === "green" ? "#22c55e" : availFilter === "yellow" ? "#eab308" : "#ef4444",
+              fontSize: "0.58rem",
+              display: "flex", alignItems: "center", gap: "4px",
+            }}>
+              {availFilter === "green" ? "🟢 Норма" : availFilter === "yellow" ? "🟡 Мало" : "🔴 Нет"}
+              <button onClick={() => { impact("light"); setAvailFilter(null); }} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", fontSize: "0.6rem", padding: "0", lineHeight: 1 }}>✕</button>
+            </span>
+          )}
+          <button
+            onClick={() => { impact("medium"); setCityFilter(null); setNetworkFilter(null); setZoneFilter(null); setAvailFilter(null); }}
+            style={{ marginLeft: "auto", background: "rgba(239,68,68,0.1)", border: "1px solid #ef444430", borderRadius: "6px", color: "#ef4444", fontSize: "0.58rem", padding: "1px 8px", cursor: "pointer", flexShrink: 0 }}
+          >✕ Сбросить всё</button>
+        </div>
+      )}
 
       {/* ── Quick fuel-type chips ── */}
       {!selectedStation && !matchedFuelType && (

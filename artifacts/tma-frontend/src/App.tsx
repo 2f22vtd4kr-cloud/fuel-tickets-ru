@@ -495,7 +495,7 @@ export default function App() {
         onTouchStart={handleTickerPressStart}
         onTouchEnd={handleTickerPressEnd}
       >
-        <MarketTicker />
+        <MarketTicker stationCount={stations.length} />
       </div>
 
       {/* Ambient dot-grid */}
