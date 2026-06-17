@@ -2,7 +2,6 @@
 type ModuleMap = Record<string, () => Promise<Record<string, unknown>>>;
 export const modules: ModuleMap = {
   "./components/mockups/ai/AiChat.tsx": () => import("../components/mockups/ai/AiChat.tsx"),
-  "./components/mockups/map/MapSearch.tsx": () => import("../components/mockups/map/MapSearch.tsx"),
   "./components/mockups/ticket/FuelTicket.tsx": () => import("../components/mockups/ticket/FuelTicket.tsx"),
   "./components/mockups/ticket/FuelTicketExpiring.tsx": () => import("../components/mockups/ticket/FuelTicketExpiring.tsx"),
   "./components/mockups/ticket/FuelTicketWarning.tsx": () => import("../components/mockups/ticket/FuelTicketWarning.tsx"),
@@ -16,5 +15,6 @@ export const modules: ModuleMap = {
   "./components/mockups/tma-variants/OperatorHUD.tsx": () => import("../components/mockups/tma-variants/OperatorHUD.tsx"),
   "./components/mockups/tma-variants/PanicButton.tsx": () => import("../components/mockups/tma-variants/PanicButton.tsx"),
   "./components/mockups/tma-variants/ProximityList.tsx": () => import("../components/mockups/tma-variants/ProximityList.tsx"),
-  "./components/mockups/tma-variants/RefinedSignal.tsx": () => import("../components/mockups/tma-variants/RefinedSignal.tsx")
+  "./components/mockups/tma-variants/RefinedSignal.tsx": () => import("../components/mockups/tma-variants/RefinedSignal.tsx"),
+  "./components/mockups/map/MapSearch.tsx": () => import("../components/mockups/map/MapSearch.tsx")
 };
