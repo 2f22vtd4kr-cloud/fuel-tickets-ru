@@ -8,3 +8,5 @@
 - [FastAPI route ordering](fastapi-route-ordering.md) — literal routes (e.g. /api/empire/leaderboard) must be declared BEFORE parameterized routes (/api/empire/{user_id}) or FastAPI will try to parse the literal as the param type and return 422.
 - [useToast API](usetoa-api.md) — useToast().add(message: string, type?: "success"|"error"|"info"|"warning") — NOT add({ type, message }). Message is first arg, type is second.
 - [AI provider pattern](ai-provider-pattern.md) — AI_PROVIDER env var: "rule-based"(default)/"grok"/"openai"/"none"; Grok uses XAI_API_KEY + base_url https://api.x.ai/v1; ai_chat must be async def to use httpx.AsyncClient.
+- [Excel station seeder](excel-station-seeder.md) — 1222 real stations in seed_excel_stations.py; threshold 600 guards re-seed; delete tma.db + restart backend to force fresh seed; must escape all quotes from Excel addresses.
+- [Game notification timer bug](game-notif-timer.md) — GamesPage useEffect cleanup cancels previous timers on new notifications; fix with Map<id,timer> ref so each notification has its own independent timeout.

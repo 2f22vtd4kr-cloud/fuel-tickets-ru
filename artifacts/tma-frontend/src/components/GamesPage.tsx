@@ -440,18 +440,29 @@ export function GamesPage() {
     return () => clearInterval(backendSyncRef.current);
   }, [userId, syncWithBackend, pushToBackend]);
 
+  const notifTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+
   useEffect(() => {
     const len = state.notifications.length;
     if (len === 0) return;
     const last = state.notifications[len - 1];
     setNotifications(prev => {
       if (prev.some(n => n.id === last.id)) return prev;
-      const next = [...prev.slice(-3), last];
-      return next;
+      return [...prev.slice(-3), last];
     });
-    const t = setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== last.id)), 3000);
-    return () => clearTimeout(t);
+    if (!notifTimers.current.has(last.id)) {
+      const t = setTimeout(() => {
+        setNotifications(prev => prev.filter(n => n.id !== last.id));
+        notifTimers.current.delete(last.id);
+      }, 3000);
+      notifTimers.current.set(last.id, t);
+    }
   }, [state.notifications]);
+
+  useEffect(() => {
+    const timers = notifTimers.current;
+    return () => { timers.forEach(t => clearTimeout(t)); timers.clear(); };
+  }, []);
 
   const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -651,7 +662,10 @@ export function GamesPage() {
           {notifications.map(n => (
             <motion.div
               key={n.id}
-              initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 40 }}
+              initial={{ opacity: 0, x: 40, scale: 0.9 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 30, scale: 0.85 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
               style={{
                 background: n.type === "crisis" ? "rgba(239,68,68,0.9)" : n.type === "error" ? "rgba(239,68,68,0.8)" : "rgba(0,230,118,0.85)",
                 borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 700, color: "#fff",

@@ -67,3 +67,4 @@ sqlalchemy
 telegram
 tornado
 uvicorn[standard]
+openpyxl

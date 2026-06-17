@@ -11,6 +11,8 @@ from sqlalchemy.orm import sessionmaker, Session
 
 from tma_backend.models import Base, GasStation, FuelStatus, AnalyticsSnapshot
 
+_EXCEL_SEED_THRESHOLD = 600  # total stations above this means Excel data is already seeded
+
 logger = logging.getLogger(__name__)
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -141,6 +143,65 @@ def seed_db(db: Session) -> None:
     db.commit()
     logger.info("Seeding complete.")
 
+    _generate_snapshot(db)
+
+
+def seed_excel_db(db: Session) -> None:
+    """Seed 1222 real stations from Excel export (idempotent — skips if already seeded)."""
+    from tma_backend.seed_excel_stations import generate_excel_stations
+    from sqlalchemy import insert as sa_insert
+
+    count = db.query(GasStation).count()
+    if count > _EXCEL_SEED_THRESHOLD:
+        logger.info(f"Excel stations already seeded ({count} total) — skipping.")
+        return
+
+    stations_data = generate_excel_stations()
+    logger.info(f"Seeding {len(stations_data)} real Excel stations…")
+
+    now = datetime.now(timezone.utc)
+
+    try:
+        stmt = sa_insert(GasStation).returning(GasStation.id)
+        rows = db.execute(stmt, [
+            dict(
+                region=s["region"], zone_type=s["zone_type"],
+                name=s["name"], address=s["address"],
+                lat=s["lat"], lng=s["lng"],
+                network=s["network"], queue_cars=s["queue_cars"],
+            )
+            for s in stations_data
+        ])
+        station_ids = [r[0] for r in rows]
+    except Exception:
+        station_ids = []
+        for s in stations_data:
+            station = GasStation(
+                region=s["region"], zone_type=s["zone_type"],
+                name=s["name"], address=s["address"],
+                lat=s["lat"], lng=s["lng"],
+                network=s["network"], queue_cars=s["queue_cars"],
+            )
+            db.add(station)
+            db.flush()
+            station_ids.append(station.id)
+
+    fuel_rows = []
+    now = datetime.now(timezone.utc)
+    for sid, s in zip(station_ids, stations_data):
+        for fs_data in s["fuel_statuses"]:
+            fuel_rows.append(dict(
+                station_id=sid,
+                fuel_type=fs_data["fuel_type"],
+                status=fs_data["status"],
+                availability_pct=fs_data["availability_pct"],
+                last_updated=now,
+            ))
+    if fuel_rows:
+        db.execute(sa_insert(FuelStatus), fuel_rows)
+
+    db.commit()
+    logger.info(f"Excel seeding complete — {len(stations_data)} stations added.")
     _generate_snapshot(db)
 
 

@@ -24,7 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
-from tma_backend.database import SessionLocal, get_db, init_db, seed_db, _generate_snapshot
+from tma_backend.database import SessionLocal, get_db, init_db, seed_db, seed_excel_db, _generate_snapshot
 from tma_backend.models import (
     Empire, RegionFavorite, StationNote, PriceSnapshot,
     AnalyticsSnapshot, DailyLimitTracker, FuelStatus, GasStation,
@@ -145,6 +145,7 @@ def _blocking_startup() -> None:
     db = SessionLocal()
     try:
         seed_db(db)
+        seed_excel_db(db)
         _fix_water_stations(db)
         _seed_news_events(db)
     finally:
