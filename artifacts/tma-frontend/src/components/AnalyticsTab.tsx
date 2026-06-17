@@ -616,27 +616,40 @@ function RegionRanking({ regions }: { regions: Record<string, RegionalSupply> })
         {display.map((r, i) => {
           const pct = Math.round(r.avg_pct);
           const color = pct >= 60 ? "#22c55e" : pct >= 25 ? "#eab308" : "#ef4444";
+          const isTop = i === 0 && sortKey === "pct";
           return (
-            <div key={r.name} style={{
-              display: "flex", alignItems: "center", gap: "0.5rem",
-              padding: "0.4rem 0.65rem",
-              borderBottom: i < display.length - 1 ? "1px solid #1a1a24" : "none",
-              background: i === 0 && sortKey === "pct" ? `${color}08` : "transparent",
-            }}>
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.5rem", width: "14px", textAlign: "right", flexShrink: 0 }}>{i + 1}</span>
+            <motion.div
+              key={r.name}
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.04, duration: 0.25 }}
+              style={{
+                display: "flex", alignItems: "center", gap: "0.5rem",
+                padding: "0.4rem 0.65rem",
+                borderBottom: i < display.length - 1 ? "1px solid #1a1a24" : "none",
+                background: isTop ? `linear-gradient(90deg,${color}12,transparent)` : "transparent",
+                borderLeft: isTop ? `2px solid ${color}66` : "2px solid transparent",
+              }}
+            >
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", color: isTop ? color : "#374151", fontSize: "0.5rem", width: "14px", textAlign: "right", flexShrink: 0, fontWeight: isTop ? 700 : 400 }}>{i + 1}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: "0.68rem", color: "#e2e8f0", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
+                <div style={{ fontSize: "0.68rem", color: isTop ? "#f1f5f9" : "#e2e8f0", fontWeight: isTop ? 700 : 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", marginTop: "2px" }}>
                   <div style={{ flex: 1, height: "3px", background: "#1a1a24", borderRadius: "2px", overflow: "hidden" }}>
-                    <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: "2px", transition: "width 0.6s ease" }} />
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${pct}%` }}
+                      transition={{ delay: i * 0.04 + 0.1, duration: 0.5, ease: "easeOut" }}
+                      style={{ height: "100%", background: isTop ? `linear-gradient(90deg,${color}88,${color})` : color, borderRadius: "2px", boxShadow: isTop ? `0 0 4px ${color}66` : "none" }}
+                    />
                   </div>
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", color, fontSize: "0.58rem", fontWeight: 700, flexShrink: 0, minWidth: "28px", textAlign: "right" }}>{pct}%</span>
+                  <span style={{ fontFamily: "'JetBrains Mono',monospace", color, fontSize: "0.58rem", fontWeight: 700, flexShrink: 0, minWidth: "28px", textAlign: "right", textShadow: isTop ? `0 0 6px ${color}66` : "none" }}>{pct}%</span>
                 </div>
               </div>
               <span style={{ fontSize: "0.6rem", flexShrink: 0 }}>
                 {pct >= 60 ? "🟢" : pct >= 25 ? "🟡" : "🔴"}
               </span>
-            </div>
+            </motion.div>
           );
         })}
       </div>
@@ -867,12 +880,12 @@ function FuelPriceBreakdown() {
         ЦЕНЫ_ТОПЛИВА · МИН / СРЕД / МАКС ₽/л
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-        {stats.map(({ fuel, min, max, avg, count }) => {
+        {stats.map(({ fuel, min, max, avg, count }, si) => {
           const color = FUEL_COLORS[fuel] ?? "#6b7280";
           const range = max - min || 1;
           const avgPct = ((avg - min) / range) * 100;
           return (
-            <div key={fuel} style={{ background: "linear-gradient(135deg,#0d0d18,#11091a)", border: `1px solid ${color}22`, borderRadius: "12px", padding: "0.6rem 0.8rem", position: "relative", overflow: "hidden" }}>
+            <motion.div key={fuel} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: si * 0.08, duration: 0.3 }} style={{ background: "linear-gradient(135deg,#0d0d18,#11091a)", border: `1px solid ${color}22`, borderRadius: "12px", padding: "0.6rem 0.8rem", position: "relative", overflow: "hidden" }}>
               <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: `linear-gradient(90deg, transparent, ${color}66, transparent)` }} />
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -901,7 +914,7 @@ function FuelPriceBreakdown() {
                   <div style={{ color: "#374151", fontSize: "0.48rem" }}>макс</div>
                 </div>
               </div>
-            </div>
+            </motion.div>
           );
         })}
       </div>
@@ -989,21 +1002,40 @@ function AIPricePredictions() {
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5rem", marginBottom: "0.7rem" }}>
-            {Object.entries(preds).map(([fuel, p]) => {
+            {Object.entries(preds).map(([fuel, p], i) => {
               const color = FUEL_COLORS[fuel] ?? "#6b7280";
-              const delta = ((p.p24h - p.curr) / p.curr * 100).toFixed(1);
+              const delta24 = ((p.p24h - p.curr) / p.curr * 100).toFixed(1);
+              const delta3d = ((p.p3d - p.curr) / p.curr * 100).toFixed(1);
+              const up3d = p.p3d >= p.curr;
               return (
-                <div key={fuel} style={{ background: "#14141c", border: `1px solid ${color}22`, borderRadius: "10px", padding: "0.55rem 0.5rem", position: "relative", overflow: "hidden" }}>
-                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1.5px", background: `linear-gradient(90deg, ${color}88, ${color})` }} />
-                  <p style={{ margin: "0 0 0.12rem", color: "#6b7280", fontSize: "0.52rem", fontFamily: "'JetBrains Mono',monospace" }}>{fuel}</p>
-                  <p style={{ margin: "0 0 0.08rem", color: "#e2e8f0", fontWeight: 700, fontSize: "0.85rem", lineHeight: 1, fontFamily: "'JetBrains Mono',monospace" }}>{p.curr}₽</p>
-                  <p style={{ margin: "0 0 0.05rem", color: p.up ? "#22c55e" : "#ef4444", fontSize: "0.7rem", fontWeight: 700, lineHeight: 1 }}>
-                    {p.up ? "↑" : "↓"} {p.p24h}₽
+                <motion.div
+                  key={fuel}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.07, duration: 0.3 }}
+                  style={{ background: `linear-gradient(160deg,#0f0f1c,#14141c)`, border: `1px solid ${color}28`, borderRadius: "10px", padding: "0.55rem 0.5rem", position: "relative", overflow: "hidden", boxShadow: `0 0 12px ${color}08` }}
+                >
+                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, ${color}55, ${color})` }} />
+                  <p style={{ margin: "0 0 0.1rem", color, fontSize: "0.52rem", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>{fuel}</p>
+                  <p style={{ margin: "0 0 0.12rem", color: "#e2e8f0", fontWeight: 800, fontSize: "0.88rem", lineHeight: 1, fontFamily: "'JetBrains Mono',monospace" }}>{p.curr}₽</p>
+                  <div style={{ display: "flex", alignItems: "center", gap: "3px", marginBottom: "0.06rem" }}>
+                    <span style={{ color: p.up ? "#22c55e" : "#ef4444", fontSize: "0.72rem", fontWeight: 700, textShadow: p.up ? "0 0 6px #22c55e66" : "0 0 6px #ef444466" }}>
+                      {p.up ? "↑" : "↓"}{p.p24h}₽
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "3px", marginBottom: "0.2rem" }}>
+                    <span style={{ color: up3d ? "#a855f766" : "#ef444466", fontSize: "0.52rem", fontFamily: "'JetBrains Mono',monospace" }}>
+                      3д:{up3d ? "↑" : "↓"}{p.p3d}₽
+                    </span>
+                  </div>
+                  {/* Confidence bar */}
+                  <div style={{ height: "3px", background: "#050507", borderRadius: "2px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${p.conf}%`, background: `linear-gradient(90deg,${color}44,${color})`, borderRadius: "2px", transition: "width 0.6s ease" }} />
+                  </div>
+                  <p style={{ margin: "2px 0 0", color: "#374151", fontSize: "0.44rem", fontFamily: "'JetBrains Mono',monospace" }}>
+                    {Math.abs(Number(delta24))}% · {p.conf}%↑ · 3д:{Math.abs(Number(delta3d))}%
                   </p>
-                  <p style={{ margin: 0, color: "#374151", fontSize: "0.48rem" }}>
-                    24ч · {Math.abs(Number(delta))}% · {p.conf}% ↑
-                  </p>
-                </div>
+                </motion.div>
               );
             })}
           </div>
@@ -1125,6 +1157,40 @@ export function AnalyticsTab({ onNavigate }: Props) {
       {/* Crisis banner */}
       <CrisisBanner count={criticalCount} onNavigate={onNavigate} />
 
+      {/* Live region availability ticker */}
+      {Object.keys(regions).length > 0 && (() => {
+        const tickerItems = Object.entries(regions)
+          .sort((a, b) => a[1].avg_pct - b[1].avg_pct)
+          .slice(0, 16)
+          .map(([region, d]) => ({
+            label: region
+              .replace("Республика ", "").replace(" область", " обл.").replace(" край", " кр.")
+              .replace("Автономная ", "").replace("Автономный округ", "АО").slice(0, 14),
+            pct: Math.round(d.avg_pct),
+            color: d.avg_pct >= 60 ? "#22c55e" : d.avg_pct >= 25 ? "#eab308" : "#ef4444",
+          }));
+        return (
+          <div style={{ overflow: "hidden", borderTop: "1px solid #0c0c14", borderBottom: "1px solid #0c0c14", background: "#04040b", height: "26px", display: "flex", alignItems: "stretch", marginBottom: "0.65rem" }}>
+            <style>{`@keyframes tmaTickerScroll { 0% { transform:translateX(0) } 100% { transform:translateX(-50%) } }`}</style>
+            <div style={{ flexShrink: 0, padding: "0 8px", borderRight: "1px solid #13131c", display: "flex", alignItems: "center", gap: "4px" }}>
+              <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#a855f7", boxShadow: "0 0 5px #a855f7", animation: "tmaPulse 2s infinite" }} />
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.43rem", color: "#a855f7", fontWeight: 700, letterSpacing: "0.10em", whiteSpace: "nowrap" }}>АЗС_СЕТЬ</span>
+            </div>
+            <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
+              <div style={{ display: "inline-flex", animation: "tmaTickerScroll 28s linear infinite", whiteSpace: "nowrap" }}>
+                {[...tickerItems, ...tickerItems].map((item, i) => (
+                  <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "0 12px 0 8px" }}>
+                    <span style={{ fontFamily: "'JetBrains Mono',monospace", color: item.color, fontSize: "0.52rem", fontWeight: 700 }}>{item.pct}%</span>
+                    <span style={{ color: "#4b5563", fontSize: "0.48rem" }}>{item.label}</span>
+                    <span style={{ color: "#161620", fontSize: "0.52rem" }}>│</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* News feed — top of page */}
       <NewsFeed />
 
@@ -1135,38 +1201,47 @@ export function AnalyticsTab({ onNavigate }: Props) {
       <div style={{ padding: "0 1rem 0.75rem" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0.5rem" }}>
           {/* Availability Index — big hero card */}
-          <div style={{ background: "linear-gradient(135deg,#14141c,#1a0d22)", border: `1px solid ${overallColor}33`, borderRadius: "14px", padding: "0.9rem 1rem", position: "relative", overflow: "hidden" }}>
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, ${overallColor}88, ${overallColor})` }} />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.35 }}
+            style={{ background: `linear-gradient(135deg,#14141c,${overallColor}10)`, border: `1px solid ${overallColor}33`, borderRadius: "14px", padding: "0.9rem 1rem", position: "relative", overflow: "hidden", boxShadow: `0 0 24px ${overallColor}10` }}
+          >
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, ${overallColor}66, ${overallColor})` }} />
+            {/* Radial glow orb */}
+            <div style={{ position: "absolute", bottom: "-20px", right: "-20px", width: "80px", height: "80px", borderRadius: "50%", background: `radial-gradient(circle,${overallColor}20,transparent 70%)`, pointerEvents: "none" }} />
             <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.38rem", letterSpacing: "0.12em", marginBottom: "0.1rem" }}>ИНДЕКС_НАЛИЧИЯ</div>
             <p style={{ color: "#6b7280", fontSize: "0.6rem", margin: "0 0 0.3rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>Индекс наличия</p>
             <AnimatedCounter value={data?.availability_index ?? 0} suffix="%" color={overallColor} size="2.2rem" />
-            <p style={{ margin: "0.3rem 0 0", color: "#4b5563", fontSize: "0.6rem" }}>
+            <p style={{ margin: "0.35rem 0 0", color: criticalCount > 0 ? "#ef444488" : "#22c55e88", fontSize: "0.6rem", fontWeight: criticalCount > 0 ? 600 : 400 }}>
               {criticalCount > 0 ? `⚠ ${criticalCount} крит. регионов` : "✓ Стабильно"}
             </p>
-          </div>
+          </motion.div>
 
           {/* Station counts */}
-          <div style={{ background: "#14141c", border: "1px solid #22222f", borderRadius: "14px", padding: "0.9rem 1rem" }}>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.35, delay: 0.07 }}
+            style={{ background: "linear-gradient(135deg,#14141c,#0f0a18)", border: "1px solid #22222f", borderRadius: "14px", padding: "0.9rem 1rem", position: "relative", overflow: "hidden" }}
+          >
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: "linear-gradient(90deg,#22c55e33,#eab30833,#ef444433)" }} />
             <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.38rem", letterSpacing: "0.12em", marginBottom: "0.1rem" }}>СТАНЦИЙ_В_СЕТИ</div>
             <p style={{ color: "#6b7280", fontSize: "0.6rem", margin: "0 0 0.55rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>Статус АЗС</p>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e", flexShrink: 0 }} />
-                <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e", fontSize: "1.35rem", fontWeight: 700, lineHeight: 1 }}>{sc.green}</span>
-                <span style={{ color: "#4b5563", fontSize: "0.58rem" }}>норма</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#eab308", boxShadow: "0 0 6px #eab308", flexShrink: 0 }} />
-                <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#eab308", fontSize: "1.35rem", fontWeight: 700, lineHeight: 1 }}>{sc.yellow}</span>
-                <span style={{ color: "#4b5563", fontSize: "0.58rem" }}>мало</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#ef4444", boxShadow: "0 0 6px #ef4444", flexShrink: 0 }} />
-                <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#ef4444", fontSize: "1.35rem", fontWeight: 700, lineHeight: 1 }}>{sc.red}</span>
-                <span style={{ color: "#4b5563", fontSize: "0.58rem" }}>нет</span>
-              </div>
+              {([
+                { count: sc.green,  color: "#22c55e", label: "норма" },
+                { count: sc.yellow, color: "#eab308", label: "мало" },
+                { count: sc.red,    color: "#ef4444", label: "нет" },
+              ]).map(({ count, color, label }, idx) => (
+                <motion.div key={label} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.12 + idx * 0.06, duration: 0.25 }} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: color, boxShadow: `0 0 5px ${color}`, flexShrink: 0 }} />
+                  <span style={{ fontFamily: "'JetBrains Mono',monospace", color, fontSize: "1.35rem", fontWeight: 700, lineHeight: 1, textShadow: `0 0 10px ${color}44` }}>{count}</span>
+                  <span style={{ color: "#4b5563", fontSize: "0.58rem" }}>{label}</span>
+                </motion.div>
+              ))}
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
 
@@ -1197,19 +1272,35 @@ export function AnalyticsTab({ onNavigate }: Props) {
             <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.4rem" }}>ГОРОДА · ОБЗОР_НАЛИЧИЯ</div>
             <div style={{ display: "flex", gap: "0.4rem" }}>
               {entries.map(({ label, emoji, pct, dotColor, stationCount }) => (
-                <div key={label} style={{
-                  flex: 1, background: "#0d0d18", border: `1px solid ${dotColor}22`,
-                  borderTop: `2px solid ${dotColor}66`,
-                  borderRadius: "10px", padding: "0.5rem 0.4rem", textAlign: "center",
-                  position: "relative", overflow: "hidden",
-                }}>
-                  <div style={{ fontSize: "0.9rem", lineHeight: 1, marginBottom: "3px" }}>{emoji}</div>
-                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.88rem", fontWeight: 800, color: dotColor, lineHeight: 1 }}>{pct}<span style={{ fontSize: "0.5rem" }}>%</span></div>
-                  <div style={{ color: "#374151", fontSize: "0.45rem", marginTop: "2px", fontFamily: "'JetBrains Mono',monospace" }}>{label.toUpperCase()}</div>
+                <motion.div
+                  key={label}
+                  whileTap={{ scale: 0.95 }}
+                  style={{
+                    flex: 1, background: `linear-gradient(160deg,#0a0a14,${dotColor}08)`,
+                    border: `1px solid ${dotColor}33`,
+                    borderRadius: "12px", padding: "0.6rem 0.35rem 0.55rem", textAlign: "center",
+                    position: "relative", overflow: "hidden",
+                    boxShadow: `0 0 12px ${dotColor}10`,
+                  }}
+                >
+                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg,transparent,${dotColor},transparent)` }} />
+                  <div style={{ fontSize: "0.9rem", lineHeight: 1, marginBottom: "4px" }}>{emoji}</div>
+                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.92rem", fontWeight: 900, color: dotColor, lineHeight: 1, textShadow: `0 0 8px ${dotColor}44` }}>
+                    {pct}<span style={{ fontSize: "0.48rem", fontWeight: 700 }}>%</span>
+                  </div>
+                  <div style={{ margin: "0.25rem 0 0.22rem", height: "3px", background: "#1a1a24", borderRadius: "2px", overflow: "hidden" }}>
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${pct}%` }}
+                      transition={{ duration: 0.9, ease: "easeOut", delay: 0.1 }}
+                      style={{ height: "100%", background: dotColor, borderRadius: "2px" }}
+                    />
+                  </div>
+                  <div style={{ color: "#4b5563", fontSize: "0.42rem", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.04em" }}>{label.toUpperCase()}</div>
                   {stationCount > 0 && (
-                    <div style={{ color: "#4b5563", fontSize: "0.42rem", fontFamily: "'JetBrains Mono',monospace", marginTop: "1px" }}>{stationCount} АЗС</div>
+                    <div style={{ color: "#374151", fontSize: "0.4rem", fontFamily: "'JetBrains Mono',monospace", marginTop: "1px" }}>{stationCount} АЗС</div>
                   )}
-                </div>
+                </motion.div>
               ))}
             </div>
           </div>
@@ -1231,20 +1322,29 @@ export function AnalyticsTab({ onNavigate }: Props) {
               { icon: "🛢", value: `${sysStats.avg_availability_pct}%`, label: "Ср. наличие", color: sysStats.avg_availability_pct >= 60 ? "#22c55e" : sysStats.avg_availability_pct >= 25 ? "#eab308" : "#ef4444", sub: "по сети АЗС" },
               { icon: "🧾", value: sysStats.active_purchases.toLocaleString("ru"), label: "Талонов", color: "#db2777", sub: "активных ордеров" },
             ].map(({ icon, value, label, color, sub }) => (
-              <div key={label} style={{
-                background: `linear-gradient(160deg, #0d0d18, ${color}08)`,
-                border: `1px solid ${color}22`,
-                borderRadius: "12px",
-                padding: "0.65rem 0.75rem",
-                position: "relative",
-                overflow: "hidden",
-              }}>
-                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: `linear-gradient(90deg, transparent, ${color}66, transparent)` }} />
-                <p style={{ margin: "0 0 0.15rem", fontSize: "1rem" }}>{icon}</p>
-                <p style={{ margin: "0 0 0.05rem", color, fontWeight: 800, fontSize: "1.15rem", fontFamily: "'JetBrains Mono', monospace", lineHeight: 1 }}>{value}</p>
-                <p style={{ margin: 0, color: "#e2e8f0", fontSize: "0.65rem", fontWeight: 600 }}>{label}</p>
-                <p style={{ margin: 0, color: "#374151", fontSize: "0.55rem" }}>{sub}</p>
-              </div>
+              <motion.div
+                key={label}
+                whileTap={{ scale: 0.96 }}
+                style={{
+                  background: `linear-gradient(160deg, #0a0a14, ${color}0c)`,
+                  border: `1px solid ${color}30`,
+                  borderRadius: "14px",
+                  padding: "0.7rem 0.8rem",
+                  position: "relative",
+                  overflow: "hidden",
+                  boxShadow: `0 0 16px ${color}0a`,
+                }}
+              >
+                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, transparent, ${color}, transparent)` }} />
+                <div style={{ position: "absolute", bottom: 0, right: 0, width: "40px", height: "40px", background: `radial-gradient(circle, ${color}10 0%, transparent 70%)`, borderRadius: "50%" }} />
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "0.3rem" }}>
+                  <p style={{ margin: 0, fontSize: "1rem", lineHeight: 1 }}>{icon}</p>
+                  <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: color, boxShadow: `0 0 6px ${color}`, animation: "tmaPulse 2s infinite" }} />
+                </div>
+                <p style={{ margin: "0 0 0.05rem", color, fontWeight: 900, fontSize: "1.2rem", fontFamily: "'JetBrains Mono', monospace", lineHeight: 1, textShadow: `0 0 12px ${color}44` }}>{value}</p>
+                <p style={{ margin: 0, color: "#e2e8f0", fontSize: "0.65rem", fontWeight: 700 }}>{label}</p>
+                <p style={{ margin: 0, color: "#374151", fontSize: "0.52rem" }}>{sub}</p>
+              </motion.div>
             ))}
           </div>
         </div>
@@ -1590,18 +1690,23 @@ function NewsFeed() {
               Нет событий по фильтру
             </div>
           )}
-          {displayedNews.map((item) => (
+          {displayedNews.map((item, ni) => (
             <motion.div
               key={item.id}
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: ni * 0.04, duration: 0.25 }}
               style={{
                 background: SEVERITY_BG[item.severity] ?? "#14141c",
                 border: `1px solid ${SEVERITY_COLOR[item.severity] ?? "#22222f"}22`,
                 borderLeft: `3px solid ${SEVERITY_COLOR[item.severity] ?? "#22222f"}`,
                 borderRadius: "10px", padding: "0.65rem 0.8rem",
+                position: "relative", overflow: "hidden",
               }}
             >
+              {item.severity === "critical" && (
+                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#ef4444,transparent)" }} />
+              )}
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "0.5rem", marginBottom: "0.25rem" }}>
                 <span style={{ background: `${SEVERITY_COLOR[item.severity] ?? "#22222f"}22`, color: SEVERITY_COLOR[item.severity] ?? "#9ca3af", fontSize: "0.58rem", fontWeight: 700, padding: "0.1rem 0.4rem", borderRadius: "4px", letterSpacing: "0.06em", flexShrink: 0 }}>
                   {SEVERITY_LABEL[item.severity] ?? item.severity.toUpperCase()}
@@ -1693,19 +1798,30 @@ function NetworkDistributionChart() {
       <div style={{ background: "linear-gradient(135deg,#0d0d18,#0f0c1a)", border: "1px solid #a855f722", borderRadius: "14px", padding: "0.75rem", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#a855f7,transparent)" }} />
         <div style={{ display: "flex", flexDirection: "column", gap: "0.32rem" }}>
-          {top.map(([name, count]) => {
+          {top.map(([name, count], ni) => {
             const pct = Math.round((count / stations.length) * 100);
             const barWidth = Math.round((count / maxCount) * 100);
             const color = netColor(name);
             return (
-              <div key={name} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <motion.div
+                key={name}
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: ni * 0.04, duration: 0.22 }}
+                style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}
+              >
                 <span style={{ color: "#9ca3af", fontSize: "0.62rem", width: "80px", flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
                 <div style={{ flex: 1, height: "8px", background: "#0b0b10", borderRadius: "4px", overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${barWidth}%`, background: `linear-gradient(90deg, ${color}aa, ${color})`, borderRadius: "4px", transition: "width 0.8s ease" }} />
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${barWidth}%` }}
+                    transition={{ delay: ni * 0.04 + 0.12, duration: 0.55, ease: "easeOut" }}
+                    style={{ height: "100%", background: `linear-gradient(90deg, ${color}aa, ${color})`, borderRadius: "4px" }}
+                  />
                 </div>
                 <span style={{ fontFamily: "'JetBrains Mono',monospace", color, fontSize: "0.62rem", fontWeight: 700, width: "28px", textAlign: "right", flexShrink: 0 }}>{count}</span>
                 <span style={{ color: "#374151", fontSize: "0.55rem", width: "28px", flexShrink: 0 }}>{pct}%</span>
-              </div>
+              </motion.div>
             );
           })}
         </div>
@@ -1778,14 +1894,25 @@ function RegionalPricesTable() {
               const pct = ((price - minP) / range) * 100;
               const barColor = pct < 33 ? "#22c55e" : pct < 67 ? "#eab308" : "#ef4444";
               return (
-                <div key={region} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                <motion.div
+                  key={region}
+                  initial={{ opacity: 0, x: -5 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.025, duration: 0.2 }}
+                  style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}
+                >
                   <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.52rem", width: "1.2rem", flexShrink: 0, textAlign: "right" }}>{i + 1}</span>
                   <span style={{ color: "#9ca3af", fontSize: "0.62rem", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{region.replace("Республика ", "Респ. ")}</span>
                   <div style={{ width: "40px", height: "4px", background: "#111", borderRadius: "2px", flexShrink: 0, overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${pct}%`, background: barColor, borderRadius: "2px" }} />
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${pct}%` }}
+                      transition={{ delay: i * 0.025 + 0.1, duration: 0.4, ease: "easeOut" }}
+                      style={{ height: "100%", background: barColor, borderRadius: "2px" }}
+                    />
                   </div>
                   <span style={{ fontFamily: "'JetBrains Mono',monospace", color, fontSize: "0.66rem", fontWeight: 700, width: "3.2rem", textAlign: "right", flexShrink: 0 }}>{price.toFixed(2)} ₽</span>
-                </div>
+                </motion.div>
               );
             })}
           </div>
@@ -1863,16 +1990,27 @@ function NetworkReliabilityWidget() {
         ЗОНЫ · СРЕДНЯЯ_ДОСТУПНОСТЬ
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
-        {zoneStats.map(({ z, label, color, emoji, count, avg }) => (
-          <div key={z} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        {zoneStats.map(({ z, label, color, emoji, count, avg }, zi) => (
+          <motion.div
+            key={z}
+            initial={{ opacity: 0, x: -6 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: zi * 0.08, duration: 0.25 }}
+            style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+          >
             <span style={{ fontSize: "0.65rem", flexShrink: 0 }}>{emoji}</span>
             <span style={{ color: "#9ca3af", fontSize: "0.65rem", width: "72px", flexShrink: 0 }}>{label}</span>
             <div style={{ flex: 1, height: "6px", background: "#0b0b0f", borderRadius: "3px", overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${avg}%`, background: avg >= 60 ? "#22c55e" : avg >= 25 ? "#eab308" : "#ef4444", transition: "width 1s", borderRadius: "3px" }} />
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${avg}%` }}
+                transition={{ delay: zi * 0.08 + 0.15, duration: 0.7, ease: "easeOut" }}
+                style={{ height: "100%", background: avg >= 60 ? "#22c55e" : avg >= 25 ? "#eab308" : "#ef4444", borderRadius: "3px" }}
+              />
             </div>
             <span style={{ fontFamily: "'JetBrains Mono',monospace", color, fontSize: "0.65rem", fontWeight: 700, width: "30px", textAlign: "right", flexShrink: 0 }}>{avg}%</span>
             <span style={{ color: "#374151", fontSize: "0.55rem", flexShrink: 0 }}>{count}АЗС</span>
-          </div>
+          </motion.div>
         ))}
       </div>
     </div>
@@ -1917,7 +2055,13 @@ function TopNetworksWidget() {
             const barPct = maxAvg > 0 ? (avg / maxAvg) * 100 : 0;
             const medals = ["🥇","🥈","🥉"];
             return (
-              <div key={name} style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+              <motion.div
+                key={name}
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.05, duration: 0.22 }}
+                style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}
+              >
                 <span style={{ fontSize: "0.65rem", flexShrink: 0, width: "1.2rem" }}>{medals[i] ?? `${i + 1}.`}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "2px" }}>
@@ -1925,11 +2069,16 @@ function TopNetworksWidget() {
                     <span style={{ fontFamily: "'JetBrains Mono',monospace", color, fontSize: "0.62rem", fontWeight: 700, flexShrink: 0, marginLeft: "0.3rem" }}>{avg}%</span>
                   </div>
                   <div style={{ height: "4px", background: "#0b0b0f", borderRadius: "2px", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${barPct}%`, background: `linear-gradient(90deg,${color}88,${color})`, borderRadius: "2px", transition: "width 0.9s ease" }} />
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${barPct}%` }}
+                      transition={{ delay: i * 0.05 + 0.12, duration: 0.6, ease: "easeOut" }}
+                      style={{ height: "100%", background: `linear-gradient(90deg,${color}88,${color})`, borderRadius: "2px" }}
+                    />
                   </div>
                 </div>
                 <span style={{ color: "#374151", fontSize: "0.52rem", flexShrink: 0, fontFamily: "'JetBrains Mono',monospace" }}>{count}</span>
-              </div>
+              </motion.div>
             );
           })}
         </div>
@@ -1991,7 +2140,19 @@ function TopCheapestStations() {
             const medals = ["🥇", "🥈", "🥉", "4.", "5."];
             const availColor = avail >= 60 ? "#22c55e" : avail >= 25 ? "#eab308" : "#ef4444";
             return (
-              <div key={s.id} style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+              <motion.div
+                key={s.id}
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.06, duration: 0.22 }}
+                style={{
+                  display: "flex", alignItems: "center", gap: "0.45rem",
+                  background: i === 0 ? "linear-gradient(135deg,#0b1408,#0d0d18)" : "transparent",
+                  border: i === 0 ? "1px solid #22c55e18" : "none",
+                  borderRadius: i === 0 ? "8px" : 0,
+                  padding: i === 0 ? "0.25rem 0.35rem" : "0.05rem 0",
+                }}
+              >
                 <span style={{ fontSize: "0.7rem", flexShrink: 0, width: "1.4rem" }}>{medals[i]}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ color: i === 0 ? "#f1f5f9" : "#9ca3af", fontSize: "0.62rem", fontWeight: i === 0 ? 700 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</div>
@@ -2004,7 +2165,7 @@ function TopCheapestStations() {
                   </div>
                   <div style={{ color: availColor, fontSize: "0.52rem" }}>{avail}%</div>
                 </div>
-              </div>
+              </motion.div>
             );
           })}
         </div>
@@ -2050,11 +2211,16 @@ function FuelSavingsWidget() {
           💰 Потенциальная экономия при выборе АЗС
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
-          {spreads.map(({ fuel, min, max, avg, spread }) => {
+          {spreads.map(({ fuel, min, max, avg, spread }, si) => {
             const color = FUEL_COLORS[fuel] ?? "#a855f7";
             const barPct = maxSpread > 0 ? (spread / maxSpread) * 100 : 0;
             return (
-              <div key={fuel}>
+              <motion.div
+                key={fuel}
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: si * 0.08, duration: 0.22 }}
+              >
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.15rem" }}>
                   <span style={{ fontFamily: "'JetBrains Mono',monospace", color, fontSize: "0.62rem", fontWeight: 700 }}>{fuel}</span>
                   <div style={{ display: "flex", gap: "0.6rem" }}>
@@ -2065,13 +2231,18 @@ function FuelSavingsWidget() {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
                   <div style={{ flex: 1, height: "5px", background: "#0b0b0f", borderRadius: "3px", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${barPct}%`, background: `linear-gradient(90deg,#22c55e,${color})`, borderRadius: "3px", transition: "width 0.8s" }} />
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${barPct}%` }}
+                      transition={{ delay: si * 0.08 + 0.12, duration: 0.6, ease: "easeOut" }}
+                      style={{ height: "100%", background: `linear-gradient(90deg,#22c55e,${color})`, borderRadius: "3px" }}
+                    />
                   </div>
                   <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e", fontSize: "0.58rem", fontWeight: 700, flexShrink: 0 }}>
                     -{spread.toFixed(1)}₽
                   </span>
                 </div>
-              </div>
+              </motion.div>
             );
           })}
         </div>
@@ -2150,17 +2321,28 @@ function NetworkPriceTableWidget() {
             const barPct = maxPrice > minPrice ? ((price - minPrice) / (maxPrice - minPrice)) * 100 : 50;
             const isCheapest = price === minPrice;
             return (
-              <div key={name} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <motion.div
+                key={name}
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: rank * 0.05, duration: 0.22 }}
+                style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+              >
                 <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.52rem", width: "1rem", flexShrink: 0 }}>#{rank + 1}</span>
                 <span style={{ fontSize: "0.72rem", flexShrink: 0 }}>{icon}</span>
                 <span style={{ color: "#9ca3af", fontSize: "0.62rem", minWidth: "75px", flexShrink: 0 }}>{name}</span>
                 <div style={{ flex: 1, height: "4px", background: "#0b0b0f", borderRadius: "2px", overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${Math.max(barPct, 8)}%`, background: `linear-gradient(90deg,${color}88,${color})`, borderRadius: "2px", transition: "width 0.5s" }} />
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.max(barPct, 8)}%` }}
+                    transition={{ delay: rank * 0.05 + 0.1, duration: 0.5, ease: "easeOut" }}
+                    style={{ height: "100%", background: `linear-gradient(90deg,${color}88,${color})`, borderRadius: "2px" }}
+                  />
                 </div>
                 <span style={{ fontFamily: "'JetBrains Mono',monospace", color: isCheapest ? "#22c55e" : color, fontSize: "0.65rem", fontWeight: 700, flexShrink: 0, minWidth: "46px", textAlign: "right" }}>
                   {price.toFixed(1)}₽{isCheapest ? " ✓" : ""}
                 </span>
-              </div>
+              </motion.div>
             );
           })}
         </div>
@@ -2212,15 +2394,26 @@ function RegionLeaderboardWidget() {
         <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e", fontSize: "0.52rem", letterSpacing: "0.1em", marginBottom: "0.4rem" }}>▲ ТОП-5 РЕГИОНОВ</div>
         <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem", marginBottom: "0.65rem" }}>
           {top5.map(({ region, total, avgPct, short }, i) => (
-            <div key={region} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <motion.div
+              key={region}
+              initial={{ opacity: 0, x: -5 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.05, duration: 0.2 }}
+              style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}
+            >
               <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.5rem", width: "1rem", flexShrink: 0 }}>#{i + 1}</span>
               <span style={{ color: "#9ca3af", fontSize: "0.6rem", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{short}</span>
-              <div style={{ width: "55px", height: "3px", background: "#0b0b0f", borderRadius: "2px", flexShrink: 0 }}>
-                <div style={{ height: "100%", width: `${Math.min(avgPct, 100)}%`, background: "linear-gradient(90deg,#16a34a,#22c55e)", borderRadius: "2px" }} />
+              <div style={{ width: "55px", height: "3px", background: "#0b0b0f", borderRadius: "2px", flexShrink: 0, overflow: "hidden" }}>
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.min(avgPct, 100)}%` }}
+                  transition={{ delay: i * 0.05 + 0.1, duration: 0.55, ease: "easeOut" }}
+                  style={{ height: "100%", background: "linear-gradient(90deg,#16a34a,#22c55e)", borderRadius: "2px" }}
+                />
               </div>
               <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e", fontSize: "0.6rem", fontWeight: 700, minWidth: "34px", textAlign: "right", flexShrink: 0 }}>{avgPct.toFixed(0)}%</span>
               <span style={{ color: "#374151", fontSize: "0.52rem", flexShrink: 0 }}>{total}АЗС</span>
-            </div>
+            </motion.div>
           ))}
         </div>
 
@@ -2229,15 +2422,26 @@ function RegionLeaderboardWidget() {
         <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#ef4444", fontSize: "0.52rem", letterSpacing: "0.1em", marginBottom: "0.4rem" }}>▼ КРИТИЧЕСКИЕ ЗОНЫ</div>
         <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
           {bottom3.map(({ region, total, avgPct, short }, i) => (
-            <div key={region} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <motion.div
+              key={region}
+              initial={{ opacity: 0, x: -5 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.05 + 0.28, duration: 0.2 }}
+              style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}
+            >
               <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.5rem", width: "1rem", flexShrink: 0 }}>#{ranked.length - 2 + i}</span>
               <span style={{ color: "#9ca3af", fontSize: "0.6rem", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{short}</span>
-              <div style={{ width: "55px", height: "3px", background: "#0b0b0f", borderRadius: "2px", flexShrink: 0 }}>
-                <div style={{ height: "100%", width: `${Math.max(Math.min(avgPct, 100), 4)}%`, background: "linear-gradient(90deg,#991b1b,#ef4444)", borderRadius: "2px" }} />
+              <div style={{ width: "55px", height: "3px", background: "#0b0b0f", borderRadius: "2px", flexShrink: 0, overflow: "hidden" }}>
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.max(Math.min(avgPct, 100), 4)}%` }}
+                  transition={{ delay: i * 0.05 + 0.38, duration: 0.55, ease: "easeOut" }}
+                  style={{ height: "100%", background: "linear-gradient(90deg,#991b1b,#ef4444)", borderRadius: "2px" }}
+                />
               </div>
               <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#ef4444", fontSize: "0.6rem", fontWeight: 700, minWidth: "34px", textAlign: "right", flexShrink: 0 }}>{avgPct.toFixed(0)}%</span>
               <span style={{ color: "#374151", fontSize: "0.52rem", flexShrink: 0 }}>{total}АЗС</span>
-            </div>
+            </motion.div>
           ))}
         </div>
         <div style={{ marginTop: "0.5rem", padding: "0.3rem 0.5rem", background: "rgba(34,197,94,0.04)", border: "1px solid #22c55e12", borderRadius: "6px" }}>
@@ -2284,15 +2488,26 @@ function CrisisForecastWidget() {
           🚨 ЗОНЫ РИСКА · {critical.length} РЕГИОН{critical.length === 1 ? "" : "А"}
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "0.38rem" }}>
-          {critical.map((f) => {
+          {critical.map((f, ci) => {
             const severity = Math.min(f.severity, 10);
             const barW = (severity / 10) * 100;
             const short = f.region.length > 22 ? f.region.split(" ").slice(-1)[0] : f.region;
             return (
-              <div key={f.region} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <motion.div
+                key={f.region}
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: ci * 0.07, duration: 0.22 }}
+                style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}
+              >
                 <span style={{ color: "#9ca3af", fontSize: "0.6rem", minWidth: "70px", flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{short}</span>
                 <div style={{ flex: 1, height: "4px", background: "#1a0505", borderRadius: "2px", overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${barW}%`, background: severity >= 9 ? "linear-gradient(90deg,#991b1b,#ef4444)" : "linear-gradient(90deg,#b45309,#f97316)", borderRadius: "2px", transition: "width 0.5s" }} />
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${barW}%` }}
+                    transition={{ delay: ci * 0.07 + 0.15, duration: 0.5, ease: "easeOut" }}
+                    style={{ height: "100%", background: severity >= 9 ? "linear-gradient(90deg,#991b1b,#ef4444)" : "linear-gradient(90deg,#b45309,#f97316)", borderRadius: "2px" }}
+                  />
                 </div>
                 <span style={{ color: trendColor(f.trend), fontFamily: "'JetBrains Mono',monospace", fontSize: "0.6rem", fontWeight: 700, flexShrink: 0, minWidth: "20px" }}>{trendIcon(f.trend)}</span>
                 <span style={{ color: "#6b7280", fontSize: "0.55rem", flexShrink: 0, whiteSpace: "nowrap" }}>
@@ -2301,7 +2516,7 @@ function CrisisForecastWidget() {
                 <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#f59e0b", fontSize: "0.55rem", flexShrink: 0 }}>
                   ~{f.recommended_volume_liters}л
                 </span>
-              </div>
+              </motion.div>
             );
           })}
         </div>

@@ -343,40 +343,40 @@ function ChatBubble({
 
 // ── Dynamic chips ─────────────────────────────────────────────────────────────
 function getDynamicChips(crisisPct: number, remainingL: number, empireLevel: number) {
-  const chips: { label: string; query: string }[] = [];
+  const chips: { label: string; query: string; color: string }[] = [];
   const hour = new Date().getHours();
 
   if (remainingL <= 0) {
-    chips.push({ label: "⛽ Лимит исчерпан", query: "Мой суточный лимит исчерпан, что делать?" });
+    chips.push({ label: "⛽ Лимит исчерпан", query: "Мой суточный лимит исчерпан, что делать?", color: "#ef4444" });
   } else if (remainingL < 20) {
-    chips.push({ label: `⚠️ Осталось ${remainingL}л`, query: "Мне мало бензина, нужно топливо" });
+    chips.push({ label: `⚠️ Осталось ${remainingL}л`, query: "Мне мало бензина, нужно топливо", color: "#f97316" });
   } else if (hour >= 6 && hour < 10) {
-    chips.push({ label: "🌅 Утро — когда заправиться?", query: "Когда лучше заправиться утром?" });
+    chips.push({ label: "🌅 Утро — когда заправиться?", query: "Когда лучше заправиться утром?", color: "#22c55e" });
   } else if (hour >= 17 && hour < 21) {
-    chips.push({ label: "🌆 Вечер — очереди?", query: "Какие очереди вечером?" });
+    chips.push({ label: "🌆 Вечер — очереди?", query: "Какие очереди вечером?", color: "#6366f1" });
   }
 
   if (crisisPct > 30) {
-    chips.push({ label: "🚨 Острый кризис", query: "Прогноз кризиса — ситуация очень плохая?" });
+    chips.push({ label: "🚨 Острый кризис", query: "Прогноз кризиса — ситуация очень плохая?", color: "#ef4444" });
   } else if (crisisPct > 10) {
-    chips.push({ label: "⚠️ Прогноз", query: "Каков прогноз топливного кризиса?" });
+    chips.push({ label: "⚠️ Прогноз", query: "Каков прогноз топливного кризиса?", color: "#eab308" });
   } else {
-    chips.push({ label: "📊 Ситуация", query: "Какова общая ситуация с топливом?" });
+    chips.push({ label: "📊 Ситуация", query: "Какова общая ситуация с топливом?", color: "#3b82f6" });
   }
 
-  chips.push({ label: "📍 АЗС рядом", query: "Найди ближайшие АЗС с наличием топлива" });
-  chips.push({ label: "🎫 Купить талон", query: "Хочу купить топливный талон на АИ-95" });
+  chips.push({ label: "📍 АЗС рядом", query: "Найди ближайшие АЗС с наличием топлива", color: "#22c55e" });
+  chips.push({ label: "🎫 Купить талон", query: "Хочу купить топливный талон на АИ-95", color: "#db2777" });
 
   if (empireLevel >= 3) {
-    chips.push({ label: "🏰 Prestige", query: "Когда мне делать Prestige в Империи?" });
+    chips.push({ label: "🏰 Prestige", query: "Когда мне делать Prestige в Империи?", color: "#f59e0b" });
   } else if (empireLevel > 1) {
-    chips.push({ label: "🏰 Империя", query: "Как прокачать Империю быстрее?" });
+    chips.push({ label: "🏰 Империя", query: "Как прокачать Империю быстрее?", color: "#f59e0b" });
   } else {
-    chips.push({ label: "💰 Цены АИ-95", query: "Сколько стоит АИ-95 сейчас?" });
+    chips.push({ label: "💰 Цены АИ-95", query: "Сколько стоит АИ-95 сейчас?", color: "#a855f7" });
   }
 
-  chips.push({ label: "🛣️ Маршрут", query: "Помоги составить маршрут с остановками на АЗС" });
-  chips.push({ label: "📉 Дизель", query: "Где сейчас дешевле всего дизельное топливо?" });
+  chips.push({ label: "🛣️ Маршрут", query: "Помоги составить маршрут с остановками на АЗС", color: "#06b6d4" });
+  chips.push({ label: "📉 Дизель", query: "Где сейчас дешевле всего дизельное топливо?", color: "#eab308" });
 
   return chips.slice(0, 5);
 }
@@ -665,16 +665,18 @@ export function AiTab({ onNavigate }: Props) {
             whileTap={{ scale: 0.93 }}
             style={{
               flexShrink: 0,
-              background: "var(--bg-glass)",
-              border: "1px solid var(--border-glass)",
+              background: `${chip.color}10`,
+              border: `1px solid ${chip.color}40`,
               borderRadius: "999px",
               padding: "5px 11px",
               fontSize: "0.68rem",
-              color: "var(--text-secondary)",
+              color: chip.color,
               cursor: thinking ? "default" : "pointer",
               whiteSpace: "nowrap",
-              opacity: thinking ? 0.5 : 1,
+              opacity: thinking ? 0.4 : 1,
               transition: "all 0.15s",
+              fontWeight: 600,
+              boxShadow: `0 0 6px ${chip.color}18`,
             }}
           >
             {chip.label}

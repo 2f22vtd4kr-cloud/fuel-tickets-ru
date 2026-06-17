@@ -1246,20 +1246,81 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
         const color = DEAL_COLORS[dealFuel];
         return (
           <div style={{ padding: "0 1rem 0.5rem" }}>
-            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.4rem", letterSpacing: "0.14em", marginBottom: "0.35rem" }}>ЛУЧШИЕ_ПРЕДЛОЖЕНИЯ · СЕЙЧАС</div>
-            <div style={{ background: "linear-gradient(135deg,#0d0d18,#0f0c1a)", border: `1px solid ${color}22`, borderRadius: "12px", padding: "0.65rem 0.75rem", position: "relative", overflow: "hidden" }}>
-              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: `linear-gradient(90deg,transparent,${color},transparent)` }} />
-              <div style={{ display: "flex", gap: "0.3rem", marginBottom: "0.5rem" }}>
-                {DEAL_FUELS.map((f) => (
-                  <button key={f} onClick={() => setDealFuel(f)} style={{ padding: "0.15rem 0.45rem", background: dealFuel === f ? `${DEAL_COLORS[f]}20` : "#0b0b10", border: `1px solid ${dealFuel === f ? DEAL_COLORS[f] : "#1e1e2a"}`, borderRadius: "6px", color: dealFuel === f ? DEAL_COLORS[f] : "#374151", fontSize: "0.62rem", fontWeight: dealFuel === f ? 700 : 400, cursor: "pointer" }}>{f}</button>
-                ))}
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.28rem" }}>
-                {deals.map(({ s, price, avail }, i) => {
-                  const medals = ["🥇", "🥈", "🥉"];
-                  return (
+            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.4rem" }}>
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.42rem", letterSpacing: "0.14em" }}>ЛУЧШИЕ_ПРЕДЛОЖЕНИЯ · СЕЙЧАС</span>
+              <div style={{ flex: 1, height: "1px", background: `linear-gradient(90deg,${color}33,transparent)` }} />
+            </div>
+            <div style={{ display: "flex", gap: "0.3rem", marginBottom: "0.55rem" }}>
+              {DEAL_FUELS.map((f) => (
+                <button key={f} onClick={() => setDealFuel(f)} style={{ padding: "0.15rem 0.45rem", background: dealFuel === f ? `${DEAL_COLORS[f]}20` : "#0b0b10", border: `1px solid ${dealFuel === f ? DEAL_COLORS[f] : "#1e1e2a"}`, borderRadius: "6px", color: dealFuel === f ? DEAL_COLORS[f] : "#374151", fontSize: "0.62rem", fontWeight: dealFuel === f ? 700 : 400, cursor: "pointer" }}>{f}</button>
+              ))}
+            </div>
+            {deals.length >= 3 ? (() => {
+              const avgPrice = deals.reduce((s, d) => s + d.price, 0) / deals.length;
+              const podiumOrder = [deals[1], deals[0], deals[2]];
+              const podiumRanks = [2, 1, 3];
+              const rankColors = ["#94a3b8", "#f59e0b", "#cd7f32"];
+              const rankMedals = ["", "🥇", "🥈", "🥉"];
+              const rankBg = [
+                "linear-gradient(160deg,#0c0d14,#10101e)",
+                "linear-gradient(160deg,#120f04,#0e0b10)",
+                "linear-gradient(160deg,#0c0d14,#100e0c)",
+              ];
+              return (
+                <div style={{ display: "flex", gap: "0.4rem", alignItems: "flex-end" }}>
+                  {podiumOrder.map(({ s, price, avail }, colIdx) => {
+                    const rank = podiumRanks[colIdx];
+                    const rc = rankColors[colIdx];
+                    const isFirst = rank === 1;
+                    const savings = Math.max(0, avgPrice - price);
+                    const availColor = avail >= 60 ? "#22c55e" : avail >= 25 ? "#eab308" : "#ef4444";
+                    return (
+                      <motion.div
+                        key={s.id}
+                        whileTap={{ scale: 0.96 }}
+                        onClick={() => { setSelectedStation(s); impact("light"); }}
+                        style={{
+                          flex: 1, background: rankBg[colIdx],
+                          border: `1.5px solid ${rc}${isFirst ? "66" : "33"}`,
+                          borderRadius: isFirst ? "14px" : "12px",
+                          padding: isFirst ? "0.7rem 0.4rem 0.55rem" : "0.5rem 0.35rem 0.45rem",
+                          cursor: "pointer", position: "relative", overflow: "hidden",
+                          boxShadow: isFirst ? `0 0 22px ${rc}22, 0 4px 16px #00000066` : "none",
+                          textAlign: "center",
+                          marginBottom: isFirst ? 0 : "4px",
+                        }}
+                      >
+                        {isFirst && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1.5px", background: `linear-gradient(90deg,transparent,${rc},transparent)` }} />}
+                        <div style={{ fontSize: isFirst ? "1.15rem" : "0.85rem", lineHeight: 1, marginBottom: "0.18rem" }}>{rankMedals[rank]}</div>
+                        <div style={{ fontFamily: "'JetBrains Mono',monospace", color: rc, fontSize: isFirst ? "0.58rem" : "0.5rem", fontWeight: 800, letterSpacing: "0.05em", marginBottom: "0.18rem" }}>#{rank}</div>
+                        <div style={{ color: isFirst ? "#e2e8f0" : "#9ca3af", fontSize: isFirst ? "0.63rem" : "0.56rem", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: "0.22rem" }}>{s.network || s.name}</div>
+                        <div style={{ fontFamily: "'JetBrains Mono',monospace", color: rc, fontSize: isFirst ? "0.95rem" : "0.78rem", fontWeight: 900, lineHeight: 1, marginBottom: "0.28rem" }}>{price.toFixed(1)}₽</div>
+                        <div style={{ height: "3px", background: "#1a1a24", borderRadius: "2px", overflow: "hidden", marginBottom: "0.18rem" }}>
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${avail}%` }}
+                            transition={{ duration: 0.8, ease: "easeOut" }}
+                            style={{ height: "100%", background: availColor, borderRadius: "2px" }}
+                          />
+                        </div>
+                        <div style={{ fontFamily: "'JetBrains Mono',monospace", color: availColor, fontSize: "0.48rem", marginBottom: savings > 0.1 ? "0.2rem" : 0 }}>{avail}%</div>
+                        {savings > 0.1 && (
+                          <div style={{ background: `${rc}18`, border: `1px solid ${rc}33`, borderRadius: "4px", padding: "0.06rem 0.28rem", color: rc, fontSize: "0.44rem", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>
+                            −{savings.toFixed(1)}₽
+                          </div>
+                        )}
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              );
+            })() : (
+              <div style={{ background: "linear-gradient(135deg,#0d0d18,#0f0c1a)", border: `1px solid ${color}22`, borderRadius: "12px", padding: "0.65rem 0.75rem", position: "relative", overflow: "hidden" }}>
+                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: `linear-gradient(90deg,transparent,${color},transparent)` }} />
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.28rem" }}>
+                  {deals.map(({ s, price, avail }, i) => (
                     <div key={s.id} onClick={() => { setSelectedStation(s); impact("light"); }} style={{ display: "flex", alignItems: "center", gap: "0.4rem", cursor: "pointer", padding: "0.22rem 0.35rem", borderRadius: "7px", background: i === 0 ? `${color}08` : "transparent" }}>
-                      <span style={{ fontSize: "0.75rem", flexShrink: 0 }}>{medals[i] ?? "·"}</span>
+                      <span style={{ fontSize: "0.75rem", flexShrink: 0 }}>{["🥇","🥈","🥉"][i] ?? "·"}</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ color: "#e2e8f0", fontSize: "0.65rem", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</div>
                         <div style={{ color: "#374151", fontSize: "0.55rem" }}>{s.network || "АЗС"}</div>
@@ -1269,10 +1330,10 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
                         <div style={{ color: avail >= 60 ? "#22c55e" : "#eab308", fontSize: "0.55rem" }}>{avail}%</div>
                       </div>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         );
       })()}
@@ -1588,20 +1649,24 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
                           );
                         })}
                       </div>
-                      {/* Mini per-fuel availability strip */}
+                      {/* Mini per-fuel progress bars */}
                       {s.fuel_statuses.length > 0 && (
-                        <div style={{ display: "flex", gap: "2px", marginTop: "0.3rem", height: "2px" }}>
-                          {s.fuel_statuses.map((fs) => (
-                            <div
-                              key={fs.fuel_type}
-                              title={`${fs.fuel_type}: ${fs.availability_pct}%`}
-                              style={{
-                                flex: 1, borderRadius: "1px", opacity: 0.65,
-                                background: fs.availability_pct >= 60 ? "#22c55e"
-                                  : fs.availability_pct >= 25 ? "#eab308" : "#ef4444",
-                              }}
-                            />
-                          ))}
+                        <div style={{ display: "flex", gap: "3px", marginTop: "0.32rem", alignItems: "flex-end" }}>
+                          {s.fuel_statuses
+                            .filter((fs) => ["АИ-92", "АИ-95", "ДТ", "Газ"].includes(fs.fuel_type))
+                            .slice(0, 5)
+                            .map((fs) => {
+                              const barColor = fs.availability_pct >= 60 ? "#22c55e" : fs.availability_pct >= 25 ? "#eab308" : "#ef4444";
+                              const label = fs.fuel_type === "АИ-92" ? "92" : fs.fuel_type === "АИ-95" ? "95" : fs.fuel_type === "ДТ" ? "ДТ" : "Г";
+                              return (
+                                <div key={fs.fuel_type} title={`${fs.fuel_type}: ${fs.availability_pct}%`} style={{ flex: 1, display: "flex", flexDirection: "column", gap: "1px", alignItems: "center" }}>
+                                  <div style={{ width: "100%", height: "3px", background: "#1a1a24", borderRadius: "2px", overflow: "hidden" }}>
+                                    <div style={{ width: `${fs.availability_pct}%`, height: "100%", background: barColor, borderRadius: "2px", transition: "width 0.5s ease" }} />
+                                  </div>
+                                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.38rem", color: "#374151", letterSpacing: "-0.01em" }}>{label}</span>
+                                </div>
+                              );
+                            })}
                         </div>
                       )}
                       </div>
@@ -1689,6 +1754,74 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
             )}
           </div>
 
+          {/* ── Station comparison panel ── */}
+          {showCompare && compareStation && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              style={{ marginBottom: "0.65rem", background: "linear-gradient(135deg,#0a0a14,#0d0c18)", border: "1px solid #3b82f633", borderRadius: "14px", padding: "0.6rem 0.7rem", position: "relative", overflow: "hidden" }}
+            >
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#3b82f6,#a855f7,transparent)" }} />
+              <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.42rem", letterSpacing: "0.14em", marginBottom: "0.45rem" }}>СРАВНЕНИЕ_СТАНЦИЙ · АНАЛИЗ</div>
+              {(() => {
+                const pair = [compareStation, selectedStation];
+                const avgs = pair.map((s) => s.fuel_statuses.length ? Math.round(s.fuel_statuses.reduce((a, f) => a + f.availability_pct, 0) / s.fuel_statuses.length) : 0);
+                const betterAvail = avgs[0] >= avgs[1] ? 0 : 1;
+                const betterQueue = pair[0].queue_cars <= pair[1].queue_cars ? 0 : 1;
+                const COMPARE_COLORS = ["#3b82f6", "#a855f7"];
+                return (
+                  <div style={{ display: "flex", gap: "0.45rem", alignItems: "stretch" }}>
+                    {pair.map((s, idx) => {
+                      const avg = avgs[idx];
+                      const ac = avg >= 60 ? "#22c55e" : avg >= 25 ? "#eab308" : "#ef4444";
+                      const cc = COMPARE_COLORS[idx];
+                      return (
+                        <div key={s.id} style={{ flex: 1, background: `${cc}08`, border: `1px solid ${cc}33`, borderRadius: "10px", padding: "0.45rem 0.4rem" }}>
+                          <div style={{ fontFamily: "'JetBrains Mono',monospace", color: cc, fontSize: "0.42rem", letterSpacing: "0.1em", marginBottom: "0.18rem" }}>
+                            {idx === 0 ? "СРАВНИВАЕМ" : "ТЕКУЩАЯ"}
+                          </div>
+                          <div style={{ color: "#e2e8f0", fontSize: "0.6rem", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: "0.08rem" }}>{s.network || s.name}</div>
+                          <div style={{ color: "#4b5563", fontSize: "0.5rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: "0.2rem" }}>{s.name}</div>
+                          <div style={{ display: "flex", alignItems: "baseline", gap: "3px", marginBottom: "0.18rem" }}>
+                            <span style={{ fontFamily: "'JetBrains Mono',monospace", color: ac, fontSize: "0.95rem", fontWeight: 900 }}>{avg}%</span>
+                            {betterAvail === idx && <span style={{ fontSize: "0.48rem", color: "#22c55e", fontWeight: 700 }}>▲</span>}
+                          </div>
+                          <div style={{ height: "3px", background: "#1a1a24", borderRadius: "2px", overflow: "hidden", marginBottom: "0.18rem" }}>
+                            <motion.div
+                              initial={{ width: 0 }} animate={{ width: `${avg}%` }}
+                              transition={{ duration: 0.7, ease: "easeOut" }}
+                              style={{ height: "100%", background: ac, borderRadius: "2px" }}
+                            />
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "3px", marginBottom: "0.2rem" }}>
+                            <span style={{ color: s.queue_cars > 8 ? "#ef4444" : "#4b5563", fontSize: "0.5rem", fontFamily: "'JetBrains Mono',monospace" }}>🚗{s.queue_cars}</span>
+                            {betterQueue === idx && <span style={{ color: "#22c55e", fontSize: "0.45rem" }}>✓</span>}
+                          </div>
+                          <div style={{ display: "flex", gap: "2px" }}>
+                            {s.fuel_statuses.filter((f) => ["АИ-92","АИ-95","ДТ"].includes(f.fuel_type)).slice(0, 3).map((fs) => {
+                              const fc = fs.availability_pct >= 60 ? "#22c55e" : fs.availability_pct >= 25 ? "#eab308" : "#ef4444";
+                              return (
+                                <div key={fs.fuel_type} style={{ flex: 1 }}>
+                                  <div style={{ height: "2px", background: "#1a1a24", borderRadius: "1px", overflow: "hidden" }}>
+                                    <div style={{ width: `${fs.availability_pct}%`, height: "100%", background: fc }} />
+                                  </div>
+                                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.35rem", color: "#374151", textAlign: "center", marginTop: "1px" }}>
+                                    {fs.fuel_type === "АИ-92" ? "92" : fs.fuel_type === "АИ-95" ? "95" : "ДТ"}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </motion.div>
+          )}
+
           {(() => {
             const selAvg = selectedStation.fuel_statuses.length ? Math.round(selectedStation.fuel_statuses.reduce((a, f) => a + f.availability_pct, 0) / selectedStation.fuel_statuses.length) : 0;
             const selColor = selAvg >= 60 ? "#22c55e" : selAvg >= 25 ? "#eab308" : "#ef4444";
@@ -1721,6 +1854,25 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
                         🚗 {selectedStation.queue_cars} авто
                       </span>
                     </div>
+                    {/* Per-fuel price row */}
+                    {(() => {
+                      const FUEL_COLORS_SEL: Record<string, string> = { "АИ-92": "#a855f7", "АИ-95": "#db2777", "ДТ": "#f59e0b", "Газ": "#22c55e" };
+                      const fuelPrices = selectedStation.fuel_statuses
+                        .filter((fs) => ["АИ-92","АИ-95","ДТ","Газ"].includes(fs.fuel_type))
+                        .map((fs) => ({ fuel: fs.fuel_type, price: getPrice(selectedStation.region, fs.fuel_type)?.effective }))
+                        .filter((x) => x.price != null && x.price > 0);
+                      if (!fuelPrices.length) return null;
+                      return (
+                        <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap", marginTop: "0.3rem" }}>
+                          {fuelPrices.map(({ fuel, price }) => (
+                            <span key={fuel} style={{ background: `${FUEL_COLORS_SEL[fuel] ?? "#a855f7"}12`, border: `1px solid ${FUEL_COLORS_SEL[fuel] ?? "#a855f7"}35`, borderRadius: "5px", padding: "0.05rem 0.4rem", display: "flex", alignItems: "center", gap: "3px" }}>
+                              <span style={{ color: FUEL_COLORS_SEL[fuel] ?? "#a855f7", fontSize: "0.52rem", fontWeight: 700 }}>{fuel}</span>
+                              <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#e2e8f0", fontSize: "0.56rem", fontWeight: 700 }}>₽{price!.toFixed(1)}</span>
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0, marginLeft: "0.5rem" }}>
                     <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "1.6rem", fontWeight: 800, color: selColor, lineHeight: 1, textShadow: `0 0 16px ${selColor}66` }}>{selAvg}%</span>

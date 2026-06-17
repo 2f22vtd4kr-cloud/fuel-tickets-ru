@@ -211,12 +211,21 @@ function QRModal({ hash, onClose }: { hash: string; onClose: () => void }) {
   );
 }
 
+const FUEL_ACCENT: Record<string, string> = {
+  "АИ-92": "#a855f7",
+  "АИ-95": "#db2777",
+  "ДТ":    "#f59e0b",
+  "Газ":   "#22c55e",
+};
+
 function PurchaseCard({ purchase }: { purchase: Purchase }) {
   const [showQr, setShowQr] = useState(false);
   const st = STATUS_LABELS[purchase.status] ?? { label: purchase.status, color: "#6b7280" };
   const date = new Date(purchase.created_at).toLocaleDateString("ru-RU", {
     day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
   });
+  const fuelColor = FUEL_ACCENT[purchase.fuel_type] ?? "#a855f7";
+  const isActive = purchase.status === "active";
 
   return (
     <>
@@ -228,85 +237,75 @@ function PurchaseCard({ purchase }: { purchase: Purchase }) {
 
       <motion.div
         whileTap={{ scale: 0.985 }}
-        animate={purchase.status === "active" ? {
+        animate={isActive ? {
           boxShadow: [
-            "0 0 20px #a855f718, 0 0 0 1px #a855f728",
-            "0 0 32px #a855f730, 0 0 0 1px #a855f748",
-            "0 0 20px #a855f718, 0 0 0 1px #a855f728",
+            `0 0 20px ${fuelColor}18, 0 0 0 1px ${fuelColor}28`,
+            `0 0 32px ${fuelColor}30, 0 0 0 1px ${fuelColor}48`,
+            `0 0 20px ${fuelColor}18, 0 0 0 1px ${fuelColor}28`,
           ],
         } : {}}
-        transition={purchase.status === "active" ? { repeat: Infinity, duration: 2.8, ease: "easeInOut" } : {}}
+        transition={isActive ? { repeat: Infinity, duration: 2.8, ease: "easeInOut" } : {}}
         style={{
-          background: purchase.status === "active"
-            ? "linear-gradient(160deg,#0d0d18,#120820)"
-            : "#0b0b0f",
-          border: `1px solid ${purchase.status === "active" ? "#a855f740" : "#1a1a24"}`,
+          background: isActive ? `linear-gradient(160deg,#0d0d18,${fuelColor}06)` : "#0b0b0f",
+          border: `1px solid ${isActive ? fuelColor + "40" : "#1a1a24"}`,
           borderRadius: "16px",
-          padding: "0.85rem 1rem",
+          padding: "0.85rem 1rem 0.85rem 1.25rem",
           marginBottom: "0.45rem",
-          cursor: purchase.status === "active" ? "pointer" : "default",
+          cursor: isActive ? "pointer" : "default",
           position: "relative",
           overflow: "hidden",
         }}
-        onClick={() => purchase.status === "active" && setShowQr(true)}
+        onClick={() => isActive && setShowQr(true)}
       >
-        {purchase.status === "active" && (
-          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#a855f7,#db2777,transparent)" }} />
+        {/* Left accent bar */}
+        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "3px", background: isActive ? `linear-gradient(180deg,${fuelColor},${fuelColor}55)` : "#1a1a24", borderRadius: "16px 0 0 16px" }} />
+
+        {isActive && (
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: `linear-gradient(90deg,transparent,${fuelColor},#db2777,transparent)` }} />
         )}
 
         {/* Top row */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.45rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.4rem" }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-              <span style={{ color: purchase.status === "active" ? "#e2e8f0" : "#6b7280", fontWeight: 700, fontSize: "0.88rem" }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: "0.4rem", flexWrap: "wrap" }}>
+              <span style={{ color: isActive ? "#e2e8f0" : "#6b7280", fontWeight: 700, fontSize: "0.88rem" }}>
                 {FUEL_LABELS[purchase.fuel_type] ?? purchase.fuel_type}
               </span>
-              <span style={{
-                fontFamily: "'JetBrains Mono',monospace",
-                color: "#a855f7", fontSize: "0.75rem", fontWeight: 700,
-              }}>
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", color: fuelColor, fontSize: "0.82rem", fontWeight: 800 }}>
                 {purchase.volume}л
               </span>
+              {purchase.price > 0 && (
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", color: isActive ? "#e2e8f0" : "#4b5563", fontSize: "0.72rem", fontWeight: 600 }}>
+                  ₽{purchase.price.toLocaleString("ru")}
+                </span>
+              )}
             </div>
-            <p style={{ margin: "0.15rem 0 0", color: "#4b5563", fontSize: "0.68rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <p style={{ margin: "0.15rem 0 0", color: "#4b5563", fontSize: "0.65rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               ⛽ {purchase.station_name ?? "АЗС"} · {purchase.region ?? ""}
             </p>
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.2rem", marginLeft: "0.5rem", flexShrink: 0 }}>
-            <span style={{
-              background: `${st.color}15`,
-              border: `1px solid ${st.color}40`,
-              color: st.color,
-              borderRadius: "6px",
-              padding: "0.15rem 0.45rem",
-              fontSize: "0.65rem", fontWeight: 700,
-            }}>
+            <span style={{ background: `${st.color}15`, border: `1px solid ${st.color}40`, color: st.color, borderRadius: "6px", padding: "0.15rem 0.45rem", fontSize: "0.65rem", fontWeight: 700 }}>
               {st.label}
             </span>
-            {purchase.status === "active" && (
-              <span style={{
-                background: "linear-gradient(135deg,#a855f7,#db2777)",
-                borderRadius: "6px", padding: "0.12rem 0.4rem",
-                color: "#fff", fontSize: "0.6rem", fontWeight: 700,
-                boxShadow: "0 0 8px #a855f740",
-              }}>
-                📱 ПОКАЗАТЬ QR
-              </span>
+            {isActive && (
+              <motion.span
+                animate={{ opacity: [1, 0.65, 1] }}
+                transition={{ duration: 1.8, repeat: Infinity }}
+                style={{ background: `linear-gradient(135deg,${fuelColor},#db2777)`, borderRadius: "6px", padding: "0.12rem 0.4rem", color: "#fff", fontSize: "0.6rem", fontWeight: 700, boxShadow: `0 0 8px ${fuelColor}40` }}
+              >
+                📱 QR
+              </motion.span>
             )}
           </div>
         </div>
 
         {/* Bottom row */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{
-            fontFamily: "'JetBrains Mono',monospace",
-            fontSize: "0.6rem", color: "#374151",
-          }}>
-            {purchase.qr_hash.slice(0, 20)}…
+          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.58rem", color: "#2a2a36" }}>
+            #{purchase.qr_hash.slice(0, 16)}
           </span>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <span style={{ color: "#374151", fontSize: "0.62rem" }}>{date}</span>
-          </div>
+          <span style={{ color: "#374151", fontSize: "0.6rem" }}>{date}</span>
         </div>
       </motion.div>
     </>
@@ -332,6 +331,7 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
   const [showCreditHistory, setShowCreditHistory] = useState(false);
   const [stationNotes, setStationNotes] = useState<Array<{ id: number; station_id: number; station_name: string; station_region: string; body: string; updated_at: string | null }>>([]);
   const [showAllNotes, setShowAllNotes] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState<"all" | "used" | "expired">("all");
 
   // Auto-clear highlight ring after 3 seconds
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -356,10 +356,12 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
 
   const { favoriteRegions, removeFavorite: removeFav, favoriteStations, toggleStationFavorite } = useFavoritesStore();
   const active = purchases.filter((p) => p.status === "active");
-  const history = purchases.filter((p) => p.status !== "active");
+  const historyAll = purchases.filter((p) => p.status !== "active");
+  const history = historyFilter === "all" ? historyAll : historyAll.filter((p) => p.status === historyFilter);
   const totalLiters = purchases.reduce((sum, p) => sum + (p.volume ?? 0), 0);
   const usedLiters = history.reduce((sum, p) => sum + (p.volume ?? 0), 0);
   const avgVolume = purchases.length > 0 ? Math.round(totalLiters / purchases.length) : 0;
+  const totalSpent = purchases.reduce((sum, p) => sum + (p.price ?? 0), 0);
 
   if (!user) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#6b7280" }}>
@@ -423,24 +425,29 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
         </div>
       </div>
 
-      {/* Quick stats row */}
+      {/* Quick stats grid (2×2) */}
       {purchases.length > 0 && (
-        <div style={{ padding: "0 12px 10px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px" }}>
+        <div style={{ padding: "0 12px 10px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
           {[
             { label: "Всего топлива", value: `${totalLiters.toLocaleString("ru")}л`, icon: "⛽", color: "#a855f7" },
             { label: "Использовано", value: `${usedLiters.toLocaleString("ru")}л`, icon: "✓", color: "#22c55e" },
-            { label: "Ср. объём", value: avgVolume > 0 ? `${avgVolume}л` : "—", icon: "⊘", color: "#f59e0b" },
+            { label: "Потрачено", value: totalSpent > 0 ? `${totalSpent.toLocaleString("ru")}₽` : "—", icon: "💳", color: "#db2777" },
+            { label: "Ср. объём", value: avgVolume > 0 ? `${avgVolume}л` : "—", icon: "📊", color: "#f59e0b" },
           ].map(({ label, value, icon, color }) => (
             <div key={label} style={{
               background: `${color}08`,
-              border: `1px solid ${color}20`,
-              borderRadius: "10px",
-              padding: "8px 8px 6px",
-              textAlign: "center",
+              border: `1px solid ${color}22`,
+              borderRadius: "11px",
+              padding: "9px 10px 7px",
+              display: "flex", alignItems: "center", gap: "8px",
+              position: "relative", overflow: "hidden",
             }}>
-              <div style={{ fontSize: "1rem", marginBottom: "2px" }}>{icon}</div>
-              <div style={{ fontFamily: "'JetBrains Mono',monospace", color, fontSize: "0.7rem", fontWeight: 800 }}>{value}</div>
-              <div style={{ color: "#4b5563", fontSize: "0.48rem", marginTop: "1px" }}>{label}</div>
+              <div style={{ position: "absolute", top: 0, left: 0, width: "3px", bottom: 0, background: color, opacity: 0.5, borderRadius: "11px 0 0 11px" }} />
+              <span style={{ fontSize: "1.1rem", lineHeight: 1, marginLeft: "4px" }}>{icon}</span>
+              <div>
+                <div style={{ fontFamily: "'JetBrains Mono',monospace", color, fontSize: "0.75rem", fontWeight: 800, lineHeight: 1 }}>{value}</div>
+                <div style={{ color: "#4b5563", fontSize: "0.47rem", marginTop: "2px" }}>{label}</div>
+              </div>
             </div>
           ))}
         </div>
@@ -740,10 +747,39 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
               ↓ CSV
             </button>
           </div>
-          <p style={{ color: "#374151", fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 0.5rem", fontFamily: "'JetBrains Mono',monospace" }}>
-            История · {history.length} ордеров
-          </p>
-          {history.map((p) => <PurchaseCard key={p.id} purchase={p} />)}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+            <p style={{ color: "#374151", fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0, fontFamily: "'JetBrains Mono',monospace" }}>
+              История · {history.length}
+            </p>
+            <div style={{ display: "flex", gap: "0.25rem" }}>
+              {([
+                { key: "all",     label: "Все",      color: "#4b5563" },
+                { key: "used",    label: "Исп.",     color: "#6b7280" },
+                { key: "expired", label: "Истёк.",   color: "#ef4444" },
+              ] as const).map(({ key, label, color }) => (
+                <button
+                  key={key}
+                  onClick={() => setHistoryFilter(key)}
+                  style={{
+                    background: historyFilter === key ? `${color}18` : "none",
+                    border: `1px solid ${historyFilter === key ? color + "55" : "#22222f"}`,
+                    borderRadius: "6px", color: historyFilter === key ? color : "#374151",
+                    fontSize: "0.55rem", fontWeight: historyFilter === key ? 700 : 400,
+                    padding: "0.1rem 0.4rem", cursor: "pointer",
+                    fontFamily: "'JetBrains Mono',monospace",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {history.length === 0 ? (
+            <p style={{ color: "#374151", fontSize: "0.65rem", textAlign: "center", padding: "0.75rem 0", fontFamily: "'JetBrains Mono',monospace" }}>— нет записей —</p>
+          ) : (
+            history.map((p) => <PurchaseCard key={p.id} purchase={p} />)
+          )}
         </div>
       )}
 
@@ -1180,18 +1216,31 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
               {creditHistory.slice(0, 10).map((tx, i) => {
                 const t = tx.created_at ? new Date(tx.created_at).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
                 return (
-                  <div key={i} style={{
-                    background: "#0b0b0f", border: "1px solid #1a1a24", borderRadius: "8px",
-                    padding: "0.35rem 0.65rem", display: "flex", justifyContent: "space-between", alignItems: "center",
-                  }}>
-                    <div>
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.04, duration: 0.22 }}
+                    style={{
+                      background: tx.delta >= 0 ? "linear-gradient(135deg,#0d0b14,#0b0b0f)" : "#0b0b0f",
+                      border: `1px solid ${tx.delta >= 0 ? "#db277720" : "#ef444418"}`,
+                      borderRadius: "8px",
+                      padding: "0.35rem 0.65rem",
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      position: "relative", overflow: "hidden",
+                    }}
+                  >
+                    {tx.delta > 0 && (
+                      <div style={{ position: "absolute", left: 0, top: "20%", bottom: "20%", width: "2px", background: "#db2777", borderRadius: "0 2px 2px 0", boxShadow: "0 0 4px #db277766" }} />
+                    )}
+                    <div style={{ paddingLeft: tx.delta > 0 ? "0.4rem" : 0 }}>
                       <p style={{ margin: 0, color: "#d1d5db", fontSize: "0.73rem" }}>{tx.reason}</p>
                       {t && <p style={{ margin: 0, color: "#374151", fontSize: "0.6rem" }}>{t}</p>}
                     </div>
                     <p style={{ margin: 0, fontFamily: "'JetBrains Mono',monospace", fontSize: "0.82rem", fontWeight: 700, color: tx.delta >= 0 ? "#db2777" : "#ef4444", flexShrink: 0 }}>
                       {tx.delta >= 0 ? "+" : ""}{tx.delta} NC
                     </p>
-                  </div>
+                  </motion.div>
                 );
               })}
             </div>

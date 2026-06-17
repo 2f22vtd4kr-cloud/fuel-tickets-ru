@@ -420,27 +420,55 @@ export default function App() {
       </button>
 
       {/* Wallet floating button */}
-      <motion.button
-        onClick={() => setShowWallet(true)}
-        whileTap={{ scale: 0.9 }}
-        title="Мой кошелёк"
-        style={{
-          position: "fixed",
-          bottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)",
-          right: "12px",
-          zIndex: 9500,
-          width: "38px", height: "38px",
-          borderRadius: "50%",
-          background: "linear-gradient(135deg, #fbbf24, #f59e0b)",
-          border: "none",
-          boxShadow: "0 0 14px rgba(251,191,36,0.45)",
-          cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: "1rem",
-        }}
-      >
-        💼
-      </motion.button>
+      <div style={{ position: "fixed", bottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)", right: "12px", zIndex: 9500 }}>
+        {(() => {
+          const activeCount = purchases.filter((p) => p.status === "active").length;
+          return (
+            <>
+              {activeCount > 0 && (
+                <motion.div
+                  initial={{ scale: 0 }} animate={{ scale: 1 }}
+                  style={{
+                    position: "absolute", top: "-4px", right: "-4px",
+                    background: "linear-gradient(135deg,#a855f7,#db2777)",
+                    color: "#fff", borderRadius: "999px",
+                    minWidth: "16px", height: "16px",
+                    fontSize: "0.44rem", fontWeight: 800,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    padding: "0 3px",
+                    boxShadow: "0 0 8px rgba(168,85,247,0.7)",
+                    border: "1.5px solid rgba(8,8,16,0.9)",
+                    zIndex: 1,
+                  }}
+                >
+                  {activeCount}
+                </motion.div>
+              )}
+              <motion.button
+                onClick={() => setShowWallet(true)}
+                whileTap={{ scale: 0.9 }}
+                title="Мой кошелёк"
+                style={{
+                  width: "38px", height: "38px",
+                  borderRadius: "50%",
+                  background: activeCount > 0
+                    ? "linear-gradient(135deg, #a855f7, #f59e0b)"
+                    : "linear-gradient(135deg, #fbbf24, #f59e0b)",
+                  border: "none",
+                  boxShadow: activeCount > 0
+                    ? "0 0 16px rgba(168,85,247,0.55)"
+                    : "0 0 14px rgba(251,191,36,0.45)",
+                  cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: "1rem",
+                }}
+              >
+                💼
+              </motion.button>
+            </>
+          );
+        })()}
+      </div>
 
       {/* AI Suggestion Banner (Phase 4.3) */}
       <AnimatePresence>

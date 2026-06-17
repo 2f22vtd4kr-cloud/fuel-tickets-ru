@@ -150,28 +150,52 @@ function CrisisTimeline({ items }: { items: NewsItem[] }) {
   if (!milestones.length) return null;
   return (
     <div style={{ marginTop: "16px", marginBottom: "8px" }}>
-      <h3 style={{ fontSize: "0.7rem", color: "var(--text-tertiary)", letterSpacing: "0.1em", marginBottom: "10px", textTransform: "uppercase" }}>
-        Хронология кризиса
-      </h3>
-      <div style={{ position: "relative", paddingLeft: "16px" }}>
-        <div style={{ position: "absolute", left: "6px", top: 0, bottom: 0, width: "2px", background: "rgba(255,255,255,0.08)", borderRadius: "1px" }} />
+      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
+        <div style={{ width: "3px", height: "12px", background: "linear-gradient(180deg,#ef4444,#f97316)", borderRadius: "2px" }} />
+        <h3 style={{ fontSize: "0.65rem", color: "#6b7280", letterSpacing: "0.12em", textTransform: "uppercase", margin: 0 }}>
+          Хронология кризиса
+        </h3>
+      </div>
+      <div style={{ position: "relative", paddingLeft: "18px" }}>
+        <div style={{ position: "absolute", left: "7px", top: "4px", bottom: "4px", width: "2px", background: "linear-gradient(180deg,#ef444430,#1a1a24)", borderRadius: "1px" }} />
         {milestones.map((item, i) => {
           const cfg = SEVERITY_CONFIG[item.severity];
+          const isFirst = i === 0;
           return (
-            <div key={item.id} style={{ display: "flex", gap: "10px", marginBottom: "12px", position: "relative" }}>
+            <motion.div
+              key={item.id}
+              initial={{ opacity: 0, x: -6 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.06 }}
+              style={{
+                display: "flex", gap: "10px", marginBottom: "10px", position: "relative",
+                background: isFirst ? `${cfg.color}08` : "transparent",
+                borderRadius: isFirst ? "8px" : 0,
+                padding: isFirst ? "6px 8px 6px 4px" : "2px 0",
+                border: isFirst ? `1px solid ${cfg.color}22` : "none",
+              }}
+            >
               <div style={{
-                position: "absolute", left: "-13px", top: "4px",
-                width: "8px", height: "8px", borderRadius: "50%",
-                background: cfg.color, boxShadow: `0 0 6px ${cfg.color}`,
+                position: "absolute", left: "-14px", top: "8px",
+                width: isFirst ? "10px" : "7px", height: isFirst ? "10px" : "7px",
+                borderRadius: "50%",
+                background: cfg.color,
+                boxShadow: isFirst ? `0 0 10px ${cfg.color}, 0 0 4px ${cfg.color}80` : `0 0 4px ${cfg.color}`,
                 flexShrink: 0,
+                animation: isFirst ? "tmaPulse 2s infinite" : "none",
               }} />
-              <div>
-                <p style={{ fontSize: "0.72rem", color: "var(--text-primary)", fontWeight: 600, lineHeight: 1.3 }}>{item.headline}</p>
-                <p style={{ fontSize: "0.62rem", color: "var(--text-tertiary)", marginTop: "2px" }}>
-                  {item.region && `${item.region} · `}{timeAgo(item.created_at)}
-                </p>
+              <div style={{ minWidth: 0 }}>
+                <p style={{ fontSize: isFirst ? "0.75rem" : "0.7rem", color: isFirst ? "var(--text-primary)" : "var(--text-secondary)", fontWeight: isFirst ? 700 : 600, lineHeight: 1.3, marginBottom: "1px" }}>{item.headline}</p>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  {item.region && (
+                    <span style={{ fontSize: "0.58rem", color: cfg.color, background: `${cfg.color}15`, borderRadius: "4px", padding: "0 4px" }}>
+                      📍 {item.region}
+                    </span>
+                  )}
+                  <span style={{ fontSize: "0.58rem", color: "var(--text-tertiary)" }}>{timeAgo(item.created_at)}</span>
+                </div>
               </div>
-            </div>
+            </motion.div>
           );
         })}
       </div>
