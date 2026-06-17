@@ -39,6 +39,60 @@ const NETWORK_VOUCHER_NETWORKS = [
   { name: "Татнефть",     color: "#22c55e" },
   { name: "ННК",          color: "#f59e0b" },
 ];
+
+const NETWORK_FUELS: Record<string, { key: string; label: string }[]> = {
+  "Лукойл": [
+    { key: "АИ-92",  label: "АИ-92" },
+    { key: "АИ-95",  label: "АИ-95" },
+    { key: "АИ-95+", label: "ЭКТО Plus" },
+    { key: "АИ-100", label: "ЭКТО-100" },
+    { key: "ДТ",     label: "ДТ Евро" },
+    { key: "ДТ+",    label: "ДТ ЭКТО" },
+    { key: "Газ",    label: "СУГ" },
+  ],
+  "Роснефть": [
+    { key: "АИ-92",  label: "АИ-92" },
+    { key: "АИ-95",  label: "АИ-95" },
+    { key: "АИ-95+", label: "Pulsar-95" },
+    { key: "АИ-100", label: "Pulsar-100" },
+    { key: "ДТ",     label: "ДТ Евро" },
+    { key: "ДТ+",    label: "Pulsar ДТ" },
+    { key: "Газ",    label: "СУГ / КПГ" },
+  ],
+  "Газпромнефть": [
+    { key: "АИ-92",  label: "АИ-92" },
+    { key: "АИ-95",  label: "АИ-95" },
+    { key: "АИ-95+", label: "G-Drive 95" },
+    { key: "АИ-100", label: "G-Drive 100" },
+    { key: "ДТ",     label: "ДТ Опти" },
+    { key: "ДТ+",    label: "G-Drive ДТ" },
+    { key: "Газ",    label: "СУГ / КПГ" },
+  ],
+  "Башнефть": [
+    { key: "АИ-92",  label: "ATUM-92" },
+    { key: "АИ-95",  label: "ATUM-95" },
+    { key: "АИ-100", label: "АИ-100" },
+    { key: "ДТ",     label: "ДТ Евро" },
+    { key: "Газ",    label: "СУГ" },
+  ],
+  "Татнефть": [
+    { key: "АИ-92",  label: "АИ-92 ТАНЕКО" },
+    { key: "АИ-95",  label: "АИ-95 ТАНЕКО" },
+    { key: "АИ-95+", label: "АИ-98 ТАНЕКО" },
+    { key: "АИ-100", label: "АИ-100 ТАНЕКО" },
+    { key: "ДТ",     label: "ДТ Евро" },
+    { key: "ДТ+",    label: "ДТ ТАНЕКО" },
+    { key: "Газ",    label: "СУГ / КПГ" },
+  ],
+  "ННК": [
+    { key: "АИ-92",  label: "NEO-92" },
+    { key: "АИ-95",  label: "NEO-95" },
+    { key: "АИ-95+", label: "NEO-98" },
+    { key: "ДТ",     label: "ДТ Евро" },
+    { key: "ДТ+",    label: "ДТ зимнее" },
+    { key: "Газ",    label: "СУГ" },
+  ],
+};
 const VOLUMES = [20, 40, 60];
 const STAR_RUB_RATE = 2.5; // ~$0.013 per Star × ~90 RUB/USD; adjusted to match real fuel prices
 const PAGE_SIZE = 25;
@@ -678,7 +732,7 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
         {!selectedStation && crisisCount >= 8 && (
           <motion.div
             initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-            style={{ padding: "0 12px 0" }}
+            style={{ padding: "0 12px 14px" }}
           >
             <div style={{
               background: "linear-gradient(135deg,rgba(239,68,68,0.12),rgba(220,38,38,0.08))",
@@ -705,28 +759,49 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
       {/* ── FLAGSHIP: Network Vouchers ── */}
       {!selectedStation && (
         <div style={{ padding: "0 12px 6px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", marginBottom: "0.5rem" }}>
-            <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#a855f7", fontSize: "0.52rem", letterSpacing: "0.15em", fontWeight: 700 }}>СЕТЕВЫЕ_ТАЛОНЫ</span>
-            <motion.div
-              animate={{ boxShadow: ["0 0 6px #a855f777", "0 0 14px #db277777", "0 0 6px #a855f777"] }}
-              transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
-              style={{
-                background: "linear-gradient(135deg,#a855f7,#db2777)",
-                borderRadius: "6px", padding: "0.1rem 0.48rem",
-                fontSize: "0.44rem", fontWeight: 800, color: "#fff",
-                fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.1em", flexShrink: 0,
-              }}
-            >🏆 БЕСТСЕЛЛЕР</motion.div>
-            <div style={{ flex: 1, height: "1px", background: "linear-gradient(90deg,#a855f733,#db277722,transparent)" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.55rem" }}>
+            <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#a855f7", fontSize: "0.65rem", letterSpacing: "0.15em", fontWeight: 700 }}>СЕТЕВЫЕ_ТАЛОНЫ</span>
+            <div style={{ flex: 1, height: "1px", background: "linear-gradient(90deg,#a855f744,transparent)" }} />
             <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#4b5563", fontSize: "0.44rem", flexShrink: 0 }}>НА ВСЕХ АЗС СЕТИ</span>
           </div>
 
+          <motion.div
+            animate={{ boxShadow: ["0 0 14px #a855f755", "0 0 28px #db277755", "0 0 14px #a855f755"] }}
+            transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+            style={{
+              background: "linear-gradient(135deg,#a855f7,#db2777,#9333ea)",
+              borderRadius: "12px",
+              padding: "0.62rem 1rem",
+              marginBottom: "0.65rem",
+              textAlign: "center",
+              position: "relative",
+              overflow: "hidden",
+            }}
+          >
+            <motion.div
+              animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+              style={{
+                position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+                background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.08),transparent)",
+                backgroundSize: "200% 100%",
+              }}
+            />
+            <span style={{
+              fontFamily: "'JetBrains Mono',monospace",
+              fontSize: "0.8rem", fontWeight: 900, color: "#fff",
+              letterSpacing: "0.08em", textTransform: "uppercase",
+              position: "relative", zIndex: 1,
+              textShadow: "0 0 20px rgba(255,255,255,0.4)",
+            }}>✦ ТО, ЗА ЧЕМ ВЫ ЗДЕСЬ</span>
+          </motion.div>
+
           <div style={{
             background: "linear-gradient(160deg,#100b1e,#130d22,#0d0d18)",
-            border: "1.5px solid #a855f744",
-            borderRadius: "16px", padding: "0.8rem",
+            border: "1.5px solid #a855f755",
+            borderRadius: "18px", padding: "1.1rem",
             position: "relative", overflow: "hidden",
-            boxShadow: "0 0 40px #a855f710, 0 0 18px #db27770a, 0 6px 24px #00000066",
+            boxShadow: "0 0 50px #a855f718, 0 0 22px #db27770d, 0 8px 32px #00000077",
           }}>
             <motion.div
               animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
@@ -740,7 +815,7 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
             <div style={{ position: "absolute", top: "-30%", right: "-10%", width: "55%", height: "55%", background: "radial-gradient(circle,#a855f70a,transparent 70%)", pointerEvents: "none" }} />
             <div style={{ position: "absolute", bottom: "-20%", left: "5%", width: "40%", height: "40%", background: "radial-gradient(circle,#db27770a,transparent 70%)", pointerEvents: "none" }} />
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "0.4rem", marginBottom: activeNetwork ? "0.65rem" : 0 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "0.5rem", marginBottom: activeNetwork ? "0.8rem" : 0 }}>
               {NETWORK_VOUCHER_NETWORKS.map(({ name, color }) => {
                 const isActive = activeNetwork === name;
                 const price92 = NETWORK_PRICES[name]?.["АИ-92"] ?? 65;
@@ -750,20 +825,20 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
                     whileTap={{ scale: 0.95 }}
                     onClick={() => { impact("light"); setActiveNetwork(isActive ? null : name); setNvFuel("АИ-92"); setNvVolume(40); }}
                     style={{
-                      padding: "0.55rem 0.2rem",
-                      background: isActive ? `linear-gradient(160deg,${color}26,${color}14)` : "rgba(255,255,255,0.03)",
-                      border: `1.5px solid ${isActive ? color + "cc" : color + "25"}`,
-                      borderRadius: "12px",
-                      display: "flex", flexDirection: "column", alignItems: "center", gap: "0.22rem",
+                      padding: "0.8rem 0.3rem",
+                      background: isActive ? `linear-gradient(160deg,${color}26,${color}14)` : "rgba(255,255,255,0.04)",
+                      border: `1.5px solid ${isActive ? color + "cc" : color + "30"}`,
+                      borderRadius: "14px",
+                      display: "flex", flexDirection: "column", alignItems: "center", gap: "0.3rem",
                       cursor: "pointer", transition: "all 0.2s",
-                      boxShadow: isActive ? `0 0 18px ${color}38, 0 2px 10px ${color}18` : "none",
+                      boxShadow: isActive ? `0 0 22px ${color}44, 0 2px 12px ${color}22` : "none",
                       position: "relative", overflow: "hidden",
                     }}
                   >
-                    {isActive && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1.5px", background: `linear-gradient(90deg,transparent,${color},transparent)` }} />}
-                    <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: color, boxShadow: isActive ? `0 0 9px ${color}` : "none", flexShrink: 0 }} />
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", color: isActive ? color : "#9ca3af", fontSize: "0.58rem", fontWeight: isActive ? 800 : 500, textAlign: "center", lineHeight: 1.2 }}>{name}</span>
-                    <span style={{ color: isActive ? color : "#4b5563", fontSize: "0.5rem", fontFamily: "'JetBrains Mono',monospace", fontWeight: isActive ? 700 : 400 }}>{price92.toFixed(1)}₽/л</span>
+                    {isActive && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg,transparent,${color},transparent)` }} />}
+                    <div style={{ width: "9px", height: "9px", borderRadius: "50%", background: color, boxShadow: isActive ? `0 0 12px ${color}` : "none", flexShrink: 0 }} />
+                    <span style={{ fontFamily: "'JetBrains Mono',monospace", color: isActive ? color : "#9ca3af", fontSize: "0.65rem", fontWeight: isActive ? 800 : 500, textAlign: "center", lineHeight: 1.2 }}>{name}</span>
+                    <span style={{ color: isActive ? color : "#4b5563", fontSize: "0.56rem", fontFamily: "'JetBrains Mono',monospace", fontWeight: isActive ? 700 : 400 }}>{price92.toFixed(1)}₽/л</span>
                   </motion.button>
                 );
               })}
@@ -781,10 +856,13 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
                     style={{ overflow: "hidden" }}
                   >
                     <div style={{ display: "flex", gap: "0.28rem", marginBottom: "0.4rem", flexWrap: "wrap" }}>
-                      {["АИ-92", "АИ-95", "ДТ", "Газ"].map((ft) => (
+                      {(NETWORK_FUELS[activeNetwork] ?? [
+                        { key: "АИ-92", label: "АИ-92" }, { key: "АИ-95", label: "АИ-95" },
+                        { key: "ДТ", label: "ДТ" }, { key: "Газ", label: "Газ" },
+                      ]).map(({ key: ft, label }) => (
                         <button key={ft} onClick={() => { impact("light"); setNvFuel(ft); }}
-                          style={{ padding: "0.26rem 0.52rem", background: nvFuel === ft ? `${netColor}22` : "#0b0b10", border: `1px solid ${nvFuel === ft ? netColor + "aa" : "#222230"}`, borderRadius: "7px", color: nvFuel === ft ? netColor : "#4b5563", fontSize: "0.6rem", fontWeight: nvFuel === ft ? 700 : 400, cursor: "pointer", transition: "all 0.15s" }}>
-                          {ft} · {(NETWORK_PRICES[activeNetwork]?.[ft] ?? FUEL_PRICES[ft] ?? 65).toFixed(1)}₽
+                          style={{ padding: "0.28rem 0.56rem", background: nvFuel === ft ? `${netColor}22` : "#0b0b10", border: `1px solid ${nvFuel === ft ? netColor + "aa" : "#222230"}`, borderRadius: "7px", color: nvFuel === ft ? netColor : "#4b5563", fontSize: "0.6rem", fontWeight: nvFuel === ft ? 700 : 400, cursor: "pointer", transition: "all 0.15s" }}>
+                          {label} · {(NETWORK_PRICES[activeNetwork]?.[ft] ?? FUEL_PRICES[ft] ?? 65).toFixed(1)}₽
                         </button>
                       ))}
                     </div>
