@@ -29,25 +29,37 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Fires when a user completes a Telegram Stars payment.
-    Payload format (set by StarsPaymentProvider): tma_{user_id}_{fuel_type}_{volume}_{station_id}
+    Station voucher payload:  tma_{user_id}_{fuel_type}_{volume}_{station_id}
+    Network voucher payload:  tmanet_{user_id}_{fuel_type}_{volume}_{network~encoded}
     """
     payment = update.message.successful_payment
     payload = payment.invoice_payload
-    stars_amount = payment.total_amount  # in Stars (XTR)
+    stars_amount = payment.total_amount
     chat_id = update.effective_chat.id
 
     logger.info("successful_payment: payload=%s stars=%d chat_id=%d", payload, stars_amount, chat_id)
 
-    # Parse payload
+    is_network = payload.startswith("tmanet_")
+
     try:
-        parts = payload.split("_", 4)  # tma, user_id, fuel_type, volume, station_id
-        if parts[0] != "tma" or len(parts) < 5:
-            raise ValueError(f"Unexpected payload format: {payload}")
-        _, user_id_str, fuel_type, volume_str, station_id_str = parts
-        user_id = int(user_id_str)
-        volume = int(volume_str)
-        station_id = int(station_id_str)
-        price_rub = round(stars_amount * STAR_RUB_RATE)
+        if is_network:
+            parts = payload.split("_", 4)  # tmanet, user_id, fuel_type, volume, network~encoded
+            if len(parts) < 5:
+                raise ValueError(f"Bad tmanet payload: {payload}")
+            _, user_id_str, fuel_type, volume_str, safe_network = parts
+            user_id = int(user_id_str)
+            volume = int(volume_str)
+            network = safe_network.replace("~", " ")
+            price_rub = round(stars_amount * STAR_RUB_RATE)
+        else:
+            parts = payload.split("_", 4)  # tma, user_id, fuel_type, volume, station_id
+            if parts[0] != "tma" or len(parts) < 5:
+                raise ValueError(f"Bad tma payload: {payload}")
+            _, user_id_str, fuel_type, volume_str, station_id_str = parts
+            user_id = int(user_id_str)
+            volume = int(volume_str)
+            station_id = int(station_id_str)
+            price_rub = round(stars_amount * STAR_RUB_RATE)
     except Exception as exc:
         logger.error("Failed to parse Stars payment payload: %s — %s", payload, exc)
         await update.message.reply_text(
@@ -59,22 +71,39 @@ async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # Record purchase in TMA backend
     try:
         async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.post(
-                f"{TMA_BACKEND_URL}/internal/record-stars-purchase",
-                json={
-                    "user_id": user_id,
-                    "fuel_type": fuel_type,
-                    "volume": volume,
-                    "station_id": station_id,
-                    "price_rub": price_rub,
-                    "stars_amount": stars_amount,
-                    "internal_secret": INTERNAL_API_SECRET,
-                },
-            )
+            if is_network:
+                resp = await client.post(
+                    f"{TMA_BACKEND_URL}/internal/record-network-stars-purchase",
+                    json={
+                        "user_id": user_id,
+                        "fuel_type": fuel_type,
+                        "volume": volume,
+                        "network": network,
+                        "price_rub": price_rub,
+                        "stars_amount": stars_amount,
+                        "internal_secret": INTERNAL_API_SECRET,
+                    },
+                )
+                label = f"Сетевой ваучер {network} {volume} л {fuel_type}"
+            else:
+                resp = await client.post(
+                    f"{TMA_BACKEND_URL}/internal/record-stars-purchase",
+                    json={
+                        "user_id": user_id,
+                        "fuel_type": fuel_type,
+                        "volume": volume,
+                        "station_id": station_id,
+                        "price_rub": price_rub,
+                        "stars_amount": stars_amount,
+                        "internal_secret": INTERNAL_API_SECRET,
+                    },
+                )
+                label = f"Ваучер {volume} л {fuel_type}"
+
         if resp.status_code == 200:
-            logger.info("Stars purchase recorded: user_id=%d fuel=%s volume=%d", user_id, fuel_type, volume)
+            logger.info("Stars purchase recorded: user_id=%d %s", user_id, label)
             await update.message.reply_text(
-                f"✅ Оплата прошла! Ваучер на {volume} л {fuel_type} активирован.\n"
+                f"✅ Оплата прошла! {label} активирован.\n"
                 f"Открой 🗄 Хранилище в приложении — там твой QR-код."
             )
         else:

@@ -221,6 +221,68 @@ class StarsPaymentProvider(PaymentProvider):
                 stars_amount=stars, error=str(exc),
             )
 
+    def create_network_invoice(
+        self,
+        user_id: int,
+        fuel_type: str,
+        volume: int,
+        price_rub: int,
+        network: str,
+    ) -> PaymentResult:
+        """Create a Stars invoice for a network-wide voucher (valid at any station of the network)."""
+        import math
+        stars = max(1, math.ceil(price_rub / self.STAR_RUB_RATE))
+        qr = generate_qr_hash(user_id, fuel_type, volume)
+        tx_id = f"STARS-NET-{secrets.token_hex(8).upper()}"
+
+        bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+        if not bot_token:
+            logger.warning("TELEGRAM_BOT_TOKEN not set — Stars network invoice cannot be created")
+            return PaymentResult(ok=True, transaction_id=tx_id, qr_hash=qr, stars_amount=stars)
+
+        # Payload: tmanet_{user_id}_{fuel_type}_{volume}_{network~encoded}
+        # Spaces encoded as ~ so underscores remain unambiguous delimiters
+        safe_network = network.replace(" ", "~")
+        payload = f"tmanet_{user_id}_{fuel_type}_{volume}_{safe_network}"
+
+        try:
+            resp = httpx.post(
+                f"https://api.telegram.org/bot{bot_token}/createInvoiceLink",
+                json={
+                    "title": f"Сетевой ваучер {network} {fuel_type} {volume}л",
+                    "description": (
+                        f"Сетевой топливный ваучер: {volume} л {fuel_type}. "
+                        f"Действителен на всех АЗС сети {network}. "
+                        f"Стоимость: ~{price_rub} ₽"
+                    ),
+                    "payload": payload,
+                    "currency": "XTR",
+                    "prices": [{"label": f"{network} {fuel_type} {volume}л", "amount": stars}],
+                },
+                timeout=10,
+            )
+            data = resp.json()
+            if data.get("ok"):
+                link: str = data["result"]
+                logger.info("Stars network invoice created: stars=%d, network=%s, user=%d", stars, network, user_id)
+                return PaymentResult(
+                    ok=True, transaction_id=tx_id, qr_hash=qr,
+                    stars_amount=stars, checkout_url=link,
+                )
+            else:
+                desc = data.get("description", "Telegram API error")
+                logger.error("createInvoiceLink (network) failed: %s", data)
+                return PaymentResult(
+                    ok=False, transaction_id=tx_id, qr_hash=qr,
+                    stars_amount=stars, error=desc,
+                )
+        except Exception as exc:
+            logger.exception("StarsPaymentProvider network invoice error: %s", exc)
+            return PaymentResult(
+                ok=False, transaction_id=tx_id, qr_hash=qr,
+                stars_amount=stars, error=str(exc),
+            )
+
 
 def get_provider(method: str = PAYMENT_METHOD) -> PaymentProvider:
     """

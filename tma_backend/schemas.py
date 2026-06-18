@@ -293,3 +293,14 @@ class StarsPurchaseIn(BaseModel):
     price_rub: int
     stars_amount: int
     internal_secret: str
+
+
+class NetworkStarsPurchaseIn(BaseModel):
+    """Posted by Telegram bot to /internal/record-network-stars-purchase after successful_payment."""
+    user_id: int
+    fuel_type: str
+    volume: int
+    network: str
+    price_rub: int
+    stars_amount: int
+    internal_secret: str

@@ -37,7 +37,7 @@ from tma_backend.payment import provider
 from tma_backend.schemas import (
     AnalyticsOut, CardOut, CheckinOut, FlipResultOut, GasStationOut,
     LeaderboardEntry, LeaderboardOut, NetworkVoucherIn, PurchaseIn, PurchaseResultOut,
-    ReferralOut, ReferralUseIn, ReferralUseOut, StarsPurchaseIn,
+    NetworkStarsPurchaseIn, ReferralOut, ReferralUseIn, ReferralUseOut, StarsPurchaseIn,
     StationReportIn, SubscriptionIn, SubscriptionOut,
     SubscriptionStatusOut, TapScoreIn, TapScoreOut, UserCreateIn, UserOut,
     VpnBuyIn, VpnInvoiceOut, VpnSessionOut, VpnStatusOut,
@@ -1598,10 +1598,11 @@ def create_network_stars_invoice(body: NetworkVoucherIn, db: Session = Depends(g
     _net_p = NETWORK_PRICES.get(body.network, {})
     price_per_l = _net_p.get(body.fuel_type) or FUEL_PRICES_RUB.get(body.fuel_type, 50)
     total_price = price_per_l * body.volume
-    from tma_backend.payment import get_provider
-    result = get_provider("stars").create_invoice(
+    from tma_backend.payment import StarsPaymentProvider
+    provider = StarsPaymentProvider()
+    result = provider.create_network_invoice(
         user_id=body.user_id, fuel_type=body.fuel_type,
-        volume=body.volume, price_rub=total_price,
+        volume=body.volume, price_rub=total_price, network=body.network,
     )
     if not result.ok:
         raise HTTPException(500, detail=result.error or "Ошибка создания инвойса Stars")
@@ -1753,6 +1754,69 @@ def record_stars_purchase(body: StarsPurchaseIn, db: Session = Depends(get_db)):
     logger.info(
         "Stars purchase recorded: user=%d, %dл %s, station=%s, qr=%s",
         body.user_id, body.volume, body.fuel_type, station_name, qr,
+    )
+    return {"ok": True, "qr_hash": qr}
+
+
+@app.post("/internal/record-network-stars-purchase")
+def record_network_stars_purchase(body: NetworkStarsPurchaseIn, db: Session = Depends(get_db)):
+    """
+    Called by Telegram bot after a successful Stars payment for a network voucher.
+    Persists the purchase to TMA DB so it appears in the user's Vault.
+    Protected by INTERNAL_API_SECRET.
+    """
+    if body.internal_secret != INTERNAL_API_SECRET:
+        raise HTTPException(403, detail="Forbidden")
+
+    from tma_backend.payment import generate_qr_hash
+
+    user = _get_or_create_user(db, body.user_id)
+    station_name = f"Любая АЗС сети {body.network}"
+
+    qr = generate_qr_hash(body.user_id, body.fuel_type, body.volume)
+    purchase = PurchaseHistory(
+        user_id=body.user_id,
+        fuel_type=body.fuel_type,
+        volume=body.volume,
+        price=body.price_rub,
+        currency="XTR",
+        status="active",
+        qr_hash=qr,
+        station_name=station_name,
+        region="Севастополь",
+        expires_at=_now() + timedelta(days=30),
+    )
+    db.add(purchase)
+
+    tomorrow = _now().replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+    tracker = (
+        db.query(DailyLimitTracker)
+        .filter(
+            DailyLimitTracker.user_id == body.user_id,
+            DailyLimitTracker.fuel_type == body.fuel_type,
+            DailyLimitTracker.reset_at > _now(),
+        )
+        .first()
+    )
+    if tracker:
+        tracker.total_volume_bought += body.volume
+    else:
+        db.add(DailyLimitTracker(
+            user_id=body.user_id,
+            fuel_type=body.fuel_type,
+            total_volume_bought=body.volume,
+            reset_at=tomorrow,
+        ))
+
+    old_level = user.level
+    user.xp += 20
+    user.level = _xp_to_level(user.xp)
+    _notify_levelup(user, old_level)
+
+    db.commit()
+    logger.info(
+        "Network Stars purchase recorded: user=%d, %dл %s, network=%s, qr=%s",
+        body.user_id, body.volume, body.fuel_type, body.network, qr,
     )
     return {"ok": True, "qr_hash": qr}
 
