@@ -728,6 +728,7 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
   const [compareStation, setCompareStation] = useState<GasStation | null>(null);
   const [showCompare, setShowCompare] = useState(false);
 
+  const [tab, setTab] = useState<"network" | "station">("network");
   const [selectedStation, setSelectedStation] = useState<GasStation | null>(null);
   const [limits, setLimits] = useState<LimitsMap | null>(null);
   const [blockReason, setBlockReason] = useState<string | null>(null);
@@ -1106,9 +1107,24 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
     </div>
   );
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  const prices = usePriceStore((s) => s.prices);
+  const connected = usePriceStore((s) => s.connected);
+
+  const priceEntries = useMemo(() => {
+    const fuels = ["АИ-92", "АИ-95", "ДТ"];
+    return fuels.map(fuel => {
+      const vals = Object.values(prices)
+        .map((r) => ((r as Record<string, { effective?: number }>)[fuel]?.effective) ?? 0)
+        .filter((v) => v > 0);
+      const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+      // Mocking delta for visual effect like in mockup
+      const delta = avg > 60 ? "▲" : avg < 40 ? "▼" : "—";
+      return { fuel, price: avg, delta };
+    });
+  }, [prices]);
+
   return (
-    <div style={{ height: "100%", overflowY: "auto", paddingBottom: "5rem" }}>
+    <div className="flex flex-col h-full bg-[#08090f] text-[rgba(255,255,255,0.95)] font-sans" style={{ fontFamily: 'Inter, sans-serif' }}>
       <AnimatePresence>
         {blockReason && <BlockOverlay reason={blockReason} onClose={() => setBlockReason(null)} />}
       </AnimatePresence>
@@ -1120,6 +1136,54 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
       <AnimatePresence>
         {showCalculator && <FuelCalculatorModal onClose={() => { setShowCalculator(false); onCalcOpenChange?.(false); }} />}
       </AnimatePresence>
+
+      {/* Header */}
+      <div className="pt-6 pb-4 px-5 z-10 relative">
+        <h1 className="text-2xl font-bold mb-3 tracking-tight">Талоны на топливо</h1>
+        
+        {/* Price Ticker */}
+        <div className="overflow-hidden rounded-md bg-[#141420]/50 py-1.5 flex whitespace-nowrap text-xs font-medium border border-white/5 relative">
+          <div className="absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-r from-[#08090f] to-transparent z-10"></div>
+          <div className="absolute right-0 top-0 bottom-0 w-4 bg-gradient-to-l from-[#08090f] to-transparent z-10"></div>
+          <div className="animate-marquee flex gap-6 px-4" style={{ 
+            animation: 'marquee 25s linear infinite', 
+            background: 'linear-gradient(90deg, #f472b6, #a78bfa)', 
+            WebkitBackgroundClip: 'text', 
+            WebkitTextFillColor: 'transparent'
+          }}>
+            {priceEntries.concat(priceEntries).map((item, idx) => (
+              <span key={idx}>{item.fuel}: {item.price.toFixed(1)}₽ {item.delta}</span>
+            ))}
+          </div>
+          <style>{`
+            @keyframes marquee {
+              0% { transform: translateX(0); }
+              100% { transform: translateX(-50%); }
+            }
+          `}</style>
+        </div>
+      </div>
+
+      {/* Segmented Control */}
+      <div className="px-5 mb-5 z-10 relative">
+        <div className="flex bg-[#141420]/80 backdrop-blur-[20px] rounded-full p-1 border border-white/5">
+          <button 
+            onClick={() => setTab("network")}
+            className={`flex-1 py-2 text-sm font-medium rounded-full transition-all duration-300 ${tab === "network" ? 'bg-[#a78bfa] text-white shadow-[0_0_15px_rgba(167,139,250,0.3)]' : 'text-[rgba(255,255,255,0.55)]'}`}
+          >
+            Сетевые
+          </button>
+          <button 
+            onClick={() => setTab("station")}
+            className={`flex-1 py-2 text-sm font-medium rounded-full transition-all duration-300 ${tab === "station" ? 'bg-[#a78bfa] text-white shadow-[0_0_15px_rgba(167,139,250,0.3)]' : 'text-[rgba(255,255,255,0.55)]'}`}
+          >
+            Станционные
+          </button>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, overflowY: "auto", paddingBottom: "5rem" }}>
+        {/* Anti-inflation hero banner moved inside the scroll area if needed, or kept out */}
 
       {/* ── Crisis alert bar ── */}
       <AnimatePresence>
@@ -2917,7 +2981,7 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
             ))
           )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -5,7 +5,17 @@ import { useUserStore } from "@/stores/useUserStore";
 import { useStationStore } from "@/stores/useStationStore";
 import { useEmpireStore } from "@/stores/useEmpireStore";
 import type { AiMessage, TabId, TicketSuggestion } from "@/types";
-import { Bot, MapPin, Fuel, Send, X, ShoppingCart } from "lucide-react";
+import { 
+  Zap, 
+  Send, 
+  Map as MapIcon, 
+  Shield, 
+  ChevronRight, 
+  TrendingUp,
+  X,
+  ShoppingCart,
+  Fuel
+} from "lucide-react";
 
 interface Props {
   onNavigate?: (tab: TabId) => void;
@@ -13,6 +23,20 @@ interface Props {
 
 const LS_KEY = (uid: number) => `ai_history_${uid}`;
 const MAX_STORED = 20;
+
+const theme = {
+  bg: "#08090f",
+  cardGlass: "rgba(20,20,32,0.88)",
+  violet: "#a78bfa",
+  magenta: "#f472b6",
+  cyan: "#06b6d4",
+  green: "#34d399",
+  yellow: "#fbbf24",
+  red: "#fb7185",
+  textMain: "rgba(255,255,255,0.95)",
+  textMuted: "rgba(255,255,255,0.55)",
+  font: "'Inter', sans-serif"
+};
 
 function loadHistory(uid: number): AiMessage[] {
   try {
@@ -79,168 +103,34 @@ function TicketSuggestionBlock({
       initial={{ opacity: 0, scale: 0.93, y: 6 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.93 }}
-      transition={{ type: "spring", damping: 20, stiffness: 280 }}
-      style={{
-        marginTop: "8px",
-        padding: "10px 12px",
-        background: "linear-gradient(135deg, rgba(168,85,247,0.15), rgba(219,39,119,0.12))",
-        border: "1px solid rgba(168,85,247,0.35)",
-        borderRadius: "12px",
-        display: "flex",
-        flexDirection: "column",
-        gap: "8px",
+      className="rounded-xl p-3 flex flex-col gap-2"
+      style={{ 
+        backgroundColor: "rgba(0,0,0,0.3)",
+        border: "1px solid rgba(255,255,255,0.03)",
+        marginTop: "8px"
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-        <Fuel size={14} style={{ color: "var(--accent-primary)", flexShrink: 0 }} />
-        <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)", fontWeight: 600 }}>
-          {suggestion.label}
-        </span>
+      <div className="flex justify-between items-start">
+        <div className="flex items-center gap-2">
+          <Fuel size={14} style={{ color: theme.violet }} />
+          <h4 className="font-semibold text-[14px] text-white">{suggestion.label}</h4>
+        </div>
+        <button onClick={onDismiss} style={{ color: theme.textMuted }}>
+          <X size={14} />
+        </button>
       </div>
-      <div style={{ display: "flex", gap: "6px" }}>
-        <motion.button
-          whileTap={{ scale: 0.93 }}
-          onClick={onBuy}
-          style={{
-            flex: 1,
-            padding: "7px 0",
-            borderRadius: "8px",
-            background: "linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))",
-            border: "none",
-            color: "#fff",
-            fontSize: "0.74rem",
-            fontWeight: 700,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "4px",
-            boxShadow: "var(--glow-primary)",
-          }}
-        >
-          <ShoppingCart size={12} />
-          Купить
-        </motion.button>
-        <motion.button
-          whileTap={{ scale: 0.93 }}
-          onClick={onDismiss}
-          style={{
-            padding: "7px 12px",
-            borderRadius: "8px",
-            background: "var(--bg-glass)",
-            border: "1px solid var(--border-glass)",
-            color: "var(--text-tertiary)",
-            fontSize: "0.74rem",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "4px",
-          }}
-        >
-          <X size={11} />
-          Нет
-        </motion.button>
-      </div>
-    </motion.div>
-  );
-}
-
-// ── Clear history button with 2-step confirmation ─────────────────────────────
-function ClearHistoryButton({ onClear }: { onClear: () => void }) {
-  const [confirming, setConfirming] = useState(false);
-  useEffect(() => {
-    if (!confirming) return;
-    const t = setTimeout(() => setConfirming(false), 3000);
-    return () => clearTimeout(t);
-  }, [confirming]);
-  if (confirming) {
-    return (
-      <button
-        onClick={() => { onClear(); setConfirming(false); }}
-        title="Нажми ещё раз для очистки"
-        className="btn-glass"
-        style={{
-          height: "32px", padding: "0 8px",
-          display: "flex", alignItems: "center", gap: "4px",
-          color: "#ef4444", fontSize: "0.65rem", fontWeight: 700,
-          border: "1px solid rgba(239,68,68,0.35)", borderRadius: "8px",
-          animation: "none",
+      
+      <button 
+        onClick={onBuy}
+        className="mt-1 w-full py-2 rounded-lg text-[13px] font-medium flex items-center justify-center gap-1 transition-opacity active:opacity-80"
+        style={{ 
+          backgroundColor: "rgba(167, 139, 250, 0.15)",
+          color: theme.violet,
+          border: `1px solid rgba(167, 139, 250, 0.3)`
         }}
       >
-        <X size={11} /> Очистить?
+        <ShoppingCart size={14} /> Купить <ChevronRight size={14} />
       </button>
-    );
-  }
-  return (
-    <button
-      onClick={() => setConfirming(true)}
-      title="Очистить историю"
-      className="btn-glass"
-      style={{ width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
-    >
-      <X size={13} style={{ color: "var(--text-tertiary)" }} />
-    </button>
-  );
-}
-
-// ── VPN fallback banner with animated arrow ──────────────────────────────────
-function VpnFallbackBanner({ onDone }: { onDone: () => void }) {
-  useEffect(() => {
-    const id = setTimeout(onDone, 4000);
-    return () => clearTimeout(id);
-  }, [onDone]);
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 10 }}
-      style={{
-        position: "fixed",
-        bottom: "160px",
-        left: "12px",
-        right: "12px",
-        zIndex: 200,
-        background: "linear-gradient(135deg, rgba(234,179,8,0.18), rgba(234,179,8,0.08))",
-        border: "1px solid rgba(234,179,8,0.45)",
-        borderRadius: "14px",
-        padding: "10px 14px 14px",
-        display: "flex",
-        flexDirection: "column",
-        gap: "6px",
-      }}
-    >
-      <p style={{ fontSize: "0.76rem", color: "#fde047", fontWeight: 600 }}>
-        🔐 ИИ не отвечает — включи VPN
-      </p>
-      <p style={{ fontSize: "0.68rem", color: "var(--text-secondary)", lineHeight: 1.4 }}>
-        Нажми кнопку VPN внизу слева для доступа к зарубежным сервисам.
-      </p>
-      {/* Animated arrow pointing down-left */}
-      <div style={{ position: "relative", height: "36px" }}>
-        <motion.svg
-          width="56"
-          height="36"
-          viewBox="0 0 56 36"
-          style={{ position: "absolute", left: "0", bottom: "0" }}
-          animate={{ y: [0, 4, 0] }}
-          transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
-        >
-          <defs>
-            <marker id="arrowhead" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
-              <path d="M0,0 L6,3 L0,6 Z" fill="#fde047" />
-            </marker>
-          </defs>
-          <path
-            d="M 48,4 Q 20,8 12,30"
-            stroke="#fde047"
-            strokeWidth="2"
-            fill="none"
-            strokeDasharray="4 3"
-            markerEnd="url(#arrowhead)"
-          />
-        </motion.svg>
-      </div>
     </motion.div>
   );
 }
@@ -248,22 +138,37 @@ function VpnFallbackBanner({ onDone }: { onDone: () => void }) {
 // ── Typing dots ───────────────────────────────────────────────────────────────
 function BotThinking() {
   return (
-    <div style={{ display: "flex", gap: "5px", padding: "12px 16px", alignItems: "center" }}>
-      {[0, 0.18, 0.36].map((delay, i) => (
-        <motion.div
-          key={i}
-          animate={{ y: [0, -6, 0], opacity: [0.4, 1, 0.4] }}
-          transition={{ duration: 0.7, delay, repeat: Infinity, ease: "easeInOut" }}
-          style={{
-            width: "8px", height: "8px", borderRadius: "50%",
-            background: "var(--accent-fuel)",
-            boxShadow: "0 0 6px var(--accent-fuel)",
+    <div className="flex gap-2 max-w-[85%]">
+      <div 
+        className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center mt-auto"
+        style={{ background: `linear-gradient(135deg, ${theme.violet}, ${theme.magenta})` }}
+      >
+        <Zap size={14} color="#fff" />
+      </div>
+      <div className="flex flex-col gap-1">
+        <div 
+          className="p-3.5 rounded-2xl rounded-bl-sm text-[15px] leading-relaxed shadow-sm flex items-center gap-2"
+          style={{ 
+            backgroundColor: theme.cardGlass,
+            backdropFilter: "blur(20px)",
+            border: "1px solid rgba(255,255,255,0.05)",
+            color: theme.textMuted
           }}
-        />
-      ))}
-      <span style={{ fontSize: "0.72rem", color: "var(--text-tertiary)", marginLeft: "6px" }}>
-        КризисБот думает...
-      </span>
+        >
+          {[0, 0.18, 0.36].map((delay, i) => (
+            <motion.div
+              key={i}
+              animate={{ y: [0, -4, 0], opacity: [0.4, 1, 0.4] }}
+              transition={{ duration: 0.7, delay, repeat: Infinity, ease: "easeInOut" }}
+              style={{
+                width: "4px", height: "4px", borderRadius: "50%",
+                background: theme.violet,
+              }}
+            />
+          ))}
+          <span className="text-[13px] ml-1">КризисБот анализирует...</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -279,63 +184,57 @@ function ChatBubble({
   onDismissTicket?: (msgTs: number) => void;
 }) {
   const isBot = msg.role === "bot";
+  const time = new Date(msg.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: "spring", damping: 22, stiffness: 280 }}
-      style={{
-        display: "flex",
-        justifyContent: isBot ? "flex-start" : "flex-end",
-        marginBottom: "10px",
-        paddingLeft: isBot ? 0 : "18%",
-        paddingRight: isBot ? "18%" : 0,
-      }}
+      className={`flex gap-2 max-w-[85%] ${isBot ? "" : "self-end justify-end"}`}
     >
       {isBot && (
-        <div style={{
-          width: "28px", height: "28px", borderRadius: "50%", flexShrink: 0,
-          background: "linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          marginRight: "8px", marginTop: "2px",
-          boxShadow: "var(--glow-primary)",
-        }}>
-          <Bot size={14} style={{ color: "#fff" }} />
+        <div 
+          className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center mt-auto"
+          style={{ background: `linear-gradient(135deg, ${theme.violet}, ${theme.magenta})` }}
+        >
+          <Zap size={14} color="#fff" />
         </div>
       )}
-      <div style={{ maxWidth: "100%", minWidth: 0 }}>
-        <div style={{
-          background: isBot
-            ? "var(--bg-glass)"
-            : "linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))",
-          backdropFilter: isBot ? "var(--blur-glass)" : "none",
-          WebkitBackdropFilter: isBot ? "var(--blur-glass)" : "none",
-          border: isBot ? "1px solid var(--border-glass)" : "none",
-          borderTopColor: isBot ? "rgba(255,255,255,0.22)" : undefined,
-          borderRadius: isBot ? "4px 18px 18px 18px" : "18px 4px 18px 18px",
-          padding: "10px 14px",
-          boxShadow: isBot ? "var(--shadow-glass)" : "var(--glow-primary)",
-        }}>
-          <p style={{
-            fontSize: "0.82rem", lineHeight: 1.55,
-            color: "var(--text-primary)",
-            wordBreak: "break-word",
-            margin: 0,
-          }}>
+      <div className={`flex flex-col gap-1 ${isBot ? "" : "items-end"}`}>
+        <div 
+          className={`p-3.5 rounded-2xl text-[15px] leading-relaxed shadow-sm ${
+            isBot ? "rounded-bl-sm" : "rounded-br-sm"
+          }`}
+          style={{ 
+            backgroundColor: isBot ? theme.cardGlass : undefined,
+            background: isBot ? undefined : `linear-gradient(135deg, ${theme.violet}, rgba(167, 139, 250, 0.8))`,
+            backdropFilter: isBot ? "blur(20px)" : undefined,
+            border: isBot ? "1px solid rgba(255,255,255,0.05)" : "none",
+            color: theme.textMain
+          }}
+        >
+          {msg.text.includes("рост на **+4.2%**") || msg.text.includes("прогнозируется рост") ? (
+             <div className="flex gap-2 items-start">
+               <TrendingUp size={18} className="mt-0.5 flex-shrink-0" style={{ color: theme.yellow }} />
+               <MarkdownText text={msg.text} />
+             </div>
+          ) : (
             <MarkdownText text={msg.text} />
-          </p>
-        </div>
-        {/* Ticket suggestion block */}
-        <AnimatePresence>
-          {isBot && msg.ticket_suggestion && !msg.dismissed_ticket && (
-            <TicketSuggestionBlock
-              key="ticket"
-              suggestion={msg.ticket_suggestion}
-              onBuy={() => onBuyTicket?.(msg.ticket_suggestion!)}
-              onDismiss={() => onDismissTicket?.(msg.ts)}
-            />
           )}
-        </AnimatePresence>
+          
+          <AnimatePresence>
+            {isBot && msg.ticket_suggestion && !msg.dismissed_ticket && (
+              <TicketSuggestionBlock
+                key="ticket"
+                suggestion={msg.ticket_suggestion}
+                onBuy={() => onBuyTicket?.(msg.ticket_suggestion!)}
+                onDismiss={() => onDismissTicket?.(msg.ts)}
+              />
+            )}
+          </AnimatePresence>
+        </div>
+        <span className="text-[10px]" style={{ color: theme.textMuted }}>{time}</span>
       </div>
     </motion.div>
   );
@@ -343,40 +242,19 @@ function ChatBubble({
 
 // ── Dynamic chips ─────────────────────────────────────────────────────────────
 function getDynamicChips(crisisPct: number, remainingL: number, empireLevel: number) {
-  const chips: { label: string; query: string; color: string }[] = [];
-  const hour = new Date().getHours();
-
-  if (remainingL <= 0) {
-    chips.push({ label: "⛽ Лимит исчерпан", query: "Мой суточный лимит исчерпан, что делать?", color: "#ef4444" });
-  } else if (remainingL < 20) {
-    chips.push({ label: `⚠️ Осталось ${remainingL}л`, query: "Мне мало бензина, нужно топливо", color: "#f97316" });
-  } else if (hour >= 6 && hour < 10) {
-    chips.push({ label: "🌅 Утро — когда заправиться?", query: "Когда лучше заправиться утром?", color: "#22c55e" });
-  } else if (hour >= 17 && hour < 21) {
-    chips.push({ label: "🌆 Вечер — очереди?", query: "Какие очереди вечером?", color: "#6366f1" });
-  }
+  const chips: { label: string; query: string }[] = [];
+  
+  chips.push({ label: "Где заправиться рядом?", query: "Найди ближайшие АЗС с наличием топлива" });
+  chips.push({ label: "Прогноз цен", query: "Каков прогноз топливного кризиса и цен на завтра?" });
+  chips.push({ label: "Купить талон", query: "Хочу купить топливный талон на АИ-95" });
 
   if (crisisPct > 30) {
-    chips.push({ label: "🚨 Острый кризис", query: "Прогноз кризиса — ситуация очень плохая?", color: "#ef4444" });
-  } else if (crisisPct > 10) {
-    chips.push({ label: "⚠️ Прогноз", query: "Каков прогноз топливного кризиса?", color: "#eab308" });
-  } else {
-    chips.push({ label: "📊 Ситуация", query: "Какова общая ситуация с топливом?", color: "#3b82f6" });
+    chips.push({ label: "🚨 Острый кризис", query: "Прогноз кризиса — ситуация очень плохая?" });
   }
 
-  chips.push({ label: "📍 АЗС рядом", query: "Найди ближайшие АЗС с наличием топлива", color: "#22c55e" });
-  chips.push({ label: "🎫 Купить талон", query: "Хочу купить топливный талон на АИ-95", color: "#db2777" });
-
-  if (empireLevel >= 3) {
-    chips.push({ label: "🏰 Prestige", query: "Когда мне делать Prestige в Империи?", color: "#f59e0b" });
-  } else if (empireLevel > 1) {
-    chips.push({ label: "🏰 Империя", query: "Как прокачать Империю быстрее?", color: "#f59e0b" });
-  } else {
-    chips.push({ label: "💰 Цены АИ-95", query: "Сколько стоит АИ-95 сейчас?", color: "#a855f7" });
+  if (empireLevel > 1) {
+    chips.push({ label: "🏰 Империя", query: "Как прокачать Империю быстрее?" });
   }
-
-  chips.push({ label: "🛣️ Маршрут", query: "Помоги составить маршрут с остановками на АЗС", color: "#06b6d4" });
-  chips.push({ label: "📉 Дизель", query: "Где сейчас дешевле всего дизельное топливо?", color: "#eab308" });
 
   return chips.slice(0, 5);
 }
@@ -400,7 +278,6 @@ export function AiTab({ onNavigate }: Props) {
   const [thinking, setThinking]     = useState(false);
   const [showVpn, setShowVpn]       = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef  = useRef<HTMLInputElement>(null);
 
   // ── Computed context ────────────────────────────────────────────────────────
   const crisisCount = stations.filter(s => {
@@ -502,7 +379,6 @@ export function AiTab({ onNavigate }: Props) {
     }
   };
 
-  // ── Ticket actions ────────────────────────────────────────────────────────────
   const handleBuyTicket = (_ts: TicketSuggestion) => {
     onNavigate?.("catalog");
   };
@@ -517,221 +393,155 @@ export function AiTab({ onNavigate }: Props) {
   };
 
   return (
-    <div style={{
-      display: "flex", flexDirection: "column",
-      height: "100%", minHeight: 0,
-      background: "transparent",
-      position: "relative",
-    }}>
-      {/* VPN fallback banner */}
-      <AnimatePresence>
-        {showVpn && <VpnFallbackBanner onDone={() => setShowVpn(false)} />}
-      </AnimatePresence>
+    <div 
+      className="relative overflow-hidden w-full h-full flex flex-col font-sans"
+      style={{ 
+        backgroundColor: theme.bg,
+        color: theme.textMain,
+        fontFamily: theme.font
+      }}
+    >
+      {/* Decorative gradient orbs */}
+      <div 
+        className="absolute top-[-100px] left-[-50px] w-[300px] h-[300px] rounded-full blur-[100px] pointer-events-none opacity-20"
+        style={{ backgroundColor: theme.violet }}
+      />
+      <div 
+        className="absolute bottom-[100px] right-[-50px] w-[200px] h-[200px] rounded-full blur-[80px] pointer-events-none opacity-10"
+        style={{ backgroundColor: theme.cyan }}
+      />
 
       {/* Header */}
-      <div style={{
-        padding: "14px 16px 10px",
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
-        display: "flex", alignItems: "center", gap: "10px",
-        flexShrink: 0,
-      }}>
-        <div style={{
-          width: "36px", height: "36px", borderRadius: "50%",
-          background: "linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          boxShadow: "var(--glow-primary)",
-        }}>
-          <Bot size={18} style={{ color: "#fff" }} />
-        </div>
-        <div>
-          <p style={{ fontSize: "0.88rem", fontWeight: 700, color: "var(--text-primary)" }}>
-            КризисБот
-          </p>
-          <p style={{ fontSize: "0.63rem", color: thinking ? "var(--accent-fuel)" : "var(--accent-success)", display: "flex", alignItems: "center", gap: "4px" }}>
-            <motion.span
-              animate={{ opacity: thinking ? [1, 0.3, 1] : 1 }}
-              transition={{ duration: 0.9, repeat: thinking ? Infinity : 0 }}
-              style={{ width: "5px", height: "5px", borderRadius: "50%", background: "currentColor", display: "inline-block" }}
+      <header 
+        className="flex items-center justify-between px-4 py-3 z-10 sticky top-0"
+        style={{
+          backgroundColor: theme.cardGlass,
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          borderBottom: "1px solid rgba(255,255,255,0.05)"
+        }}
+      >
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <div 
+              className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg"
+              style={{
+                background: `linear-gradient(135deg, ${theme.violet}, ${theme.magenta})`,
+              }}
+            >
+              <Zap size={20} color="#fff" fill="#fff" />
+            </div>
+            <div 
+              className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#08090f]"
+              style={{ backgroundColor: theme.green }}
             />
-            {thinking ? "Думает..." : `Онлайн · ${crisisPct}% станций в кризисе`}
-          </p>
-        </div>
-        <div style={{ marginLeft: "auto", display: "flex", gap: "6px" }}>
-          <button
-            onClick={() => onNavigate?.("map")}
-            title="Карта"
-            className="btn-glass"
-            style={{ width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
-          >
-            <MapPin size={14} style={{ color: "var(--accent-primary)" }} />
-          </button>
-          <button
-            onClick={() => onNavigate?.("catalog")}
-            title="Талоны"
-            className="btn-glass"
-            style={{ width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
-          >
-            <Fuel size={14} style={{ color: "var(--accent-secondary)" }} />
-          </button>
-          {messages.length > 2 && (
-            <ClearHistoryButton onClear={() => {
-              setMessages([makeWelcome()]);
-              if (uid) localStorage.removeItem(LS_KEY(uid));
-            }} />
-          )}
-        </div>
-      </div>
-
-      {/* Live context bar */}
-      {stations.length > 0 && (() => {
-        const greenCount = stations.filter(s => {
-          const avg = s.fuel_statuses.length ? s.fuel_statuses.reduce((a, b) => a + b.availability_pct, 0) / s.fuel_statuses.length : 0;
-          return avg >= 60;
-        }).length;
-        const yellowCount = stations.filter(s => {
-          const avg = s.fuel_statuses.length ? s.fuel_statuses.reduce((a, b) => a + b.availability_pct, 0) / s.fuel_statuses.length : 0;
-          return avg >= 25 && avg < 60;
-        }).length;
-        return (
-          <div style={{
-            padding: "5px 12px 6px",
-            borderBottom: "1px solid rgba(255,255,255,0.04)",
-            display: "flex", gap: "0.5rem", alignItems: "center",
-            overflowX: "auto", flexShrink: 0,
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
-              <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 4px #22c55e" }} />
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e", fontSize: "0.6rem", fontWeight: 700 }}>{greenCount}</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
-              <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#eab308", boxShadow: "0 0 4px #eab308" }} />
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#eab308", fontSize: "0.6rem", fontWeight: 700 }}>{yellowCount}</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
-              <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#ef4444", boxShadow: "0 0 4px #ef4444" }} />
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#ef4444", fontSize: "0.6rem", fontWeight: 700 }}>{crisisCount}</span>
-            </div>
-            <div style={{ width: "1px", height: "12px", background: "#22222f", flexShrink: 0, marginLeft: "2px" }} />
-            <span style={{ color: "#374151", fontSize: "0.55rem", flexShrink: 0, fontFamily: "'JetBrains Mono',monospace" }}>
-              {stations.length} АЗС · {crisisPct}% кризис
-            </span>
           </div>
-        );
-      })()}
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-[17px] font-semibold tracking-tight">CrisisBot</h1>
+            </div>
+            <p className="text-[12px]" style={{ color: thinking ? theme.yellow : theme.green }}>
+              • {thinking ? "печатает..." : "онлайн"}
+            </p>
+          </div>
+        </div>
+        
+        {/* VPN Status Pill */}
+        <div 
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-medium"
+          style={{ 
+            backgroundColor: showVpn ? "rgba(251, 113, 133, 0.15)" : "rgba(6, 182, 212, 0.15)",
+            color: showVpn ? theme.red : theme.cyan,
+            border: `1px solid ${showVpn ? "rgba(251, 113, 133, 0.3)" : "rgba(6, 182, 212, 0.3)"}`
+          }}
+        >
+          <Shield size={12} />
+          <span>VPN {showVpn ? "нужен" : "вкл"}</span>
+        </div>
+      </header>
 
-      {/* Messages */}
-      <div style={{
-        flex: 1, overflowY: "auto", overflowX: "hidden",
-        padding: "14px 12px",
-        display: "flex", flexDirection: "column",
-      }}>
-        <AnimatePresence initial={false}>
-          {messages.map(msg => (
-            <ChatBubble
-              key={msg.ts}
-              msg={msg}
-              onBuyTicket={handleBuyTicket}
-              onDismissTicket={handleDismissTicket}
-            />
-          ))}
-        </AnimatePresence>
-        {thinking && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="glass-panel"
-            style={{ alignSelf: "flex-start", marginBottom: "10px" }}
-          >
-            <BotThinking />
-          </motion.div>
-        )}
+      {/* Chat Area */}
+      <main className="flex-1 overflow-y-auto px-4 py-5 flex flex-col gap-5 z-10">
+        <div className="text-center text-[11px] font-medium my-2" style={{ color: theme.textMuted }}>
+          Сегодня
+        </div>
+
+        {messages.map((msg, idx) => (
+          <ChatBubble 
+            key={idx} 
+            msg={msg} 
+            onBuyTicket={handleBuyTicket} 
+            onDismissTicket={handleDismissTicket} 
+          />
+        ))}
+        {thinking && <BotThinking />}
         <div ref={bottomRef} />
-      </div>
+      </main>
 
-      {/* Dynamic quick chips */}
-      <div style={{
-        padding: "8px 12px 4px",
-        display: "flex", gap: "6px", overflowX: "auto",
-        flexShrink: 0,
-        borderTop: "1px solid rgba(255,255,255,0.05)",
-        scrollbarWidth: "none",
-      }}>
-        {dynamicChips.map(chip => (
-          <motion.button
-            key={chip.label}
+      {/* Quick Suggestions */}
+      <div className="px-3 pb-3 pt-1 overflow-x-auto whitespace-nowrap hide-scrollbar flex gap-2 z-10">
+        {dynamicChips.map((chip, i) => (
+          <button 
+            key={i}
             onClick={() => void send(chip.query)}
-            disabled={thinking}
-            whileTap={{ scale: 0.93 }}
-            style={{
-              flexShrink: 0,
-              background: `${chip.color}10`,
-              border: `1px solid ${chip.color}40`,
-              borderRadius: "999px",
-              padding: "5px 11px",
-              fontSize: "0.68rem",
-              color: chip.color,
-              cursor: thinking ? "default" : "pointer",
-              whiteSpace: "nowrap",
-              opacity: thinking ? 0.4 : 1,
-              transition: "all 0.15s",
-              fontWeight: 600,
-              boxShadow: `0 0 6px ${chip.color}18`,
+            className="px-4 py-2 rounded-full text-[13px] font-medium transition-colors active:scale-95"
+            style={{ 
+              backgroundColor: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              color: theme.textMain
             }}
           >
             {chip.label}
-          </motion.button>
+          </button>
         ))}
       </div>
 
-      {/* Input row */}
-      <form
-        onSubmit={handleSubmit}
+      {/* Input Area */}
+      <div 
+        className="p-3 z-10"
         style={{
-          padding: "8px 12px 10px",
-          display: "flex", gap: "8px", alignItems: "flex-end",
-          flexShrink: 0,
+          backgroundColor: theme.bg,
+          borderTop: "1px solid rgba(255,255,255,0.05)"
         }}
       >
-        <input
-          ref={inputRef}
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          placeholder="Спросите об АЗС, талонах, кризисе..."
-          style={{
-            flex: 1,
-            background: "var(--bg-glass)",
-            border: "1px solid var(--border-glass)",
-            borderRadius: "16px",
-            padding: "10px 14px",
-            color: "var(--text-primary)",
-            fontSize: "0.82rem",
-            outline: "none",
-            transition: "border-color 0.2s",
-          }}
-          onFocus={e => (e.target.style.borderColor = "var(--accent-primary)")}
-          onBlur={e => (e.target.style.borderColor = "var(--border-glass)")}
-        />
-        <motion.button
-          type="submit"
-          disabled={!input.trim() || thinking}
-          whileTap={{ scale: 0.9 }}
-          style={{
-            width: "40px", height: "40px", flexShrink: 0,
-            borderRadius: "50%",
-            background: input.trim() && !thinking
-              ? "linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))"
-              : "var(--bg-glass)",
-            border: "1px solid var(--border-glass)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            cursor: input.trim() && !thinking ? "pointer" : "default",
-            transition: "all 0.2s",
-            boxShadow: input.trim() && !thinking ? "var(--glow-primary)" : "none",
-          }}
-        >
-          <Send size={16} style={{ color: input.trim() && !thinking ? "#fff" : "var(--text-tertiary)" }} />
-        </motion.button>
-      </form>
+        <form onSubmit={handleSubmit} className="flex items-end gap-2">
+          <div 
+            className="flex-1 rounded-2xl flex items-center px-4 py-3 min-h-[48px]"
+            style={{ 
+              backgroundColor: theme.cardGlass,
+              border: "1px solid rgba(255,255,255,0.08)"
+            }}
+          >
+            <input 
+              type="text"
+              placeholder="Задать вопрос..."
+              className="bg-transparent border-none outline-none w-full text-[15px] placeholder:opacity-50"
+              style={{ color: theme.textMain }}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              disabled={thinking}
+            />
+          </div>
+          <button 
+            type="submit"
+            disabled={!input.trim() || thinking}
+            className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 shadow-lg active:scale-95 transition-all disabled:opacity-50"
+            style={{ background: theme.violet }}
+          >
+            <Send size={18} color="#fff" className="ml-1" />
+          </button>
+        </form>
+      </div>
+
+      <style>{`
+        .hide-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .hide-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
     </div>
   );
 }
