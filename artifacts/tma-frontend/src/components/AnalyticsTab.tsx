@@ -900,11 +900,6 @@ function FuelPriceBreakdown() {
           );
         })}
       </div>
-      {lastUpdated && (
-        <p style={{ margin: "0.3rem 0 0", color: "rgba(255,255,255,0.45)", fontSize: "0.52rem", fontFamily: "'JetBrains Mono',monospace" }}>
-          ⏱ Данные: {lastUpdated.toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" })}
-        </p>
-      )}
     </div>
   );
 }
@@ -1020,11 +1015,6 @@ function AIPricePredictions() {
               );
             })}
           </div>
-        )}
-        {lastUpdated && (
-          <p style={{ margin: "0 0 0.55rem", color: "rgba(255,255,255,0.45)", fontSize: "0.53rem", fontFamily: "'JetBrains Mono',monospace" }}>
-            Обновлено: {lastUpdated.toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-          </p>
         )}
         <div style={{ background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.14)", borderRadius: "8px", padding: "0.45rem 0.6rem" }}>
           <p style={{ margin: 0, color: "rgba(255,255,255,0.65)", fontSize: "0.57rem", lineHeight: 1.55 }}>
@@ -1162,9 +1152,7 @@ export function AnalyticsTab({ onNavigate }: Props) {
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ fontSize: "0.52rem", color: "rgba(255,255,255,0.45)", fontFamily: "'JetBrains Mono',monospace" }}>
-                {lastRefreshed
-                  ? `${lastRefreshed.toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" })} · ${stations.length > 0 ? stations.length.toLocaleString("ru") : "1000+"} АЗС`
-                  : `${stations.length > 0 ? stations.length.toLocaleString("ru") : "1000+"} АЗС`}
+                {stations.length > 0 ? stations.length.toLocaleString("ru") : "1000+"} АЗС
               </span>
               <button
                 onClick={async () => { setRefreshing(true); await Promise.all([loadAnalytics(), loadTrend()]).catch(() => {}); setRefreshing(false); }}
@@ -1634,7 +1622,6 @@ function NewsFeed() {
             <p style={{ margin: 0, color: "#e2e8f0", fontSize: "0.82rem", fontWeight: 800, lineHeight: 1 }}>Лента событий</p>
             <p style={{ margin: "0.1rem 0 0", color: "rgba(255,255,255,0.55)", fontSize: "0.58rem" }}>
               {news.length > 0 ? `${news.length} событий` : "нажмите для загрузки"}
-              {lastNewsRefresh && ` · ${lastNewsRefresh.toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" })}`}
             </p>
           </div>
           {criticalCount > 0 && (
@@ -1693,10 +1680,9 @@ function NewsFeed() {
             ))}
           </div>
 
-          {lastNewsRefresh && (
+          {(searchQuery || filterSeverity) && lastNewsRefresh && (
             <p style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.6rem", margin: "0 0 0.1rem", textAlign: "right" }}>
-              Обновлено: {lastNewsRefresh.toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" })}
-              {(searchQuery || filterSeverity) && <span style={{ color: "#a855f7" }}> · {displayedNews.length} из {news.length}</span>}
+              <span style={{ color: "#a855f7" }}>{displayedNews.length} из {news.length}</span>
             </p>
           )}
           {displayedNews.length === 0 && (
