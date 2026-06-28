@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Search, SlidersHorizontal } from "lucide-react";
 import { impact } from "@/lib/haptic";
 import { MapContainer, TileLayer, useMap, useMapEvents, Rectangle, Tooltip } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
@@ -377,6 +378,7 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
       }}
     >
       {/* Filter Bar — clean: Filters button + Search only */}
+      {/* ── Top floating controls: glass search bar + fuel chips ── */}
       <div
         style={{
           position: "absolute",
@@ -385,183 +387,172 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
           right: "0.75rem",
           zIndex: 1000,
           display: "flex",
+          flexDirection: "column",
           gap: "0.5rem",
-          alignItems: "center",
         }}
       >
-        {/* Фильтры button */}
-        <button
-          onClick={() => { setShowFilters(!showFilters); impact("light"); }}
-          style={{
-            background: activeFilterCount > 0 || showFavoritesOnly
-              ? "rgba(168,85,247,0.15)"
-              : "rgba(20,20,28,0.92)",
-            border: `1px solid ${activeFilterCount > 0 || showFavoritesOnly ? "#a855f755" : "#22222f"}`,
-            borderRadius: "10px",
-            color: activeFilterCount > 0 || showFavoritesOnly ? "#c084fc" : "#e2e8f0",
-            padding: "0.4rem 0.75rem",
-            fontSize: "0.75rem",
-            cursor: "pointer",
-            backdropFilter: "blur(12px)",
-            display: "flex",
-            alignItems: "center",
-            gap: "0.3rem",
-            fontWeight: 600,
-            flexShrink: 0,
-            boxShadow: activeFilterCount > 0 || showFavoritesOnly ? "0 0 10px rgba(168,85,247,0.25)" : "none",
-            transition: "all 0.2s",
-          }}
-        >
-          ⬡ Фильтры
-          {(activeFilterCount > 0 || showFavoritesOnly) && (
-            <span style={{
-              background: "#a855f7",
-              borderRadius: "8px",
-              color: "#fff",
-              fontSize: "0.62rem",
-              fontWeight: 800,
-              padding: "0.05rem 0.38rem",
-              lineHeight: "1.5",
-              minWidth: "1.1rem",
-              textAlign: "center",
-              boxShadow: "0 0 6px #a855f7",
-              fontFamily: "'JetBrains Mono',monospace",
-            }}>
-              {activeFilterCount + (showFavoritesOnly ? 1 : 0)}
-            </span>
-          )}
-        </button>
-
-        {/* Search — takes all remaining space */}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", flex: 1 }}>
-          <button
-            onClick={() => {
-              setSearchOpen((v) => !v);
-              if (!searchOpen) {
-                setTimeout(() => searchRef.current?.focus(), 80);
-              } else {
-                setSearchQuery("");
-              }
-              impact("light");
+        {/* Glass Search Bar */}
+        <div style={{
+          position: "relative",
+          display: "flex",
+          alignItems: "center",
+          background: "rgba(20,20,32,0.88)",
+          backdropFilter: "blur(20px)",
+          border: "1px solid rgba(255,255,255,0.06)",
+          borderRadius: "16px",
+          height: "52px",
+          padding: "0 1rem",
+          boxShadow: "0 4px 24px rgba(0,0,0,0.5)",
+          gap: "0.5rem",
+        }}>
+          <Search size={18} style={{ color: "rgba(255,255,255,0.4)", flexShrink: 0 }} />
+          <input
+            ref={searchRef}
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => setMapSearchFocused(true)}
+            onBlur={() => setTimeout(() => setMapSearchFocused(false), 160)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") jumpToSearchResult();
+              if (e.key === "Escape") { setSearchOpen(false); setSearchQuery(""); }
             }}
+            placeholder="Поиск АЗС..."
             style={{
-              background: (searchOpen || searchQuery) ? "rgba(219,39,119,0.15)" : "rgba(20,20,28,0.92)",
-              border: `1px solid ${(searchOpen || searchQuery) ? "#db277755" : "#22222f"}`,
-              borderRadius: "10px",
-              color: (searchOpen || searchQuery) ? "#f472b6" : "#9ca3af",
-              padding: "0.4rem 0.6rem",
-              fontSize: "0.78rem",
-              cursor: "pointer",
-              backdropFilter: "blur(12px)",
-              flexShrink: 0,
-              transition: "all 0.2s",
+              flex: 1,
+              background: "transparent",
+              border: "none",
+              outline: "none",
+              color: "rgba(255,255,255,0.95)",
+              fontSize: "1rem",
+              fontFamily: "system-ui, sans-serif",
             }}
-            title="Поиск АЗС"
+          />
+          {searchQuery && (
+            <button
+              onClick={jumpToSearchResult}
+              style={{
+                background: filtered.length > 0 ? "rgba(219,39,119,0.15)" : "rgba(239,68,68,0.12)",
+                border: `1px solid ${filtered.length > 0 ? "#db277744" : "#ef444444"}`,
+                borderRadius: "8px",
+                padding: "0.2rem 0.5rem",
+                color: filtered.length > 0 ? "#f472b6" : "#ef4444",
+                fontSize: "0.62rem",
+                fontFamily: "'JetBrains Mono',monospace",
+                cursor: filtered.length > 0 ? "pointer" : "default",
+                flexShrink: 0,
+              }}
+            >
+              {filtered.length > 0 ? `${filtered.length} →` : "0"}
+            </button>
+          )}
+          <div style={{ width: "1px", height: "22px", background: "rgba(255,255,255,0.08)", flexShrink: 0 }} />
+          <button
+            onClick={() => { setShowFilters(!showFilters); impact("light"); }}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: "0.25rem",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              position: "relative",
+              flexShrink: 0,
+            }}
           >
-            🔍
+            <SlidersHorizontal size={20} style={{ color: activeFilterCount > 0 || showFavoritesOnly ? "#a78bfa" : "rgba(255,255,255,0.5)" }} />
+            {(activeFilterCount > 0 || showFavoritesOnly) && (
+              <span style={{
+                position: "absolute",
+                top: "0",
+                right: "0",
+                width: "7px",
+                height: "7px",
+                background: "#a855f7",
+                borderRadius: "50%",
+                boxShadow: "0 0 5px #a855f7",
+              }} />
+            )}
           </button>
+
+          {/* Recent searches dropdown */}
           <AnimatePresence>
-            {searchOpen && (
+            {mapSearchFocused && !searchQuery && mapRecentSearches.length > 0 && (
               <motion.div
-                initial={{ width: 0, opacity: 0 }}
-                animate={{ width: "auto", opacity: 1 }}
-                exit={{ width: 0, opacity: 0 }}
-                style={{ overflow: "hidden", flex: 1, position: "relative" }}
+                initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                transition={{ duration: 0.15 }}
+                style={{
+                  position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0,
+                  background: "rgba(8,7,16,0.98)", backdropFilter: "blur(24px)",
+                  border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px",
+                  padding: "0.5rem",
+                  boxShadow: "0 12px 32px #00000099",
+                  zIndex: 9999,
+                }}
               >
-                <input
-                  ref={searchRef}
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={() => setMapSearchFocused(true)}
-                  onBlur={() => setTimeout(() => setMapSearchFocused(false), 160)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") { jumpToSearchResult(); }
-                    if (e.key === "Escape") { setSearchOpen(false); setSearchQuery(""); }
-                  }}
-                  placeholder="АЗС, сеть, адрес…"
-                  style={{
-                    width: "100%",
-                    background: "rgba(10,10,18,0.97)",
-                    border: "1px solid #db277755",
-                    borderRadius: "10px",
-                    color: "#e2e8f0",
-                    padding: "0.4rem 0.65rem",
-                    fontSize: "0.75rem",
-                    outline: "none",
-                    fontFamily: "system-ui, sans-serif",
-                    backdropFilter: "blur(12px)",
-                    boxSizing: "border-box",
-                  }}
-                />
-                <AnimatePresence>
-                  {mapSearchFocused && !searchQuery && mapRecentSearches.length > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -4, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -4, scale: 0.98 }}
-                      transition={{ duration: 0.15 }}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem", padding: "0 0.15rem" }}>
+                  <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.48rem", letterSpacing: "0.12em" }}>НЕДАВНИЕ_ПОИСКИ</span>
+                  <button
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => { setMapRecentSearches([]); localStorage.removeItem("tma-map-recent-searches"); }}
+                    style={{ background: "none", border: "none", color: "#374151", fontSize: "0.65rem", cursor: "pointer", padding: "0 0.15rem", lineHeight: 1 }}
+                  >✕</button>
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
+                  {mapRecentSearches.map((q) => (
+                    <button
+                      key={q}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => { setSearchQuery(q); setMapSearchFocused(false); setTimeout(() => searchRef.current?.focus(), 0); }}
                       style={{
-                        position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
-                        background: "rgba(8,7,16,0.98)", backdropFilter: "blur(24px)",
-                        border: "1px solid #db277733", borderRadius: "12px",
-                        padding: "0.5rem",
-                        boxShadow: "0 12px 32px #00000099",
-                        zIndex: 9999,
-                        minWidth: "200px",
+                        background: "rgba(219,39,119,0.07)", border: "1px solid #db277722",
+                        borderRadius: "8px", color: "#9ca3af", fontSize: "0.65rem",
+                        padding: "0.2rem 0.55rem", cursor: "pointer",
+                        display: "flex", alignItems: "center", gap: "0.25rem",
                       }}
                     >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem", padding: "0 0.15rem" }}>
-                        <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.48rem", letterSpacing: "0.12em" }}>НЕДАВНИЕ_ПОИСКИ</span>
-                        <button
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => { setMapRecentSearches([]); localStorage.removeItem("tma-map-recent-searches"); }}
-                          style={{ background: "none", border: "none", color: "#374151", fontSize: "0.65rem", cursor: "pointer", padding: "0 0.15rem", lineHeight: 1 }}
-                        >✕</button>
-                      </div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
-                        {mapRecentSearches.map((q) => (
-                          <button
-                            key={q}
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => { setSearchQuery(q); setMapSearchFocused(false); setTimeout(() => searchRef.current?.focus(), 0); }}
-                            style={{
-                              background: "rgba(219,39,119,0.07)", border: "1px solid #db277722",
-                              borderRadius: "8px", color: "#9ca3af", fontSize: "0.65rem",
-                              padding: "0.2rem 0.55rem", cursor: "pointer",
-                              display: "flex", alignItems: "center", gap: "0.25rem",
-                              transition: "background 0.15s",
-                            }}
-                          >
-                            <span style={{ color: "#4b5563", fontSize: "0.55rem" }}>🕐</span>
-                            {q}
-                          </button>
-                        ))}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                      <span style={{ color: "#4b5563", fontSize: "0.55rem" }}>🕐</span>
+                      {q}
+                    </button>
+                  ))}
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
-          {/* Search result count badge — compact, inside the search row */}
-          {searchQuery && (
-            <div style={{
-              background: filtered.length > 0 ? "rgba(219,39,119,0.12)" : "rgba(239,68,68,0.12)",
-              border: `1px solid ${filtered.length > 0 ? "#db277744" : "#ef444444"}`,
-              borderRadius: "10px",
-              padding: "0.4rem 0.5rem",
-              fontFamily: "'JetBrains Mono',monospace",
-              fontSize: "0.62rem",
-              color: filtered.length > 0 ? "#f472b6" : "#ef4444",
-              backdropFilter: "blur(12px)",
-              cursor: filtered.length > 0 ? "pointer" : "default",
-              flexShrink: 0,
-              whiteSpace: "nowrap",
-            }} onClick={jumpToSearchResult}>
-              {filtered.length > 0 ? `${filtered.length} →` : "0"}
-            </div>
-          )}
+        </div>
+
+        {/* Fuel Filter Chips */}
+        <div style={{ display: "flex", gap: "0.4rem", overflowX: "auto", paddingBottom: "2px" }}>
+          {([null, "АИ-92", "АИ-95", "ДТ", "Газ"] as (string | null)[]).map((f) => {
+            const isActive = filterFuel === f;
+            const label = f === null ? "Все" : f;
+            return (
+              <button
+                key={label}
+                onClick={() => { setFilter("filterFuel", f); impact("light"); }}
+                style={{
+                  padding: "0.4rem 0.9rem",
+                  borderRadius: "99px",
+                  whiteSpace: "nowrap",
+                  fontSize: "0.82rem",
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  backdropFilter: "blur(12px)",
+                  transition: "all 0.2s",
+                  background: isActive ? "rgba(167,139,250,0.18)" : "rgba(20,20,32,0.75)",
+                  color: isActive ? "#a78bfa" : "rgba(255,255,255,0.7)",
+                  border: `1px solid ${isActive ? "#a78bfa55" : "rgba(255,255,255,0.06)"}`,
+                  boxShadow: isActive ? "0 0 14px rgba(167,139,250,0.22)" : "none",
+                  flexShrink: 0,
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -1126,12 +1117,9 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
               left: 0,
               right: 0,
               zIndex: 1001,
-              borderRadius: "64px 64px 0 0",
-              background: "linear-gradient(90deg, #a855f7, #db2777)",
-              padding: "2px 2px 0",
-              boxShadow: "0 -12px 50px rgba(168,85,247,0.2), 0 -4px 24px rgba(0,0,0,0.8)",
             }}
           >
+            {/* Glass card shell */}
             <div
               ref={(el) => { (dragControls as any)._sheetEl = el; }}
               onPointerDown={(e) => {
@@ -1139,34 +1127,67 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
                 if (el.scrollTop === 0) dragControls.start(e);
               }}
               style={{
-              background: "rgba(8,8,20,0.97)",
-              borderRadius: "62px 62px 0 0",
-              maxHeight: "70vh",
-              overflowY: "auto",
-              backdropFilter: "blur(24px)",
-              position: "relative",
-            }}>
+                background: "rgba(20,20,32,0.95)",
+                backdropFilter: "blur(24px)",
+                borderRadius: "28px 28px 0 0",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderBottom: "none",
+                boxShadow: "0 -12px 48px rgba(0,0,0,0.6), 0 -1px 0 rgba(255,255,255,0.06)",
+                maxHeight: "72vh",
+                overflowY: "auto",
+                position: "relative",
+              }}
+            >
+              {/* Top glare */}
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.15),transparent)", borderRadius: "28px 28px 0 0" }} />
+
               {/* Drag handle */}
               <div
                 onPointerDown={(e) => dragControls.start(e)}
-                style={{ display: "flex", justifyContent: "center", paddingTop: "14px", paddingBottom: "2px", flexShrink: 0, cursor: "grab", touchAction: "none" }}
+                style={{ display: "flex", justifyContent: "center", paddingTop: "12px", paddingBottom: "4px", cursor: "grab", touchAction: "none" }}
               >
-                <div style={{ width: "64px", height: "4px", background: "rgba(255,255,255,0.18)", borderRadius: "99px" }} />
+                <div style={{ width: "40px", height: "4px", background: "rgba(255,255,255,0.2)", borderRadius: "99px" }} />
               </div>
 
-              {/* Inner top glow */}
-              <div aria-hidden style={{
-                position: "absolute", top: 0, left: 0, right: 0, height: "128px",
-                background: "linear-gradient(to bottom, rgba(168,85,247,0.08), transparent)",
-                borderRadius: "62px 62px 0 0",
-                pointerEvents: "none", zIndex: 0,
-              }} />
-
-              <div style={{ position: "relative", zIndex: 1, paddingBottom: "88px" }}>
+              <div style={{ position: "relative", paddingBottom: "6rem" }}>
                 <StationCard
                   station={selectedStation}
                   onClose={() => selectStation(null)}
                 />
+              </div>
+
+              {/* Sticky CTA at bottom */}
+              <div style={{
+                position: "sticky",
+                bottom: 0,
+                padding: "0.75rem 1.25rem 1.25rem",
+                background: "linear-gradient(to top, rgba(20,20,32,1) 70%, transparent)",
+              }}>
+                <button
+                  onClick={() => { impact("medium"); selectStation(null); }}
+                  style={{
+                    width: "100%",
+                    padding: "1rem",
+                    borderRadius: "14px",
+                    background: "#a78bfa",
+                    color: "#08090f",
+                    fontWeight: 700,
+                    fontSize: "1rem",
+                    border: "none",
+                    cursor: "pointer",
+                    boxShadow: "0 4px 20px rgba(167,139,250,0.4)",
+                    position: "relative",
+                    overflow: "hidden",
+                  }}
+                >
+                  <span style={{ position: "relative", zIndex: 1 }}>Зарезервировать →</span>
+                  <div style={{
+                    position: "absolute", inset: 0,
+                    background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.15),transparent)",
+                    animation: "shimmer 2s infinite",
+                  }} />
+                  <style>{`@keyframes shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }`}</style>
+                </button>
               </div>
             </div>
           </motion.div>
