@@ -124,9 +124,18 @@ export type TabId = "map" | "analytics" | "catalog" | "ai" | "games" | "news";
 - **AnalyticsTab** — graduated to cobalt
 - **CatalogTab** — graduated to cobalt
 
+### ✅ AiTab — graduated to cobalt (2026-06-28)
+- Cobalt gradient bg + 88-star deterministic starfield (`twinkle` keyframe)
+- Bot avatar: `linear-gradient(135deg, #2228e8, #E8622A)` cobalt-to-coral
+- Bot bubbles: cobalt glass `rgba(16,20,165,0.72)` + white border
+- User bubbles: coral-orange gradient `#E8622A → #c94f1e`
+- Send button: `#E8622A` coral-orange
+- Chips: white active-state `rgba(255,255,255,0.15)` + `rgba(255,255,255,0.32)` border
+- Thinking dots: coral-orange
+- VPN pill: white active-state chrome
+
 ### 🔴 Still needs cobalt treatment
 - **GamesTab** — fully old palette
-- **AiTab** — fully old palette
 
 ### Pattern to apply to each tab
 
