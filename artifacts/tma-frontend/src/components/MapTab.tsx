@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { impact } from "@/lib/haptic";
-import { MapContainer, TileLayer, useMap, useMapEvents, Rectangle, Tooltip } from "react-leaflet";
+import { MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
 import { Marker, Popup } from "react-leaflet";
 import L from "leaflet";
@@ -308,7 +308,6 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
   const { viewport, filterStatus, filterFuel, filterRegion, filterNetwork, filterZone, setFilter, selectedStationId, selectStation } =
     useMapStore();
   const [showFilters, setShowFilters] = useState(false);
-  const [showHeatmap, setShowHeatmap] = useState(true);
   const [geoLoading, setGeoLoading] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -480,7 +479,7 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
       <div
         style={{
           position: "absolute",
-          top: "3rem",
+          top: "0.75rem",
           left: "0.75rem",
           right: "0.75rem",
           zIndex: 1000,
@@ -640,10 +639,10 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
                   cursor: "pointer",
                   backdropFilter: "blur(12px)",
                   transition: "all 0.2s",
-                  background: isActive ? "rgba(167,139,250,0.28)" : "rgba(22,26,188,0.72)",
-                  color: isActive ? "#a78bfa" : "rgba(255,255,255,0.7)",
-                  border: `1px solid ${isActive ? "#a78bfa55" : "rgba(255,255,255,0.06)"}`,
-                  boxShadow: isActive ? "0 0 14px rgba(167,139,250,0.22)" : "none",
+                  background: isActive ? "rgba(255,255,255,0.15)" : "rgba(22,26,188,0.72)",
+                  color: isActive ? "#ffffff" : "rgba(255,255,255,0.7)",
+                  border: `1px solid ${isActive ? "rgba(255,255,255,0.32)" : "rgba(255,255,255,0.06)"}`,
+                  boxShadow: isActive ? "0 0 14px rgba(255,255,255,0.10)" : "none",
                   flexShrink: 0,
                 }}
               >
@@ -663,7 +662,7 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
             exit={{ opacity: 0, y: -10 }}
             style={{
               position: "absolute",
-              top: "5rem",
+              top: "calc(0.75rem + 52px + 0.5rem + 42px + 0.5rem)",
               left: "0.75rem",
               right: "0.75rem",
               zIndex: 1000,
@@ -786,23 +785,6 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
                 🟢 С топливом
               </button>
 
-              {/* Heatmap toggle */}
-              <button
-                onClick={() => setShowHeatmap((v) => !v)}
-                title="Тепловая карта регионов"
-                style={{
-                  background: showHeatmap ? "rgba(255,255,255,0.15)" : "rgba(16,20,165,0.82)",
-                  border: `1px solid ${showHeatmap ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.08)"}`,
-                  borderRadius: "8px",
-                  color: showHeatmap ? "#ffffff" : "rgba(255,255,255,0.72)",
-                  padding: "0.3rem 0.55rem",
-                  fontSize: "0.72rem", cursor: "pointer",
-                  display: "flex", alignItems: "center", gap: "0.25rem",
-                  transition: "all 0.2s",
-                }}
-              >
-                🌡 Тепловая карта
-              </button>
 
               {/* Available fuel only */}
               {(() => {
@@ -1124,33 +1106,6 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
         <MapViewportSync />
         <MapRecenter lat={viewport.lat} lng={viewport.lng} zoom={viewport.zoom} />
 
-        {/* Region heatmap overlay */}
-        {showHeatmap && regionStats.map((r) => {
-          if (r.avgPct === null) return null;
-          const color = availabilityColor(r.avgPct);
-          return (
-            <Rectangle
-              key={r.name}
-              bounds={[[r.latMin, r.lngMin], [r.latMax, r.lngMax]]}
-              pathOptions={{
-                color,
-                weight: 1,
-                opacity: 0.5,
-                fillColor: color,
-                fillOpacity: r.avgPct < 25 ? 0.22 : 0.12,
-              }}
-            >
-              <Tooltip sticky direction="center" opacity={0.92}>
-                <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "#e2e8f0", background: "transparent" }}>
-                  {r.name}
-                  <br />
-                  <span style={{ color, fontFamily: "monospace" }}>{Math.round(r.avgPct)}%</span>
-                  <span style={{ color: "rgba(255,255,255,0.72)", fontWeight: 400 }}> наличие</span>
-                </div>
-              </Tooltip>
-            </Rectangle>
-          );
-        })}
 
         <MarkerClusterGroup
           chunkedLoading
