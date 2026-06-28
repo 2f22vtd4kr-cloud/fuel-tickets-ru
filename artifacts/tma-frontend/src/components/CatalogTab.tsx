@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Fuse from "fuse.js";
 import { fetchLimits, createStarsInvoice, createCryptoBotInvoice, createNetworkStarsInvoice, createNetworkCryptoBotInvoice, fetchStations as apiFetchStations, setPriceAlert, fetchPriceAlerts, deletePriceAlert } from "@/api/client";
@@ -156,7 +156,7 @@ function BlockOverlay({ reason, onClose }: { reason: string; onClose: () => void
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       style={{
         position: "fixed", inset: 0, zIndex: 9000,
-        background: "rgba(5,5,7,0.97)",
+        background: "rgba(4,5,68,0.97)",
         display: "flex", flexDirection: "column",
         alignItems: "center", justifyContent: "center",
         padding: "1.5rem", textAlign: "center",
@@ -170,36 +170,37 @@ function BlockOverlay({ reason, onClose }: { reason: string; onClose: () => void
         initial={{ scale: 0.82, y: 30 }} animate={{ scale: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 280, damping: 22 }}
         style={{
-          background: "linear-gradient(160deg,#14141c,#1a050a)",
-          border: "1px solid #ef444455", borderRadius: "24px",
+          background: "linear-gradient(160deg,rgba(20,5,25,0.95),rgba(4,5,68,0.92))",
+          border: "1px solid #FF174455", borderRadius: "24px",
           padding: "2rem 1.5rem", maxWidth: "320px", width: "100%",
           position: "relative", overflow: "hidden",
-          boxShadow: "0 0 60px #ef444422, inset 0 1px 0 #ef444422",
+          boxShadow: "0 0 60px #FF174422, inset 0 1px 0 #FF174422",
+          backdropFilter: "blur(20px)",
         }}
       >
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: "linear-gradient(90deg, transparent, #ef4444, transparent)" }} />
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: "linear-gradient(90deg, transparent, #FF1744, transparent)" }} />
         <motion.div
           animate={{ scale: [1, 1.08, 1] }}
           transition={{ repeat: Infinity, duration: 2.2, ease: "easeInOut" }}
-          style={{ fontSize: "3rem", marginBottom: "0.75rem", filter: "drop-shadow(0 0 16px #ef444488)" }}
+          style={{ fontSize: "3rem", marginBottom: "0.75rem", filter: "drop-shadow(0 0 16px #FF174488)" }}
         >🚫</motion.div>
-        <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#ef4444", fontSize: "0.55rem", letterSpacing: "0.15em", marginBottom: "0.5rem", opacity: 0.7 }}>
+        <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#FF1744", fontSize: "0.55rem", letterSpacing: "0.15em", marginBottom: "0.5rem", opacity: 0.7 }}>
           СИСТЕМА · БЛОКИРОВКА · {new Date().toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
         </div>
-        <h3 style={{ color: "#ef4444", fontSize: "1rem", margin: "0 0 0.75rem", fontWeight: 800, lineHeight: 1.2 }}>
+        <h3 style={{ color: "#FF1744", fontSize: "1rem", margin: "0 0 0.75rem", fontWeight: 800, lineHeight: 1.2 }}>
           Шлюз временно недоступен
         </h3>
-        <p style={{ color: "#9ca3af", fontSize: "0.8rem", margin: "0 0 1.25rem", lineHeight: 1.6 }}>{reason}</p>
+        <p style={{ color: "rgba(255,255,255,0.5)", fontSize: "0.8rem", margin: "0 0 1.25rem", lineHeight: 1.6 }}>{reason}</p>
         <div style={{ marginBottom: "1.25rem" }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.3rem" }}>
-            <span style={{ color: "#4b5563", fontSize: "0.62rem" }}>Авто-закрытие через</span>
-            <span style={{ color: countdown > 5 ? "#ef4444" : "#f97316", fontFamily: "'JetBrains Mono',monospace", fontSize: "0.72rem", fontWeight: 700 }}>{countdown}с</span>
+            <span style={{ color: "rgba(255,255,255,0.3)", fontSize: "0.62rem" }}>Авто-закрытие через</span>
+            <span style={{ color: countdown > 5 ? "#FF1744" : "#FF6D00", fontFamily: "'JetBrains Mono',monospace", fontSize: "0.72rem", fontWeight: 700 }}>{countdown}с</span>
           </div>
-          <div style={{ height: "3px", background: "#1e1e2a", borderRadius: "2px", overflow: "hidden" }}>
+          <div style={{ height: "3px", background: "rgba(255,255,255,0.06)", borderRadius: "2px", overflow: "hidden" }}>
             <motion.div
               initial={{ width: "100%" }} animate={{ width: "0%" }}
               transition={{ duration: 15, ease: "linear" }}
-              style={{ height: "100%", background: "linear-gradient(90deg,#ef4444,#dc2626)", borderRadius: "2px" }}
+              style={{ height: "100%", background: "linear-gradient(90deg,#FF1744,#FF5252)", borderRadius: "2px" }}
             />
           </div>
         </div>
@@ -227,11 +228,12 @@ function PaymentConfirmModal({ pending, onConfirm, onCancel }: { pending: Pendin
         initial={{ scale: 0.88, y: 24 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.92, y: 12 }}
         transition={{ type: "spring", stiffness: 300, damping: 24 }}
         style={{
-          background: "linear-gradient(160deg,#0d0d18,#0f0820)",
+          background: "linear-gradient(160deg,rgba(12,14,168,0.7),rgba(4,5,80,0.92))",
           border: "1px solid #a855f733", borderRadius: "22px",
           padding: "1.6rem 1.4rem", maxWidth: "320px", width: "100%",
           position: "relative", overflow: "hidden",
           boxShadow: "0 0 60px #a855f722, inset 0 1px 0 #a855f718",
+          backdropFilter: "blur(24px)",
         }}
       >
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: "linear-gradient(90deg,transparent,#a855f7,#db2777,transparent)" }} />
@@ -241,26 +243,25 @@ function PaymentConfirmModal({ pending, onConfirm, onCancel }: { pending: Pendin
             transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
             style={{ fontSize: "2.4rem", marginBottom: "0.6rem" }}
           >⛽</motion.div>
-          <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#4b5563", fontSize: "0.5rem", letterSpacing: "0.16em", marginBottom: "0.4rem" }}>ПОДГОТОВКА_ОПЛАТЫ</div>
           <h3 style={{ margin: "0 0 0.3rem", color: "#e2e8f0", fontSize: "1.1rem", fontWeight: 800 }}>Подтвердите заказ</h3>
           <p style={{ margin: 0, color: "#6b7280", fontSize: "0.78rem", lineHeight: 1.5 }}>{pending.volume}л {pending.fuelType}</p>
           <div style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", marginTop: "0.45rem", background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)", borderRadius: "20px", padding: "0.2rem 0.55rem" }}>
             <span style={{ fontSize: "0.65rem" }}>🔒</span>
-            <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e", fontSize: "0.44rem", fontWeight: 700 }}>ЦЕНА ЗАМОРОЖЕНА · 90 ДНЕЙ</span>
+            <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#00E676", fontSize: "0.44rem", fontWeight: 700 }}>ЦЕНА ЗАМОРОЖЕНА · 90 ДНЕЙ</span>
           </div>
         </div>
-        <div style={{ background: "#14141c", border: "1px solid #22222f", borderRadius: "14px", padding: "0.85rem 1rem", marginBottom: "1.1rem" }}>
+        <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "14px", padding: "0.85rem 1rem", marginBottom: "1.1rem" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.45rem" }}>
-            <span style={{ color: "#6b7280", fontSize: "0.72rem" }}>Объём</span>
+            <span style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.72rem" }}>Объём</span>
             <span style={{ color: "#e2e8f0", fontFamily: "'JetBrains Mono',monospace", fontSize: "0.8rem", fontWeight: 700 }}>{pending.volume} л</span>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.45rem" }}>
-            <span style={{ color: "#6b7280", fontSize: "0.72rem" }}>Сумма</span>
+            <span style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.72rem" }}>Сумма</span>
             <span style={{ color: "#a855f7", fontFamily: "'JetBrains Mono',monospace", fontSize: "0.8rem", fontWeight: 700 }}>{pending.totalPrice.toFixed(0)} ₽</span>
           </div>
-          <div style={{ height: "1px", background: "#22222f", margin: "0.45rem 0" }} />
+          <div style={{ height: "1px", background: "rgba(255,255,255,0.08)", margin: "0.45rem 0" }} />
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ color: "#6b7280", fontSize: "0.72rem" }}>Оплата</span>
+            <span style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.72rem" }}>Оплата</span>
             <span style={{ color: pending.method === "stars" ? "#f59e0b" : "#3b82f6", fontFamily: "'JetBrains Mono',monospace", fontSize: "0.82rem", fontWeight: 800 }}>
               {pending.method === "stars" ? `⭐ ${pending.starsAmount} Stars` : `💎 ${(pending.totalPrice / 92).toFixed(2)} USDT`}
             </span>
@@ -269,7 +270,7 @@ function PaymentConfirmModal({ pending, onConfirm, onCancel }: { pending: Pendin
         <div style={{ display: "flex", gap: "0.6rem" }}>
           <button
             onClick={() => { notify("warning" as any); impact("light"); onCancel(); }}
-            style={{ flex: 1, padding: "0.85rem", background: "#14141c", border: "1px solid #22222f", borderRadius: "12px", color: "#6b7280", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer" }}
+            style={{ flex: 1, padding: "0.85rem", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", color: "rgba(255,255,255,0.4)", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer" }}
           >Отмена</button>
           <motion.button
             onClick={() => { impact("heavy"); onConfirm(); }}
@@ -607,7 +608,7 @@ function FuelItem({ fuelType, station, limits, userId, payMethod, onBuy }: {
 
   const fuelStatus = station.fuel_statuses.find((f) => f.fuel_type === fuelType);
   const available = fuelStatus && fuelStatus.availability_pct > 0;
-  const statusColor = !available ? "#ef4444" : fuelStatus.availability_pct >= 60 ? "#22c55e" : "#eab308";
+  const statusColor = !available ? "#FF1744" : fuelStatus.availability_pct >= 60 ? "#00E676" : "#FFD600";
   const starsAmount = Math.ceil(totalPrice / STAR_RUB_RATE);
 
   const btnLabel = () => {
@@ -620,9 +621,11 @@ function FuelItem({ fuelType, station, limits, userId, payMethod, onBuy }: {
 
   return (
     <motion.div layout className={isCrisis ? "crisis-badge" : ""} style={{
-      background: "#14141c",
-      border: `1px solid ${isCrisis ? "#ff008855" : "#22222f"}`,
+      background: isCrisis ? "linear-gradient(135deg,rgba(255,23,68,0.08),rgba(4,5,80,0.4))" : "linear-gradient(135deg,rgba(255,255,255,0.03),rgba(12,14,168,0.25))",
+      border: `1px solid ${isCrisis ? "#FF174433" : "rgba(255,255,255,0.08)"}`,
       borderRadius: "14px", padding: "0.85rem", marginBottom: "0.5rem",
+      position: "relative", overflow: "hidden",
+      backdropFilter: "blur(12px)",
       transition: "border-color 0.4s",
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.6rem" }}>
@@ -642,13 +645,12 @@ function FuelItem({ fuelType, station, limits, userId, payMethod, onBuy }: {
         <div style={{ marginBottom: "0.6rem" }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.2rem" }}>
             <div>
-              <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.4rem", letterSpacing: "0.12em", marginBottom: "1px" }}>ЛИМИТ_СУТОЧНЫЙ</div>
-              <span style={{ color: "#6b7280", fontSize: "0.7rem" }}>Суточный лимит</span>
+              <span style={{ color: "rgba(255,255,255,0.35)", fontSize: "0.7rem" }}>Суточный лимит</span>
             </div>
-            <span style={{ color: remaining > 0 ? "#9ca3af" : "#ef4444", fontSize: "0.7rem", fontFamily: "'JetBrains Mono',monospace" }}>{limit.used}л / {limit.max}л</span>
+            <span style={{ color: remaining > 0 ? "rgba(255,255,255,0.5)" : "#FF1744", fontSize: "0.7rem", fontFamily: "'JetBrains Mono',monospace" }}>{limit.used}л / {limit.max}л</span>
           </div>
-          <div style={{ height: "4px", borderRadius: "2px", background: "#0b0b0f", overflow: "hidden" }}>
-            <div style={{ height: "100%", width: `${Math.min(100, (limit.used / limit.max) * 100)}%`, background: limit.used >= limit.max ? "#ef4444" : "#a855f7", transition: "width 0.5s" }} />
+          <div style={{ height: "4px", borderRadius: "2px", background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${Math.min(100, (limit.used / limit.max) * 100)}%`, background: limit.used >= limit.max ? "#FF1744" : "#a855f7", transition: "width 0.5s" }} />
           </div>
         </div>
       )}
@@ -671,20 +673,20 @@ function FuelItem({ fuelType, station, limits, userId, payMethod, onBuy }: {
       </div>
 
       {!withinLimit && (
-        <p style={{ color: "#eab308", fontSize: "0.72rem", margin: "0 0 0.5rem" }}>
+        <p style={{ color: "#FFD600", fontSize: "0.72rem", margin: "0 0 0.5rem" }}>
           ⚠️ Превышен суточный лимит отпуска для данного региона.
         </p>
       )}
 
-      <div style={{ background: "linear-gradient(135deg,rgba(34,197,94,0.07),rgba(168,85,247,0.05))", border: "1px solid rgba(34,197,94,0.2)", borderRadius: "10px", padding: "0.45rem 0.65rem", marginBottom: "0.6rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+      <div style={{ background: "rgba(0,230,118,0.06)", border: "1px solid rgba(0,230,118,0.2)", borderRadius: "10px", padding: "0.45rem 0.65rem", marginBottom: "0.6rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
         <span style={{ fontSize: "0.85rem", flexShrink: 0 }}>🔒</span>
         <div>
-          <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e", fontSize: "0.44rem", fontWeight: 700, letterSpacing: "0.1em", marginBottom: "0.15rem" }}>ЦЕНА ЗАМОРОЖЕНА · 90 ДНЕЙ</div>
-          <div style={{ color: "#4b5563", fontSize: "0.54rem", lineHeight: 1.45 }}>Оплатите сейчас — заправляйтесь по сегодняшней цене в течение трёх месяцев.</div>
+          <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#00E676", fontSize: "0.44rem", fontWeight: 700, letterSpacing: "0.1em", marginBottom: "0.15rem" }}>ЦЕНА ЗАМОРОЖЕНА · 90 ДНЕЙ</div>
+          <div style={{ color: "rgba(255,255,255,0.3)", fontSize: "0.54rem", lineHeight: 1.45 }}>Оплатите сейчас — заправляйтесь по сегодняшней цене в течение трёх месяцев.</div>
         </div>
         <div style={{ flexShrink: 0, textAlign: "right" }}>
-          <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e", fontSize: "0.55rem", fontWeight: 800 }}>+{(pricePerL * 0.085 * volume).toFixed(0)}₽</div>
-          <div style={{ color: "#374151", fontSize: "0.38rem" }}>экономия·3мес</div>
+          <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#00E676", fontSize: "0.55rem", fontWeight: 800 }}>+{(pricePerL * 0.085 * volume).toFixed(0)}₽</div>
+          <div style={{ color: "rgba(255,255,255,0.2)", fontSize: "0.38rem" }}>экономия·3мес</div>
         </div>
       </div>
 
@@ -695,9 +697,9 @@ function FuelItem({ fuelType, station, limits, userId, payMethod, onBuy }: {
         transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
         style={{
           width: "100%", padding: "0.95rem 1rem",
-          background: (!withinLimit || !available) ? "#1a1a2a" : "linear-gradient(135deg,#a855f7,#db2777)",
-          color: (!withinLimit || !available) ? "#374151" : "#fff",
-          border: (!withinLimit || !available) ? "1px solid #22222f" : "none",
+          background: (!withinLimit || !available) ? "rgba(255,255,255,0.04)" : "linear-gradient(135deg,#a855f7,#db2777)",
+          color: (!withinLimit || !available) ? "rgba(255,255,255,0.2)" : "#fff",
+          border: (!withinLimit || !available) ? "1px solid rgba(255,255,255,0.08)" : "none",
           borderRadius: "14px", fontSize: "0.97rem", fontWeight: 800,
           cursor: (!withinLimit || !available) ? "not-allowed" : "pointer",
           display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
@@ -709,6 +711,37 @@ function FuelItem({ fuelType, station, limits, userId, payMethod, onBuy }: {
       </motion.button>
     </motion.div>
   );
+}
+
+// ── Cobalt starfield primitives ────────────────────────────────────────────
+const CATALOG_COBALT_CSS = `
+@keyframes ctStarTwinkle  { 0%,100%{opacity:var(--op)} 50%{opacity:calc(var(--op)*0.25)} }
+@keyframes ctAmbientFlow  { 0%{background-position:0% 50%} 100%{background-position:200% 50%} }
+@keyframes ctAmbientPulse { 0%,100%{opacity:.55} 50%{opacity:1} }
+@keyframes ctScanPulse    { 0%,100%{transform:scale(1);opacity:.8} 50%{transform:scale(1.35);opacity:.3} }
+.ct-ambient-strip { background-size:200% 100%; animation:ctAmbientFlow 3s linear infinite, ctAmbientPulse 2.6s ease-in-out infinite; }
+`;
+
+function CatalogStarField({ n = 90 }: { n?: number }) {
+  const stars = useMemo(() =>
+    Array.from({ length: n }, (_, i) => ({
+      id: i, x: (i * 97 + 13) % 100, y: (i * 61 + 7) % 100,
+      r: 0.3 + (i % 7) * 0.2, op: 0.1 + (i % 6) * 0.1, dur: 2 + (i % 5), del: i % 4,
+    })), [n]);
+  return (
+    <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 1 }}>
+      {stars.map(s => (
+        <circle key={s.id} cx={`${s.x}%`} cy={`${s.y}%`} r={s.r} fill="white"
+          style={{ opacity: s.op, animation: `ctStarTwinkle ${s.dur}s ${s.del}s ease-in-out infinite`, ["--op" as string]: s.op } as React.CSSProperties}
+        />
+      ))}
+    </svg>
+  );
+}
+
+function CatalogStrip({ color, style = {} }: { color: string; style?: React.CSSProperties }) {
+  const grad = `linear-gradient(90deg,transparent 0%,${color}00 5%,${color}cc 30%,${color} 50%,${color}cc 70%,${color}00 95%,transparent 100%)`;
+  return <div className="ct-ambient-strip" style={{ position: "absolute", background: grad, height: "1.5px", width: "100%", pointerEvents: "none", ...style }} />;
 }
 
 // ─── CatalogTab ────────────────────────────────────────────────────────────
@@ -1124,7 +1157,20 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
   }, [prices]);
 
   return (
-    <div className="flex flex-col h-full bg-[#08090f] text-[rgba(255,255,255,0.95)] font-sans" style={{ fontFamily: 'Inter, sans-serif' }}>
+    <div className="flex flex-col h-full text-[rgba(255,255,255,0.95)] font-sans" style={{ fontFamily: 'Inter, sans-serif', background: 'linear-gradient(160deg,#0C0EA8 0%,#090B82 40%,#060760 75%,#040450 100%)', position: 'relative' }}>
+      <style>{CATALOG_COBALT_CSS}</style>
+      {/* Starfield + grid */}
+      <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
+        <CatalogStarField n={90} />
+        <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.09 }}>
+          <line x1="0" y1="33%" x2="100%" y2="33%" stroke="#818cf8" strokeWidth=".8"/>
+          <line x1="0" y1="66%" x2="100%" y2="66%" stroke="#818cf8" strokeWidth=".8"/>
+          <line x1="33%" y1="0" x2="33%" y2="100%" stroke="#818cf8" strokeWidth=".8"/>
+          <line x1="66%" y1="0" x2="66%" y2="100%" stroke="#818cf8" strokeWidth=".8"/>
+        </svg>
+        <div style={{ position: 'absolute', top: -80, left: '50%', transform: 'translateX(-50%)', width: 340, height: 220, borderRadius: '50%', background: 'radial-gradient(ellipse,rgba(168,85,247,0.2) 0%,transparent 70%)', filter: 'blur(22px)' }} />
+        <div style={{ position: 'absolute', bottom: '10%', right: -40, width: 200, height: 200, borderRadius: '50%', background: 'radial-gradient(ellipse,rgba(219,39,119,0.12) 0%,transparent 70%)', filter: 'blur(24px)' }} />
+      </div>
       <AnimatePresence>
         {blockReason && <BlockOverlay reason={blockReason} onClose={() => setBlockReason(null)} />}
       </AnimatePresence>
@@ -1137,48 +1183,41 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
         {showCalculator && <FuelCalculatorModal onClose={() => { setShowCalculator(false); onCalcOpenChange?.(false); }} />}
       </AnimatePresence>
 
-      {/* Header */}
-      <div className="pt-6 pb-4 px-5 z-10 relative">
-        <h1 className="text-2xl font-bold mb-3 tracking-tight">Талоны на топливо</h1>
-        
+      {/* Header — sticky cobalt glass */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'rgba(4,5,68,0.88)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(120,140,255,0.1)', padding: '2.8rem 1.1rem 0.7rem', flexShrink: 0 }} className="relative">
+        <CatalogStrip color="#a855f7" style={{ bottom: 0, left: 0 }} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <h1 style={{ margin: 0, fontSize: '1.22rem', fontWeight: 900, background: 'linear-gradient(90deg,#fff 0%,#a855f7 55%,#db2777 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+            Талоны на топливо
+          </h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#00E676', boxShadow: '0 0 8px #00E676', animation: 'ctScanPulse 1.5s infinite' }} />
+            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: '0.55rem', color: '#00E676', fontWeight: 700 }}>LIVE</span>
+          </div>
+        </div>
         {/* Price Ticker */}
-        <div className="overflow-hidden rounded-md bg-[#141420]/50 py-1.5 flex whitespace-nowrap text-xs font-medium border border-white/5 relative">
-          <div className="absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-r from-[#08090f] to-transparent z-10"></div>
-          <div className="absolute right-0 top-0 bottom-0 w-4 bg-gradient-to-l from-[#08090f] to-transparent z-10"></div>
-          <div className="animate-marquee flex gap-6 px-4" style={{ 
-            animation: 'marquee 25s linear infinite', 
-            background: 'linear-gradient(90deg, #f472b6, #a78bfa)', 
-            WebkitBackgroundClip: 'text', 
-            WebkitTextFillColor: 'transparent'
-          }}>
+        <div style={{ overflow: 'hidden', background: 'rgba(255,255,255,0.04)', borderRadius: 8, height: 28, display: 'flex', alignItems: 'center', border: '1px solid rgba(255,255,255,0.07)', position: 'relative' }}>
+          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 20, background: 'linear-gradient(90deg,rgba(4,5,68,0.95),transparent)', zIndex: 1 }} />
+          <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 20, background: 'linear-gradient(270deg,rgba(4,5,68,0.95),transparent)', zIndex: 1 }} />
+          <div style={{ display: 'flex', gap: 24, padding: '0 16px', animation: 'ctAmbientFlow 25s linear infinite', whiteSpace: 'nowrap', background: 'linear-gradient(90deg,#db2777,#a855f7)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             {priceEntries.concat(priceEntries).map((item, idx) => (
-              <span key={idx}>{item.fuel}: {item.price.toFixed(1)}₽ {item.delta}</span>
+              <span key={idx} style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: '0.65rem', fontWeight: 600 }}>{item.fuel}: {item.price.toFixed(1)}₽ {item.delta}</span>
             ))}
           </div>
-          <style>{`
-            @keyframes marquee {
-              0% { transform: translateX(0); }
-              100% { transform: translateX(-50%); }
-            }
-          `}</style>
         </div>
       </div>
 
       {/* Segmented Control */}
-      <div className="px-5 mb-5 z-10 relative">
-        <div className="flex bg-[#141420]/80 backdrop-blur-[20px] rounded-full p-1 border border-white/5">
-          <button 
-            onClick={() => setTab("network")}
-            className={`flex-1 py-2 text-sm font-medium rounded-full transition-all duration-300 ${tab === "network" ? 'bg-[#a78bfa] text-white shadow-[0_0_15px_rgba(167,139,250,0.3)]' : 'text-[rgba(255,255,255,0.55)]'}`}
-          >
-            Сетевые
-          </button>
-          <button 
-            onClick={() => setTab("station")}
-            className={`flex-1 py-2 text-sm font-medium rounded-full transition-all duration-300 ${tab === "station" ? 'bg-[#a78bfa] text-white shadow-[0_0_15px_rgba(167,139,250,0.3)]' : 'text-[rgba(255,255,255,0.55)]'}`}
-          >
-            Станционные
-          </button>
+      <div style={{ padding: '0.6rem 1.1rem 0', position: 'relative', zIndex: 9, flexShrink: 0 }}>
+        <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: 999, padding: 4, border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(20px)' }}>
+          <button
+            onClick={() => { impact("light"); setTab("network"); }}
+            style={{ flex: 1, padding: '0.5rem 0', borderRadius: 999, border: 'none', background: tab === "network" ? 'linear-gradient(135deg,#a855f7,#db2777)' : 'transparent', color: tab === "network" ? '#fff' : 'rgba(255,255,255,0.45)', fontSize: '0.82rem', fontWeight: tab === "network" ? 700 : 400, cursor: 'pointer', transition: 'all .25s', boxShadow: tab === "network" ? '0 0 16px rgba(168,85,247,0.35)' : 'none' }}
+          >Сетевые</button>
+          <button
+            onClick={() => { impact("light"); setTab("station"); }}
+            style={{ flex: 1, padding: '0.5rem 0', borderRadius: 999, border: 'none', background: tab === "station" ? 'linear-gradient(135deg,#a855f7,#db2777)' : 'transparent', color: tab === "station" ? '#fff' : 'rgba(255,255,255,0.45)', fontSize: '0.82rem', fontWeight: tab === "station" ? 700 : 400, cursor: 'pointer', transition: 'all .25s', boxShadow: tab === "station" ? '0 0 16px rgba(168,85,247,0.35)' : 'none' }}
+          >Станционные</button>
         </div>
       </div>
 
@@ -1259,7 +1298,7 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
 
           {/* Section label row */}
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.55rem" }}>
-            <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#a855f7", fontSize: "0.65rem", letterSpacing: "0.15em", fontWeight: 700 }}>СЕТЕВЫЕ_ТАЛОНЫ</span>
+            <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#a855f7", fontSize: "0.65rem", letterSpacing: "0.15em", fontWeight: 700 }}>Сетевые талоны</span>
             <div style={{ flex: 1, height: "1px", background: "linear-gradient(90deg,#a855f744,transparent)" }} />
             {Object.values(activeVouchersByNetwork).reduce((s, n) => s + n, 0) > 0 && (
               <div style={{
