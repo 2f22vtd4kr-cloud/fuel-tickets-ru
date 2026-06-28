@@ -113,21 +113,20 @@ export type TabId = "map" | "analytics" | "catalog" | "ai" | "games" | "news";
 
 ---
 
-## What still needs to be done (next session priority)
+## Graduation status (updated 2026-06-28)
 
-### High priority — remaining tabs need cobalt treatment
-The owner wants all tabs to match the cobalt starfield design. Done so far:
-- ✅ MapTab: cobalt tiles + starfield + white chrome
-- ✅ MarketTicker: cobalt strip
-- ✅ BottomNav: cobalt pill
-- ✅ IntroSplash (LoadingScreen): already graduated earlier
+### ✅ Already graduated to cobalt starfield
+- **MapTab** — cobalt tiles (CSS filter) + starfield + white chrome, orange CTAs
+- **VaultTab** — cobalt gradient bg + 70 starfield particles + violet glow header
+- **BottomNav** — cobalt glass pill + NavStars + white active states
+- **MarketTicker** — cobalt strip, mint LIVE dot, no rose
+- **IntroSplash (LoadingScreen)** — vertical stacked typography splash
+- **AnalyticsTab** — graduated to cobalt
+- **CatalogTab** — graduated to cobalt
 
-Still needing cobalt treatment (they currently use old dark cyberpunk):
-- 🔴 **AnalyticsTab** — charts, section headers, card backgrounds still dark `#14141c` / purple
-- 🔴 **CatalogTab** — fuel cards, modal overlays still old palette (some partial work done, see redesign-mockups.md)
-- 🔴 **GamesTab** — fully old palette
-- 🔴 **AiTab** — fully old palette
-- 🔴 **VaultTab** — fully old palette (QR codes, purchase history)
+### 🔴 Still needs cobalt treatment
+- **GamesTab** — fully old palette
+- **AiTab** — fully old palette
 
 ### Pattern to apply to each tab
 

@@ -1,6 +1,27 @@
 # Топливный Узел — Матрица Снабжения
 
-A premium Telegram bot + Telegram Mini App (TMA) fuel availability dashboard for Sevastopol/Crimea region. Features 1000+ seeded gas stations (1295 total), real-time availability tracking, gamification, and a cyberpunk UI (#050507 bg, #a855f7 violet, #db2777 magenta). 100% Russian UI.
+A premium Telegram bot + Telegram Mini App (TMA) fuel availability dashboard for Sevastopol/Crimea region. Features 1000+ seeded gas stations (1295 total), real-time availability tracking, gamification, and a **Cobalt Starfield** design system. 100% Russian UI.
+
+## ⚠️ CURRENT DESIGN SYSTEM — Cobalt Starfield (as of 2026-06-28)
+
+The old "cyberpunk" palette (#050507 bg, #a855f7 violet, #db2777 magenta) was **fully replaced**. Do NOT use it. The reference image is `attached_assets/IMG_2581_1782645108290.jpeg` — "Building The Future" poster: royal cobalt blue bg, white star particles, coral-orange accent.
+
+**Current palette:**
+- Background: `linear-gradient(160deg, #1E22DC 0%, #181CC6 40%, #1318B0 75%, #1015A5 100%)` — vivid royal cobalt
+- CTA / active accent: `#E8622A` coral-orange
+- Active state chrome: `rgba(255,255,255,0.15)` bg + `rgba(255,255,255,0.32)` border + `#ffffff` text — **WHITE, not purple**
+- Glass panels: `rgba(14–24, 18–28, 158–198, 0.72–0.97)` cobalt-tinted
+- Data ok: `#22c55e` green; warning: `#fbbf24` amber; crisis: `#ff6b6b` coral-red
+- Stars: 80–100 deterministic SVG white dots with twinkle keyframe
+
+**BANNED colors (zero tolerance in UI chrome):**
+- `#db2777` rose magenta — gone
+- `#f472b6` rose pink — gone
+- `#a855f7` violet — only allowed on map cluster markers; never in buttons/badges/borders/separators
+- `linear-gradient(135deg, #a855f7, #db2777)` CTA gradient — gone
+
+**Tabs graduated to cobalt:** MapTab ✅, VaultTab ✅, BottomNav ✅, MarketTicker ✅, IntroSplash ✅, AnalyticsTab ✅, CatalogTab ✅
+**Still old palette:** GamesTab 🔴, AiTab 🔴
 
 ## Run & Operate
 
@@ -9,7 +30,7 @@ A premium Telegram bot + Telegram Mini App (TMA) fuel availability dashboard for
 - SQLite DB auto-created at `tma_backend/tma.db`
 
 **TMA Frontend (React + Vite)**
-- `pnpm --filter @workspace/tma-frontend run dev` — runs on port 3001
+- `pnpm --filter @workspace/tma-frontend run dev` — runs on port 5000
 
 **Telegram Bot**
 - `python bot.py` — polling bot with voucher QR system
