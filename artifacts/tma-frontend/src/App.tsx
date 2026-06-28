@@ -216,7 +216,7 @@ export default function App() {
       setShowAdmin(true);
     }
     const urlTab = urlParams.get("tab") as TabId | null;
-    const validTabs: TabId[] = ["map", "analytics", "catalog", "ai", "games", "news"];
+    const validTabs: TabId[] = ["map", "analytics", "catalog", "news"];
     if (urlTab && validTabs.includes(urlTab)) {
       setActiveTab(urlTab);
     }
@@ -299,7 +299,7 @@ export default function App() {
     }
   };
 
-  const tabOrder: TabId[] = ["map", "analytics", "catalog", "ai", "games", "news"];
+  const tabOrder: TabId[] = ["map", "analytics", "catalog", "news"];
   const tabIndexRef = useRef(0);
   const prevTabIndex = tabIndexRef.current;
   const curTabIndex = tabOrder.indexOf(activeTab);
@@ -573,8 +573,6 @@ export default function App() {
             >
               {activeTab === "analytics" && <AnalyticsTab />}
               {activeTab === "catalog"   && <CatalogTab initialStationId={initialStationId} onCalcOpenChange={setCalcOpen} />}
-              {activeTab === "ai"        && <AiTab onNavigate={handleTabChange} />}
-              {activeTab === "games"     && <GamesTab />}
               {activeTab === "news"      && <NewsTab onNavigate={handleTabChange} />}
             </motion.div>
           )}

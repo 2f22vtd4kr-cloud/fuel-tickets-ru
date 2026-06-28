@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { impact } from "@/lib/haptic";
 import type { TabId } from "@/types";
-import { Map, BarChart2, Ticket, Bot, Gamepad2 } from "lucide-react";
+import { Map, BarChart2, Ticket } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 interface Props {
@@ -15,8 +15,6 @@ const TABS: { id: TabId; Icon: LucideIcon; label: string }[] = [
   { id: "map",       Icon: Map,       label: "Карта"       },
   { id: "analytics", Icon: BarChart2, label: "Аналитика"   },
   { id: "catalog",   Icon: Ticket,    label: "Талоны"      },
-  { id: "ai",        Icon: Bot,       label: "ИИ"          },
-  { id: "games",     Icon: Gamepad2,  label: "Игры"        },
 ];
 
 const NAV_CSS = `
