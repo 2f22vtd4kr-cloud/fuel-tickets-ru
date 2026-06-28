@@ -547,7 +547,7 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem", padding: "0 0.15rem" }}>
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.48rem", letterSpacing: "0.12em" }}>НЕДАВНИЕ_ПОИСКИ</span>
+                  <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.48rem", letterSpacing: "0.12em" }}>НЕДАВНИЕ ПОИСКИ</span>
                   <button
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => { setMapRecentSearches([]); localStorage.removeItem("tma-map-recent-searches"); }}
@@ -636,7 +636,7 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
 
             {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.65rem" }}>
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#4b5563", fontSize: "0.55rem", letterSpacing: "0.14em" }}>ФИЛЬТР_МАТРИЦА</span>
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#4b5563", fontSize: "0.55rem", letterSpacing: "0.14em" }}>ФИЛЬТР МАТРИЦА</span>
               <button
                 onClick={() => setShowFilters(false)}
                 style={{ background: "none", border: "none", color: "#374151", cursor: "pointer", fontSize: "0.7rem", padding: "0.1rem 0.3rem" }}

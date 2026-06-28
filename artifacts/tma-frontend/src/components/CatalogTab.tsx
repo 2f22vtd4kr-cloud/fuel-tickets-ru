@@ -1606,7 +1606,7 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
                 { label: "СЕТЕЙ", value: String(NETWORK_VOUCHER_NETWORKS.length) },
                 { label: "АЗС ОХВАЧЕНО", value: String(NETWORK_VOUCHER_NETWORKS.reduce((a, { name }) => a + (networkStationCounts[name] ?? 0), 0)) },
                 { label: "БРЕНДОВ ТОПЛИВА", value: "до 7" },
-                { label: "СРОК", value: "до мес." },
+                { label: "СРОК", value: "90 дней" },
               ] as { label: string; value: string }[]).map(({ label, value }) => (
                 <div key={label} style={{ background: "rgba(168,85,247,0.08)", border: "1px solid #a855f725", borderRadius: "7px", padding: "0.18rem 0.42rem", display: "flex", gap: "0.28rem", alignItems: "baseline" }}>
                   <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#a855f7", fontSize: "0.62rem", fontWeight: 800 }}>{value}</span>
@@ -1758,7 +1758,7 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
                           {/* Header row */}
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.55rem" }}>
                             <div>
-                              <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.44rem", letterSpacing: "0.12em", marginBottom: "4px" }}>СЕТЕВОЙ_ТАЛОН · ИТОГО</div>
+                              <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.44rem", letterSpacing: "0.12em", marginBottom: "4px" }}>СЕТЕВОЙ ТАЛОН · ИТОГО</div>
                               <div style={{ display: "flex", gap: "0.32rem", alignItems: "center" }}>
                                 <span style={{ background: `${netColor}22`, border: `1px solid ${netColor}55`, borderRadius: "5px", padding: "0.06rem 0.32rem", color: netColor, fontSize: "0.56rem", fontWeight: 800, fontFamily: "'JetBrains Mono',monospace" }}>{nvFuel}</span>
                                 <span style={{ color: "#6b7280", fontSize: "0.56rem" }}>{nvVolume}л</span>
@@ -1956,7 +1956,7 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem", padding: "0 0.2rem" }}>
-                <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.48rem", letterSpacing: "0.12em" }}>НЕДАВНИЕ_ЗАПРОСЫ</span>
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.48rem", letterSpacing: "0.12em" }}>НЕДАВНИЕ ЗАПРОСЫ</span>
                 <button
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => { setRecentSearches([]); localStorage.removeItem(RECENT_SEARCHES_KEY); impact("light"); }}
@@ -2338,7 +2338,7 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
         return (
           <div style={{ padding: "0 1rem 0.5rem" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.4rem" }}>
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.42rem", letterSpacing: "0.14em" }}>ЛУЧШИЕ_ПРЕДЛОЖЕНИЯ · СЕЙЧАС</span>
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.42rem", letterSpacing: "0.14em" }}>ЛУЧШИЕ ПРЕДЛОЖЕНИЯ · СЕЙЧАС</span>
               <div style={{ flex: 1, height: "1px", background: `linear-gradient(90deg,${color}33,transparent)` }} />
             </div>
             <div style={{ display: "flex", gap: "0.3rem", marginBottom: "0.55rem" }}>
@@ -2521,7 +2521,7 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
       {!selectedStation && !searchQuery && recentlyViewed.length > 0 && (
         <div style={{ padding: "0 1rem 0.65rem" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.45rem" }}>
-            <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#6b7280", fontSize: "0.46rem", letterSpacing: "0.14em" }}>НЕДАВНО_ПРОСМОТРЕНО</span>
+            <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#6b7280", fontSize: "0.46rem", letterSpacing: "0.14em" }}>НЕДАВНО ПРОСМОТРЕНО</span>
             <div style={{ flex: 1, height: "1px", background: "linear-gradient(90deg,#6b728022,transparent)" }} />
           </div>
           <div style={{ display: "flex", gap: "0.4rem", overflowX: "auto", paddingBottom: "0.25rem" }}>
@@ -2593,7 +2593,7 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
       {!selectedStation && !searchQuery && sortMode === "availability" && (
         <div style={{ padding: "0 1rem 0.75rem" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.45rem" }}>
-            <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e", fontSize: "0.46rem", letterSpacing: "0.14em" }}>ТОП_ДОСТУПНОСТЬ</span>
+            <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e", fontSize: "0.46rem", letterSpacing: "0.14em" }}>ТОП ДОСТУПНОСТЬ</span>
           </div>
           <div style={{ display: "flex", gap: "0.4rem", overflowX: "auto", paddingBottom: "0.25rem" }}>
             {[...stations]
@@ -2816,7 +2816,7 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
                 >
                   <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#a855f7,#db2777,transparent)" }} />
                   <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#4b5563", fontSize: "0.46rem", letterSpacing: "0.16em", marginBottom: "0.4rem" }}>
-                    ЛИМИТ_ОТОБРАЖЕНИЯ · {MAX_INLINE}_СТАНЦИЙ
+                    ЛИМИТ ОТОБРАЖЕНИЯ · {MAX_INLINE} СТАНЦИЙ
                   </div>
                   <p style={{ margin: "0 0 0.35rem", color: "#e2e8f0", fontSize: "0.82rem", fontWeight: 700 }}>
                     Показано {MAX_INLINE} из {filteredStations.length.toLocaleString("ru")} АЗС
@@ -2854,7 +2854,7 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
               style={{ marginBottom: "0.65rem", background: "linear-gradient(135deg,#0a0a14,#0d0c18)", border: "1px solid #3b82f633", borderRadius: "14px", padding: "0.6rem 0.7rem", position: "relative", overflow: "hidden" }}
             >
               <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#3b82f6,#a855f7,transparent)" }} />
-              <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.42rem", letterSpacing: "0.14em", marginBottom: "0.45rem" }}>СРАВНЕНИЕ_СТАНЦИЙ · АНАЛИЗ</div>
+              <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.42rem", letterSpacing: "0.14em", marginBottom: "0.45rem" }}>СРАВНЕНИЕ СТАНЦИЙ · АНАЛИЗ</div>
               {(() => {
                 const pair = [compareStation, selectedStation];
                 const avgs = pair.map((s) => s.fuel_statuses.length ? Math.round(s.fuel_statuses.reduce((a, f) => a + f.availability_pct, 0) / s.fuel_statuses.length) : 0);
@@ -2927,7 +2927,7 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
                 <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: `linear-gradient(90deg,transparent,${selColor},transparent)` }} />
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.18rem" }}>ВЫБРАННАЯ_СТАНЦИЯ · ЗАПРАВКА</div>
+                    <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.18rem" }}>ВЫБРАННАЯ СТАНЦИЯ · ЗАПРАВКА</div>
                     <p style={{ margin: "0 0 0.15rem", color: "#f1f5f9", fontWeight: 800, fontSize: "0.95rem", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {selectedStation.name}
                     </p>
@@ -2975,7 +2975,7 @@ export function CatalogTab({ initialStationId, onCalcOpenChange }: CatalogTabPro
 
           {/* Payment method */}
           <div style={{ marginBottom: "0.25rem" }}>
-            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.1rem" }}>СПОСОБ_ОПЛАТЫ · ШЛЮЗ</div>
+            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.1rem" }}>СПОСОБ ОПЛАТЫ · ШЛЮЗ</div>
             <p style={{ color: "#6b7280", fontSize: "0.68rem", margin: "0 0 0.35rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>Способ оплаты</p>
             <PaymentMethodSelector value={payMethod} onChange={setPayMethod} />
           </div>

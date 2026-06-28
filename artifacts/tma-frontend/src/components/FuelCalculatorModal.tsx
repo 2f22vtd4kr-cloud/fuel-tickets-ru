@@ -81,7 +81,7 @@ export function FuelCalculatorModal({ onClose }: Props) {
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
           <div>
-            <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.46rem", color: "#4b5563", letterSpacing: "0.16em", marginBottom: "0.15rem" }}>ТОПЛИВО_КАЛЬКУЛЯТОР · РЕЙС</div>
+            <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.46rem", color: "#4b5563", letterSpacing: "0.16em", marginBottom: "0.15rem" }}>ТОПЛИВО КАЛЬКУЛЯТОР · РЕЙС</div>
             <h3 style={{ margin: 0, color: "#e2e8f0", fontSize: "1rem", fontWeight: 700 }}>🧮 Калькулятор расхода</h3>
           </div>
           <button

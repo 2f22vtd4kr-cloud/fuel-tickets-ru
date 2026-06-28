@@ -228,7 +228,7 @@ export function VpnModal({ onClose, isTroubleshooter = false, onSessionChange }:
         <div style={{ padding: "1.25rem 1rem 0" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.8rem" }}>
           <div>
-            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#4b5563", fontSize: "0.46rem", letterSpacing: "0.14em", marginBottom: "0.15rem" }}>МАТРИЦА_ДОСТУПА · VPN</div>
+            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#4b5563", fontSize: "0.46rem", letterSpacing: "0.14em", marginBottom: "0.15rem" }}>МАТРИЦА ДОСТУПА · VPN</div>
             <h2 style={{ margin: 0, color: "#e2e8f0", fontSize: "1.1rem", fontWeight: 800 }}>
               🔒 VPN-доступ
             </h2>

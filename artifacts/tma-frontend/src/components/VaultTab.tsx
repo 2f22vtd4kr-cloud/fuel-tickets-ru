@@ -594,7 +594,7 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
         return (
           <div style={{ padding: "0 12px 10px" }}>
             <div className="glass-panel" style={{ padding: "10px 12px" }}>
-              <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.42rem", letterSpacing: "0.14em", marginBottom: "6px" }}>РАСПРЕДЕЛЕНИЕ_ТОПЛИВА · ОБЪЁМ</div>
+              <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.42rem", letterSpacing: "0.14em", marginBottom: "6px" }}>РАСПРЕДЕЛЕНИЕ ТОПЛИВА · ОБЪЁМ</div>
               <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
                 {fuels.map(([fuel, vol]) => {
                   const color = FUEL_COLORS[fuel] ?? "#6b7280";
@@ -644,7 +644,7 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
               {/* User row */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.6rem" }}>
                 <div>
-                  <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.18rem" }}>ПРОФИЛЬ_ОПЕРАТОРА · XP</div>
+                  <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.18rem" }}>ПРОФИЛЬ ОПЕРАТОРА · XP</div>
                   <p style={{ margin: "0 0 0.15rem", color: "#e2e8f0", fontWeight: 700, fontSize: "1rem" }}>
                     {user.username ? `@${user.username}` : `Пользователь #${user.id}`}
                   </p>
@@ -809,7 +809,7 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
         return (
           <div style={{ margin: "0 1rem 0.75rem", background: "linear-gradient(135deg,#0d0d18,#110a18)", border: "1px solid #a855f722", borderRadius: "14px", padding: "0.75rem", position: "relative", overflow: "hidden" }}>
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#a855f7,#db2777,transparent)" }} />
-            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.4rem", letterSpacing: "0.14em", marginBottom: "0.45rem" }}>СТАТИСТИКА_РАСХОДА · ВСЕГО</div>
+            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.4rem", letterSpacing: "0.14em", marginBottom: "0.45rem" }}>СТАТИСТИКА РАСХОДА · ВСЕГО</div>
             <div style={{ display: "flex", gap: "0.4rem" }}>
               {[
                 { label: "Топлива", value: `${totalVolume}л`, color: "#22c55e" },
@@ -910,7 +910,7 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
                     return (
                       <div style={{ padding: "0 0.75rem 0.5rem" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.2rem" }}>
-                          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.38rem", color: "#2a2a36", letterSpacing: "0.08em" }}>СРОК_ДЕЙСТВИЯ</span>
+                          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.38rem", color: "#2a2a36", letterSpacing: "0.08em" }}>СРОК ДЕЙСТВИЯ</span>
                           <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "0.4rem", color: exColor, fontWeight: 700 }}>мин {daysLeft}д</span>
                         </div>
                         <div style={{ height: "3px", background: "#0b0b12", borderRadius: "2px", overflow: "hidden" }}>
@@ -950,7 +950,7 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
       {history.length > 0 && (
         <div style={{ padding: "0 1rem 0.5rem" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.1rem", marginTop: "0.5rem" }}>
-            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em" }}>АРХИВ_ОРДЕРОВ · ИСТОРИЯ</div>
+            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em" }}>АРХИВ ОРДЕРОВ · ИСТОРИЯ</div>
             <button
               onClick={() => {
                 const rows = [
@@ -1021,7 +1021,7 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
         <div style={{ padding: "0 1rem 0.75rem" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
             <div>
-              <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.46rem", letterSpacing: "0.14em", marginBottom: "0.1rem" }}>МОНИТОРИНГ_АЗС · АКТИВНЫЕ</div>
+              <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.46rem", letterSpacing: "0.14em", marginBottom: "0.1rem" }}>МОНИТОРИНГ АЗС · АКТИВНЫЕ</div>
               <p style={{ margin: 0, color: "#a855f7", fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>
                 🔔 Подписки · {subscriptions.length} АЗС
               </p>
@@ -1118,7 +1118,7 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
         <div style={{ padding: "0 1rem 0.75rem" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
             <div>
-              <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.46rem", letterSpacing: "0.14em", marginBottom: "0.1rem" }}>МОИ_ЗАМЕТКИ · АЗС</div>
+              <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.46rem", letterSpacing: "0.14em", marginBottom: "0.1rem" }}>МОИ ЗАМЕТКИ · АЗС</div>
               <p style={{ margin: 0, color: "#db2777", fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>
                 📝 Заметки · {stationNotes.length} АЗС
               </p>
@@ -1185,7 +1185,7 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
       {/* Favorite stations */}
       {favoriteStations.length > 0 && (
         <div style={{ padding: "0 1rem 0.75rem" }}>
-          <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.1rem" }}>ИЗБРАННЫЕ_АЗС · БЫСТРЫЙ_ДОСТУП</div>
+          <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.1rem" }}>ИЗБРАННЫЕ АЗС · БЫСТРЫЙ ДОСТУП</div>
           <p style={{ color: "#f59e0b", fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 0.5rem", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>
             ⭐ Избранные АЗС · {favoriteStations.length}
           </p>
@@ -1243,7 +1243,7 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
       {/* Favorite regions */}
       {favoriteRegions.length > 0 && (
         <div style={{ padding: "0 1rem 0.75rem" }}>
-          <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.1rem" }}>ИЗБРАННЫЕ_РЕГИОНЫ · МОНИТОРИНГ</div>
+          <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.1rem" }}>ИЗБРАННЫЕ РЕГИОНЫ · МОНИТОРИНГ</div>
           <p style={{ color: "#eab308", fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 0.5rem", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>
             ⭐ Мониторинг · {favoriteRegions.length} регионов
           </p>
@@ -1325,7 +1325,7 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
         <div style={{ padding: "0 1rem 0.75rem" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
             <div>
-              <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.1rem" }}>ДОСТИЖЕНИЯ_СИСТЕМЫ · РАЗБЛОКИРОВАНО</div>
+              <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.1rem" }}>ДОСТИЖЕНИЯ СИСТЕМЫ · РАЗБЛОКИРОВАНО</div>
               <p style={{ margin: 0, color: "#f59e0b", fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>
                 🏆 Достижения · {achievements.filter(a => a.unlocked).length}/{achievements.length}
               </p>

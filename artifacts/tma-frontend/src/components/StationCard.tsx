@@ -54,7 +54,7 @@ function NearbyAlternatives({ station }: { station: GasStation }) {
   return (
     <div style={{ padding: "0.5rem 1rem", borderBottom: "1px solid #0f0f17" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.4rem" }}>
-        <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.46rem", letterSpacing: "0.14em" }}>БЛИЖАЙШИЕ_АЛЬТЕРНАТИВЫ</div>
+        <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.46rem", letterSpacing: "0.14em" }}>БЛИЖАЙШИЕ АЛЬТЕРНАТИВЫ</div>
         <div style={{ flex: 1, height: "1px", background: "linear-gradient(90deg,#1e1e2a,transparent)" }} />
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
@@ -468,7 +468,7 @@ export function StationCard({ station, onClose }: Props) {
       {/* Live prices */}
       <div style={{ padding: "0.6rem 1rem", borderBottom: "1px solid #0f0f17" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.45rem" }}>
-          <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.46rem", letterSpacing: "0.14em" }}>ЦЕНЫ_СЕЙЧАС</div>
+          <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.46rem", letterSpacing: "0.14em" }}>ЦЕНЫ СЕЙЧАС</div>
           <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: connected ? "#22c55e" : "#4b5563", boxShadow: connected ? "0 0 5px #22c55e" : "none", flexShrink: 0 }} />
           {connected && <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#22c55e66", fontSize: "0.46rem", letterSpacing: "0.1em" }}>LIVE</span>}
           <div style={{ flex: 1, height: "1px", background: "linear-gradient(90deg,#1e1e2a,transparent)" }} />
@@ -503,7 +503,7 @@ export function StationCard({ station, onClose }: Props) {
       {/* Fuel statuses */}
       <div style={{ padding: "0.65rem 1rem", borderBottom: "1px solid #0f0f17" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.45rem" }}>
-          <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.46rem", letterSpacing: "0.14em" }}>НАЛИЧИЕ_ТОПЛИВА</div>
+          <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.46rem", letterSpacing: "0.14em" }}>НАЛИЧИЕ ТОПЛИВА</div>
           <div style={{ flex: 1, height: "1px", background: "linear-gradient(90deg,#1e1e2a,transparent)" }} />
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
@@ -590,7 +590,7 @@ export function StationCard({ station, onClose }: Props) {
       {noteLoaded && (
         <div style={{ padding: "0.5rem 1rem", borderBottom: "1px solid #0f0f17" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.4rem" }}>
-            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.46rem", letterSpacing: "0.14em" }}>МОЯ_ЗАМЕТКА · ЛИЧНАЯ</div>
+            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.46rem", letterSpacing: "0.14em" }}>МОЯ ЗАМЕТКА · ЛИЧНАЯ</div>
             <div style={{ flex: 1, height: "1px", background: "linear-gradient(90deg,#1e1e2a,transparent)" }} />
             {!noteEditing && (
               <button

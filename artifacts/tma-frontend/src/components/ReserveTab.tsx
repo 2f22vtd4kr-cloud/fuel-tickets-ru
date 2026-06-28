@@ -197,7 +197,7 @@ function FlipGame() {
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.55rem" }}>
           <div>
-            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.48rem", letterSpacing: "0.15em", marginBottom: "0.15rem" }}>СИСТЕМА_ТАРО · v2.0</div>
+            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.48rem", letterSpacing: "0.15em", marginBottom: "0.15rem" }}>СИСТЕМА ТАРО · v2.0</div>
             <h3 style={{ margin: 0, color: "#e2e8f0", fontSize: "0.92rem", fontWeight: 800 }}>
               🃏 Бензиновое Таро
             </h3>
@@ -471,7 +471,7 @@ function TapGame() {
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: phase === "playing" ? (timeLeft <= 8 ? "linear-gradient(90deg,transparent,#ef4444,transparent)" : "linear-gradient(90deg,transparent,#22c55e,transparent)") : "linear-gradient(90deg,transparent,#22c55e88,transparent)" }} />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
           <div>
-            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.48rem", letterSpacing: "0.15em", marginBottom: "0.12rem" }}>ИГРА_СКОРОСТИ · 30с</div>
+            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.48rem", letterSpacing: "0.15em", marginBottom: "0.12rem" }}>ИГРА СКОРОСТИ · 30с</div>
             <h3 style={{ margin: 0, color: "#e2e8f0", fontSize: "0.92rem", fontWeight: 800 }}>
               ⚡ Заправка на скорость
             </h3>
@@ -832,7 +832,7 @@ function PriceGuessGame() {
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: "linear-gradient(90deg,transparent,#f59e0b,#a855f7,transparent)" }} />
         <div style={{ padding: "0.85rem 1rem 0.6rem", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
-            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.15rem" }}>ТОПЛИВНЫЙ_ТРЕЙДЕР · МИНИ_ИГРА</div>
+            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.15rem" }}>ТОПЛИВНЫЙ ТРЕЙДЕР · МИНИ ИГРА</div>
             <h3 style={{ margin: 0, color: "#e2e8f0", fontSize: "0.9rem", fontWeight: 800 }}>💹 Угадай цену</h3>
             <p style={{ margin: "0.1rem 0 0", color: "#4b5563", fontSize: "0.62rem" }}>Где дороже? Угадай регион с большей ценой</p>
           </div>
@@ -978,7 +978,7 @@ function XpTiers() {
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#a855f7,transparent)" }} />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
           <div>
-            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.46rem", letterSpacing: "0.14em", marginBottom: "0.15rem" }}>РАНГОВЫЙ_ПУТЬ · УЧАСТНИКА</div>
+            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.46rem", letterSpacing: "0.14em", marginBottom: "0.15rem" }}>РАНГОВЫЙ ПУТЬ · УЧАСТНИКА</div>
             <h3 style={{ margin: 0, color: "#e2e8f0", fontSize: "0.9rem", fontWeight: 800 }}>⭐ Путь участника</h3>
           </div>
           {next && (
@@ -1156,7 +1156,7 @@ function DailyCheckin() {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.1rem" }}>
               <div>
-                <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.4rem", letterSpacing: "0.12em", marginBottom: "1px" }}>ЕЖЕДНЕВНЫЙ_БОНУС · СЕРИЯ</div>
+                <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.4rem", letterSpacing: "0.12em", marginBottom: "1px" }}>ЕЖЕДНЕВНЫЙ БОНУС · СЕРИЯ</div>
               <p style={{ margin: 0, color: "#e2e8f0", fontWeight: 800, fontSize: "0.88rem" }}>
                 Ежедневный бонус
               </p>
@@ -1207,7 +1207,7 @@ function DailyCheckin() {
             {/* 28-day streak calendar */}
             {streak > 0 && (
               <div style={{ marginTop: "0.55rem" }}>
-                <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.38rem", letterSpacing: "0.1em", marginBottom: "0.3rem" }}>КАЛЕНДАРЬ_СЕРИИ · 28Д</div>
+                <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.38rem", letterSpacing: "0.1em", marginBottom: "0.3rem" }}>КАЛЕНДАРЬ СЕРИИ · 28Д</div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "3px" }}>
                   {Array.from({ length: 28 }, (_, i) => {
                     const daysAgo = 27 - i;
@@ -1307,7 +1307,7 @@ function LeaderboardSection() {
               fontSize: "1.1rem", boxShadow: "0 0 10px rgba(245,158,11,0.2)",
             }}>🏆</div>
             <div style={{ textAlign: "left" }}>
-              <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.46rem", letterSpacing: "0.14em", marginBottom: "0.1rem" }}>РЕЙТИНГ_ОПЕРАТОРОВ · XP</div>
+              <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.46rem", letterSpacing: "0.14em", marginBottom: "0.1rem" }}>РЕЙТИНГ ОПЕРАТОРОВ · XP</div>
               <p style={{ margin: 0, color: "#e2e8f0", fontWeight: 700, fontSize: "0.9rem", lineHeight: 1 }}>
                 Таблица лидеров
               </p>
@@ -1494,7 +1494,7 @@ function ReferralSection() {
             fontSize: "1.1rem", boxShadow: "0 0 10px rgba(168,85,247,0.2)",
           }}>🔗</div>
           <div>
-            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.46rem", letterSpacing: "0.14em", marginBottom: "0.1rem" }}>РЕФЕРАЛ_ПРОГРАММА · +200_XP</div>
+            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.46rem", letterSpacing: "0.14em", marginBottom: "0.1rem" }}>РЕФЕРАЛ ПРОГРАММА · +200_XP</div>
             <p style={{ margin: 0, color: "#e2e8f0", fontWeight: 700, fontSize: "0.9rem", lineHeight: 1 }}>
               Реферальная программа
             </p>
@@ -1635,7 +1635,7 @@ function OperatorConsole() {
 
           {/* Info */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.18rem" }}>КОНСОЛЬ_ОПЕРАТОРА · СТАТУС</div>
+            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.18rem" }}>КОНСОЛЬ ОПЕРАТОРА · СТАТУС</div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.2rem" }}>
               <p style={{ margin: 0, color, fontWeight: 800, fontSize: "0.95rem", lineHeight: 1 }}>
                 {tierName.join(" ")}
@@ -1678,7 +1678,7 @@ function OperatorConsole() {
         {/* XP milestone roadmap */}
         {next && (
           <div style={{ marginTop: "0.75rem", borderTop: `1px solid ${color}22`, paddingTop: "0.65rem" }}>
-            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.38rem", letterSpacing: "0.1em", marginBottom: "0.35rem" }}>ДОРОЖНАЯ_КАРТА · РАНГИ</div>
+            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.38rem", letterSpacing: "0.1em", marginBottom: "0.35rem" }}>ДОРОЖНАЯ КАРТА · РАНГИ</div>
             <div style={{ display: "flex", gap: "0.3rem", overflowX: "auto", paddingBottom: "0.15rem" }}>
               {TIERS.map((t) => {
                 const tColor = TIER_COLORS[t.name] ?? "#6b7280";
