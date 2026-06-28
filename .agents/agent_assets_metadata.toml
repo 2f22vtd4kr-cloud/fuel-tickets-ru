@@ -24,3 +24,9 @@ id = "qXaHfcdokIcRJ6ERZSOj6"
 uri = "file://screenshots/app_banner_v2.jpg"
 type = "image"
 title = "Топливо — Баннер (обновлённый)"
+
+[[outputs]]
+id = "F5-NdA4GqDpCklJR50jfg"
+uri = "file://screenshots/app_banner_v3.jpg"
+type = "image"
+title = "Баннер v3"

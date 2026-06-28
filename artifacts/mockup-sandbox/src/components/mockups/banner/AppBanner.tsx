@@ -279,16 +279,11 @@ export function AppBanner() {
       }} />
 
       {/* ── Left: text block ── */}
-      <div className="relative z-10 flex flex-col gap-5 pl-12" style={{ width: 460, flexShrink: 0 }}>
-        {/* app name */}
-        <div className="text-white font-bold tracking-wide" style={{ fontSize: 18, opacity: 0.92 }}>
-          Топливо ⛽️
-        </div>
-
+      <div className="relative z-10 flex flex-col gap-0 pl-12" style={{ width: 480, flexShrink: 0 }}>
         {/* hero slogan */}
         <div className="flex flex-col gap-0" style={{ overflow: "visible" }}>
-          <ShadowText text="Пох*й" className="text-[72px] leading-none" />
-          <span className="font-black leading-none mt-1 text-white" style={{ fontSize: 52 }}>инфляция —</span>
+          <ShadowText text="Пох*й" className="text-[148px] leading-none" />
+          <span className="font-black leading-none text-white" style={{ fontSize: 52, marginTop: 48 }}>инфляция —</span>
           <span className="font-black leading-none mt-1 text-white" style={{ fontSize: 44 }}>бери талоны</span>
           <span className="font-black leading-none mt-1 text-white" style={{ fontSize: 38 }}>и замораживай</span>
           <span className="font-black leading-none mt-1 text-white" style={{ fontSize: 72 }}>цены.</span>
