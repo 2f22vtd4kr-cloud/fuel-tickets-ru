@@ -153,18 +153,19 @@ function CatalogStrip({ color, style = {} }: { color: string; style?: React.CSSP
   }} />;
 }
 
-const NETWORK_LOGOS: Record<string, { src: string; bg: string; padding: number }> = {
-  "Лукойл":       { src: "/logo-lukoil-clean.png",   bg: "#C8102E",              padding: 1  },
-  "Роснефть":     { src: "/logo-rosneft-clean.png",  bg: "#ffffff",              padding: 2  },
-  "Газпромнефть": { src: "/logo-gazprom-clean.png",  bg: "#ffffff",              padding: 2  },
-  "Башнефть":     { src: "/logo-bashneft-clean.png", bg: "#ffffff",              padding: 1  },
-  "Татнефть":     { src: "/logo-tatneft-clean.png",  bg: "#ffffff",              padding: 3  },
-  "ННК":          { src: "/logo-nnk-clean.png",      bg: "#ffffff",              padding: 2  },
+const NETWORK_LOGOS: Record<string, { src: string; bg: string; zoom: number }> = {
+  "Лукойл":       { src: "/logo-lukoil-clean.png",   bg: "#C8102E",  zoom: 1.10 },
+  "Роснефть":     { src: "/logo-rosneft-clean.png",  bg: "#ffffff",  zoom: 2.00 },
+  "Газпромнефть": { src: "/logo-gazprom-clean.png",  bg: "#ffffff",  zoom: 2.00 },
+  "Башнефть":     { src: "/logo-bashneft-clean.png", bg: "#ffffff",  zoom: 1.80 },
+  "Татнефть":     { src: "/logo-tatneft-clean.png",  bg: "#ffffff",  zoom: 1.70 },
+  "ННК":          { src: "/logo-nnk-clean.png",      bg: "#ffffff",  zoom: 1.70 },
 };
 
 function NetworkLogo({ net }: { net: Net }) {
   const logo = NETWORK_LOGOS[net.name];
   if (logo) {
+    const overflow = ((logo.zoom - 1) / 2) * 100;
     return (
       <div
         className="ct-net-logo"
@@ -175,7 +176,7 @@ function NetworkLogo({ net }: { net: Net }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          padding: logo.padding,
+          padding: 0,
           flexShrink: 0,
         }}
       >
@@ -183,8 +184,9 @@ function NetworkLogo({ net }: { net: Net }) {
           src={logo.src}
           alt={net.name}
           style={{
-            width: "100%",
-            height: "100%",
+            width: `${logo.zoom * 100}%`,
+            height: `${logo.zoom * 100}%`,
+            margin: `-${overflow}%`,
             objectFit: "contain",
             objectPosition: "center",
             display: "block",
