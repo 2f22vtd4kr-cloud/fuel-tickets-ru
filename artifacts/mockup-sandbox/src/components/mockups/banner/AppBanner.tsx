@@ -285,13 +285,13 @@ export function AppBanner() {
           Топливо ⛽️
         </div>
 
-        {/* hero slogan with fading orange shadow — 3 lines matching reference scale */}
+        {/* hero slogan */}
         <div className="flex flex-col gap-0" style={{ overflow: "visible" }}>
           <ShadowText text="Пох*й" className="text-[72px] leading-none" />
-          <ShadowText text="инфляция —" className="text-[52px] leading-none mt-1" />
-          <ShadowText text="бери талоны" className="text-[44px] leading-none mt-1" />
-          <ShadowText text="и замораживай" className="text-[38px] leading-none mt-1" />
-          <ShadowText text="цены." className="text-[72px] leading-none mt-1" />
+          <span className="font-black leading-none mt-1 text-white" style={{ fontSize: 52 }}>инфляция —</span>
+          <span className="font-black leading-none mt-1 text-white" style={{ fontSize: 44 }}>бери талоны</span>
+          <span className="font-black leading-none mt-1 text-white" style={{ fontSize: 38 }}>и замораживай</span>
+          <span className="font-black leading-none mt-1 text-white" style={{ fontSize: 72 }}>цены.</span>
         </div>
       </div>
 
