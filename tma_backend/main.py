@@ -143,6 +143,14 @@ def _run_migrations() -> None:
         ),
         "CREATE INDEX IF NOT EXISTS ix_alert_active ON market_price_alerts (active)",
         "CREATE INDEX IF NOT EXISTS ix_alert_user ON market_price_alerts (user_id)",
+        # AI-enriched network insight cache (daily background job)
+        (
+            "CREATE TABLE IF NOT EXISTS network_insight_cache ("
+            "network_name TEXT NOT NULL, "
+            "insight_json TEXT NOT NULL, "
+            "updated_at TEXT, "
+            "PRIMARY KEY (network_name))"
+        ),
     ]
     with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
         for stmt in ddl_statements:
@@ -150,6 +158,31 @@ def _run_migrations() -> None:
                 conn.execute(text(stmt))
             except Exception as _e:
                 logger.debug("Migration skipped (column likely exists): %s", _e)
+
+
+# ── Service-word blocklist for network name filtering ────────────────────────
+_SERVICE_NETWORK_WORDS = {
+    "шиномонтаж", "мойка", "автомойка", "автосервис", "кафе", "магазин",
+    "стоянка", "парковка", "сто", "техцентр", "сервис", "шины",
+    "гараж", "прокат", "заправщик", "жесть", "нефть", "азс", "агзс",
+    "агнкс", "мазс",
+}
+_SERVICE_NETWORK_PREFIXES = ("мойка", "шиномонтаж", "автомойка", "шины", "автосервис")
+
+
+def _is_service_network(name: str) -> bool:
+    """Return True if this 'network' name is actually a service facility, not a fuel brand."""
+    if not name or not name.strip():
+        return True
+    lower = name.strip().lower()
+    if lower in _SERVICE_NETWORK_WORDS:
+        return True
+    if any(lower.startswith(p) for p in _SERVICE_NETWORK_PREFIXES):
+        return True
+    # Single generic words without distinguishing suffix are noise
+    if lower in {"азс", "агзс", "агнкс", "мазс", "нефть"}:
+        return True
+    return False
 
 
 def _blocking_startup() -> None:
@@ -187,6 +220,7 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(generate_news_from_availability, "interval", hours=2, jitter=60)
     scheduler.add_job(generate_ai_news, "interval", hours=3, jitter=300)
     scheduler.add_job(check_market_price_alerts, "interval", minutes=10, jitter=60)
+    scheduler.add_job(refresh_network_ai_rankings, "cron", hour=3, minute=15)
     scheduler.start()
     logger.info("Топливо ⛽️ API запущен (DB init running in background).")
 
@@ -2785,6 +2819,34 @@ def get_analytics_trend(region: Optional[str] = None, days: int = 7, db: Session
     ]
 
 
+@app.get("/api/analytics/network-insights")
+def get_network_insights(networks: str = "", db: Session = Depends(get_db)):
+    """
+    Return cached AI insights for comma-separated network names.
+    Populated by the daily refresh_network_ai_rankings background job.
+    Only returns data that is already cached — never blocks on live AI calls.
+    """
+    from sqlalchemy import text as _text
+    net_list = [n.strip() for n in networks.split(",") if n.strip()][:12]
+    if not net_list:
+        return {"insights": {}}
+    result: dict = {}
+    try:
+        for name in net_list:
+            row = db.execute(
+                _text("SELECT insight_json FROM network_insight_cache WHERE network_name = :n"),
+                {"n": name},
+            ).fetchone()
+            if row:
+                try:
+                    result[name] = json.loads(row[0])
+                except Exception:
+                    pass
+    except Exception as e:
+        logger.warning(f"get_network_insights error: {e}")
+    return {"insights": result}
+
+
 # ──────────────────────────────────────────────────────────────────
 #  Dynamic Pricing Engine
 # ──────────────────────────────────────────────────────────────────
@@ -3193,6 +3255,125 @@ def generate_ai_news():
 
     except Exception as e:
         logger.error(f"generate_ai_news error: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+
+# ──────────────────────────────────────────────────────────────────
+#  Daily AI network enrichment
+# ──────────────────────────────────────────────────────────────────
+
+async def refresh_network_ai_rankings():
+    """
+    Daily at 03:15: enrich the top 25 fuel networks with AI-sourced real data
+    (founding year, total stations, regions, specialty, reliability rating).
+    Uses Gemini 2.0 Flash → Groq fallback in batches of 5 to respect free-tier limits.
+    Results stored in network_insight_cache table; served via GET /api/analytics/network-insights.
+    """
+    from sqlalchemy import func as _func
+
+    db = SessionLocal()
+    try:
+        top_nets = (
+            db.query(GasStation.network, _func.count(GasStation.id).label("cnt"))
+            .filter(GasStation.network.isnot(None), GasStation.network != "")
+            .group_by(GasStation.network)
+            .order_by(_func.count(GasStation.id).desc())
+            .limit(35)
+            .all()
+        )
+        valid_nets = [n for n, _ in top_nets if not _is_service_network(n)][:25]
+
+        gemini_key = os.getenv("GEMINI_API_KEY", "")
+        groq_key = os.getenv("GROQ_API_KEY", "")
+
+        if not gemini_key and not groq_key:
+            logger.info("refresh_network_ai_rankings: no AI keys — skipping.")
+            return
+
+        import asyncio as _aio, re as _re, time as _time
+
+        saved_total = 0
+        for i in range(0, len(valid_nets), 5):
+            batch = valid_nets[i : i + 5]
+            names_str = ", ".join(batch)
+            prompt = (
+                f"Дай реальные данные 2024-2025 по каждой российской топливной сети АЗС.\n"
+                f"Сети: {names_str}\n\n"
+                "Верни ТОЛЬКО JSON-массив (без markdown, без объяснений):\n"
+                '[{"name":"...","founded":YYYY,"total_stations":N,"regions_count":N,'
+                '"specialty":"кратко","rating":1-10}]\n'
+                "Если данных нет — пиши null для конкретного поля."
+            )
+            sys_inst = "Ты аналитик российского топливного рынка. Отвечай только валидным JSON без markdown."
+
+            raw = None
+            if gemini_key:
+                try:
+                    raw = await _call_gemini(
+                        gemini_key, [{"role": "user", "content": prompt}], sys_inst
+                    )
+                except Exception as e:
+                    logger.warning(f"Network AI Gemini batch {i//5+1}: {e}")
+
+            if raw is None and groq_key:
+                try:
+                    raw = await _call_groq(
+                        groq_key, [{"role": "user", "content": prompt}], sys_inst
+                    )
+                except Exception as e:
+                    logger.warning(f"Network AI Groq batch {i//5+1}: {e}")
+
+            if raw:
+                try:
+                    m = _re.search(r"\[[\s\S]*\]", raw)
+                    if m:
+                        entries = json.loads(m.group(0))
+                        now_ts = _now().isoformat()
+                        for entry in entries:
+                            nname = entry.get("name", "").strip()
+                            if not nname:
+                                continue
+                            insight_json = json.dumps(entry, ensure_ascii=False)
+                            from sqlalchemy import text as _text
+                            existing = db.execute(
+                                _text("SELECT 1 FROM network_insight_cache WHERE network_name = :n"),
+                                {"n": nname},
+                            ).fetchone()
+                            if existing:
+                                db.execute(
+                                    _text(
+                                        "UPDATE network_insight_cache "
+                                        "SET insight_json = :j, updated_at = :t "
+                                        "WHERE network_name = :n"
+                                    ),
+                                    {"j": insight_json, "t": now_ts, "n": nname},
+                                )
+                            else:
+                                db.execute(
+                                    _text(
+                                        "INSERT INTO network_insight_cache "
+                                        "(network_name, insight_json, updated_at) "
+                                        "VALUES (:n, :j, :t)"
+                                    ),
+                                    {"n": nname, "j": insight_json, "t": now_ts},
+                                )
+                            saved_total += 1
+                        db.commit()
+                        logger.info(
+                            f"Network AI enrich: saved {len(entries)} entries (batch {i//5+1})"
+                        )
+                except Exception as e:
+                    logger.warning(f"Network AI parse error batch {i//5+1}: {e}")
+
+            # Respect free-tier rate limits between batches
+            await _aio.sleep(4)
+
+        logger.info(f"refresh_network_ai_rankings: done — {saved_total} entries updated.")
+
+    except Exception as e:
+        logger.error(f"refresh_network_ai_rankings error: {e}")
         db.rollback()
     finally:
         db.close()

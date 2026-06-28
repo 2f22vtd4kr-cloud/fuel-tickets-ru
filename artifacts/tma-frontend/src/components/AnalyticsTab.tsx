@@ -1778,13 +1778,14 @@ function NetworkDistributionChart() {
   const { stations } = useStationStore();
   if (!stations.length) return null;
 
-  // Count stations per network
+  // Count stations per network, skip service facilities
   const counts: Record<string, number> = {};
   for (const s of stations) {
-    const net = s.network || "АЗС";
+    const raw = s.network?.trim() || "";
+    const net = isServiceNetwork(raw) ? "Остальные" : raw || "Остальные";
     counts[net] = (counts[net] ?? 0) + 1;
   }
-  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const sorted = Object.entries(counts).filter(([n]) => n !== "Остальные").sort((a, b) => b[1] - a[1]);
   const top = sorted.slice(0, 8);
   const otherCount = sorted.slice(8).reduce((s, [, c]) => s + c, 0);
   if (otherCount > 0) top.push(["Остальные", otherCount]);
@@ -2028,14 +2029,32 @@ function NetworkReliabilityWidget() {
   );
 }
 
+// ── Service-word blocklist (mirrors backend _SERVICE_NETWORK_WORDS) ───────────
+const SERVICE_NETWORK_WORDS = new Set([
+  "шиномонтаж", "мойка", "автомойка", "автосервис", "кафе", "магазин",
+  "стоянка", "парковка", "сто", "техцентр", "сервис", "шины",
+  "гараж", "прокат", "заправщик", "жесть", "нефть", "азс", "агзс",
+  "агнкс", "мазс", "другие",
+]);
+const SERVICE_PREFIXES = ["мойка", "шиномонтаж", "автомойка", "шины", "автосервис"];
+
+function isServiceNetwork(name: string): boolean {
+  if (!name?.trim()) return true;
+  const lower = name.trim().toLowerCase();
+  if (SERVICE_NETWORK_WORDS.has(lower)) return true;
+  if (SERVICE_PREFIXES.some((p) => lower.startsWith(p))) return true;
+  return false;
+}
+
 // ── Top Networks by Availability ─────────────────────────────────
 function TopNetworksWidget() {
   const { stations } = useStationStore();
-  if (!stations.length) return null;
+  const [insights, setInsights] = useState<Record<string, { founded?: number; total_stations?: number; regions_count?: number; specialty?: string; rating?: number }>>({});
 
   const nets: Record<string, { total: number; sum: number }> = {};
   stations.forEach((s) => {
-    const n = s.network || "Другие";
+    const n = s.network?.trim() || "";
+    if (isServiceNetwork(n)) return;
     const avg = s.fuel_statuses.length
       ? s.fuel_statuses.reduce((a, f) => a + f.availability_pct, 0) / s.fuel_statuses.length
       : 0;
@@ -2050,6 +2069,16 @@ function TopNetworksWidget() {
     .sort((a, b) => b.avg - a.avg)
     .slice(0, 8);
 
+  useEffect(() => {
+    if (ranked.length === 0) return;
+    const names = ranked.map((r) => r.name).join(",");
+    fetch(`/api/analytics/network-insights?networks=${encodeURIComponent(names)}`)
+      .then((r) => r.json())
+      .then((d) => { if (d.insights) setInsights(d.insights); })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ranked.length > 0 ? ranked.map((r) => r.name).join(",") : ""]);
+
   if (ranked.length < 3) return null;
   const maxAvg = ranked[0]?.avg ?? 100;
 
@@ -2058,13 +2087,14 @@ function TopNetworksWidget() {
       <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "rgba(255,255,255,0.45)", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.45rem" }}>
         РЕЙТИНГ СЕТЕЙ · ДОСТУПНОСТЬ · ТОП-8
       </div>
-      <div style={{ background: "linear-gradient(135deg,#0d0d18,#0f0b18)", border: "1px solid #a855f722", borderRadius: "14px", padding: "0.75rem", position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#a855f7,#db2777,transparent)" }} />
+      <div style={{ background: "rgba(14,18,158,0.55)", border: "1px solid rgba(255,255,255,0.10)", borderRadius: "14px", padding: "0.75rem", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.3),transparent)" }} />
         <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
           {ranked.map(({ name, count, avg }, i) => {
-            const color = avg >= 60 ? "#00E676" : avg >= 35 ? "#FFD600" : "#FF1744";
+            const color = avg >= 60 ? "#22c55e" : avg >= 35 ? "#fbbf24" : "#ff6b6b";
             const barPct = maxAvg > 0 ? (avg / maxAvg) * 100 : 0;
             const medals = ["🥇","🥈","🥉"];
+            const ins = insights[name];
             return (
               <motion.div
                 key={name}
@@ -2076,10 +2106,20 @@ function TopNetworksWidget() {
                 <span style={{ fontSize: "0.65rem", flexShrink: 0, width: "1.2rem" }}>{medals[i] ?? `${i + 1}.`}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "2px" }}>
-                    <span style={{ color: i < 3 ? "#e2e8f0" : "rgba(255,255,255,0.72)", fontSize: "0.62rem", fontWeight: i === 0 ? 700 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", color, fontSize: "0.62rem", fontWeight: 700, flexShrink: 0, marginLeft: "0.3rem" }}>{avg}%</span>
+                    <div style={{ minWidth: 0 }}>
+                      <span style={{ color: i < 3 ? "#ffffff" : "rgba(255,255,255,0.82)", fontSize: "0.62rem", fontWeight: i === 0 ? 700 : 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>{name}</span>
+                      {ins?.specialty && (
+                        <span style={{ color: "rgba(255,255,255,0.38)", fontSize: "0.48rem", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ins.specialty}</span>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", flexShrink: 0, marginLeft: "0.3rem" }}>
+                      <span style={{ fontFamily: "'JetBrains Mono',monospace", color, fontSize: "0.62rem", fontWeight: 700 }}>{avg}%</span>
+                      {ins?.rating != null && (
+                        <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "rgba(255,255,255,0.38)", fontSize: "0.44rem" }}>★{ins.rating}/10</span>
+                      )}
+                    </div>
                   </div>
-                  <div style={{ height: "4px", background: "#0b0b0f", borderRadius: "2px", overflow: "hidden" }}>
+                  <div style={{ height: "4px", background: "rgba(255,255,255,0.08)", borderRadius: "2px", overflow: "hidden" }}>
                     <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: `${barPct}%` }}
@@ -2088,7 +2128,12 @@ function TopNetworksWidget() {
                     />
                   </div>
                 </div>
-                <span style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.52rem", flexShrink: 0, fontFamily: "'JetBrains Mono',monospace" }}>{count}</span>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", flexShrink: 0 }}>
+                  <span style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.52rem", fontFamily: "'JetBrains Mono',monospace" }}>{count}</span>
+                  {ins?.total_stations != null && ins.total_stations !== count && (
+                    <span style={{ color: "rgba(255,255,255,0.25)", fontSize: "0.42rem", fontFamily: "'JetBrains Mono',monospace" }}>~{ins.total_stations.toLocaleString("ru")}</span>
+                  )}
+                </div>
               </motion.div>
             );
           })}
