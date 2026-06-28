@@ -12,7 +12,7 @@ description: Canvas mockup screens for the premium app redesign — file paths, 
 | `ds-loading` | `LoadingScreen.tsx` | ✅ Graduated → `artifacts/tma-frontend/src/components/IntroSplash.tsx` |
 | `ds-map` | `MapTab.tsx` | ✅ **Graduated** → `artifacts/tma-frontend/src/components/MapTab.tsx` (cobalt starfield) |
 | `ds-analytics` | `AnalyticsTab.tsx` | ✅ **Graduated** → `artifacts/tma-frontend/src/components/AnalyticsTab.tsx` (cobalt starfield) |
-| `ds-catalog` | `CatalogTab.tsx` | ✅ **Graduated** → `artifacts/tma-frontend/src/components/CatalogTab.tsx` (cobalt starfield, 2989 lines, full functionality preserved) |
+| `ds-catalog` | `CatalogTab.tsx` | ✅ **Graduated** → `artifacts/tma-frontend/src/components/CatalogTab.tsx` (cobalt starfield re-applied; ~490 lines, network-voucher wizard flow with Stars/crypto payment) |
 | `ds-vault` | `VaultTab.tsx` | 🔵 Dormant — next candidate |
 | `ds-vpn` | `VPNTab.tsx` | 🔵 Dormant |
 | `ds-games` | `GamesTab.tsx` | 🔵 Dormant |

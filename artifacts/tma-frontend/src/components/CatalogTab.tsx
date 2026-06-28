@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createNetworkStarsInvoice, createNetworkCryptoBotInvoice } from "@/api/client";
 import { useUserStore } from "@/stores/useUserStore";
@@ -41,21 +41,27 @@ type Step = "networks" | "fuel" | "volume" | "confirm" | "success";
 
 interface Sel { network: Net | null; fuel: { key: string; label: string } | null; volume: number; }
 
+const COBALT_BG = "linear-gradient(160deg,#0C0EA8 0%,#090B82 40%,#060760 75%,#040450 100%)";
+
 const CSS = `
-.ct-root { min-height:100%; background:#060608; color:#e2e8f0; font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif; display:flex; flex-direction:column; overflow:hidden; }
-.ct-hero { position:relative; margin:20px 16px 0; padding:18px 20px; border-radius:24px; background:linear-gradient(135deg,rgba(99,102,241,0.14) 0%,rgba(139,92,246,0.08) 50%,rgba(99,102,241,0.04) 100%); border:1px solid rgba(139,92,246,0.25); overflow:hidden; flex-shrink:0; }
+@keyframes ctStarTwinkle { 0%,100%{opacity:var(--op)} 50%{opacity:calc(var(--op)*0.25)} }
+@keyframes ctAmbientFlow { 0%{background-position:0% 50%} 100%{background-position:200% 50%} }
+@keyframes ctAmbientPulse { 0%,100%{opacity:.55} 50%{opacity:1} }
+.ct-amb-strip { background-size:200% 100%; animation:ctAmbientFlow 3s linear infinite, ctAmbientPulse 2.6s ease-in-out infinite; }
+.ct-root { min-height:100%; background:${COBALT_BG}; color:#e2e8f0; font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif; display:flex; flex-direction:column; overflow:hidden; position:relative; }
+.ct-hero { position:relative; margin:20px 16px 0; padding:18px 20px; border-radius:24px; background:rgba(255,255,255,0.04); border:1px solid rgba(168,85,247,0.3); overflow:hidden; flex-shrink:0; backdrop-filter:blur(12px); z-index:1; }
 .ct-hero-glow { position:absolute; top:-40px; right:-40px; width:140px; height:140px; border-radius:50%; background:radial-gradient(circle,rgba(139,92,246,0.3) 0%,transparent 70%); pointer-events:none; }
 .ct-hero-row { display:flex; align-items:center; gap:14px; position:relative; }
 .ct-hero-icon { font-size:32px; line-height:1; flex-shrink:0; }
 .ct-hero-headline { font-size:22px; font-weight:800; letter-spacing:-0.5px; background:linear-gradient(135deg,#e2e8f0 0%,#a78bfa 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; line-height:1.1; display:block; }
 .ct-hero-sub { font-size:12px; color:rgba(167,139,250,0.7); font-weight:500; display:block; margin-top:3px; }
-.ct-steps { display:flex; align-items:flex-start; justify-content:center; gap:32px; padding:18px 20px 4px; flex-shrink:0; }
+.ct-steps { display:flex; align-items:flex-start; justify-content:center; gap:32px; padding:18px 20px 4px; flex-shrink:0; position:relative; z-index:1; }
 .ct-step { display:flex; flex-direction:column; align-items:center; gap:5px; }
 .ct-dot { width:28px; height:28px; border-radius:50%; background:rgba(255,255,255,0.06); border:1.5px solid rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:rgba(255,255,255,0.3); transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1); }
 .ct-dot.active { background:rgba(139,92,246,0.25); border-color:rgba(139,92,246,0.6); color:#a78bfa; transform:scale(1.1); }
-.ct-dot.done { background:rgba(34,197,94,0.2); border-color:rgba(34,197,94,0.4); color:#22c55e; font-size:12px; }
+.ct-dot.done { background:rgba(0,230,118,0.15); border-color:rgba(0,230,118,0.4); color:#00E676; font-size:12px; }
 .ct-step-lbl { font-size:9px; color:rgba(255,255,255,0.3); font-weight:600; letter-spacing:0.05em; text-transform:uppercase; }
-.ct-scroll { flex:1; overflow-y:auto; overflow-x:hidden; padding:0 16px; -webkit-overflow-scrolling:touch; }
+.ct-scroll { flex:1; overflow-y:auto; overflow-x:hidden; padding:0 16px; -webkit-overflow-scrolling:touch; position:relative; z-index:1; }
 .ct-scroll::-webkit-scrollbar { display:none; }
 .ct-section { margin-top:20px; }
 .ct-revealed { animation:ctReveal 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards; }
@@ -87,7 +93,7 @@ const CSS = `
 .ct-vol-p { font-size:11px; font-weight:600; font-variant-numeric:tabular-nums; }
 .ct-proceed { width:100%; padding:18px; border-radius:20px; border:none; color:#fff; font-size:17px; font-weight:800; letter-spacing:-0.3px; cursor:pointer; transition:all 0.2s; -webkit-tap-highlight-color:transparent; }
 .ct-proceed:active { transform:scale(0.97); opacity:0.9; }
-.ct-confirm { min-height:100%; display:flex; flex-direction:column; padding:0 0 32px; animation:ctReveal 0.35s cubic-bezier(0.34,1.56,0.64,1); }
+.ct-confirm { min-height:100%; display:flex; flex-direction:column; padding:0 0 32px; animation:ctReveal 0.35s cubic-bezier(0.34,1.56,0.64,1); position:relative; z-index:1; }
 .ct-confirm-bar { height:4px; width:100%; opacity:0.7; }
 .ct-confirm-hdr { display:flex; align-items:center; gap:12px; padding:20px 20px 16px; }
 .ct-back { background:none; border:none; color:rgba(255,255,255,0.4); font-size:14px; font-weight:600; cursor:pointer; padding:0; }
@@ -102,20 +108,44 @@ const CSS = `
 .ct-savings { display:flex; align-items:center; gap:8px; margin:14px 16px; padding:12px 16px; background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.2); border-radius:14px; font-size:12px; }
 .ct-savings-icon { font-size:16px; }
 .ct-savings-txt { color:rgba(255,255,255,0.5); flex:1; line-height:1.3; }
-.ct-savings-amt { color:#22c55e; font-weight:800; font-size:14px; white-space:nowrap; }
+.ct-savings-amt { color:#00E676; font-weight:800; font-size:14px; white-space:nowrap; }
 .ct-pay-row { display:flex; gap:10px; margin:auto 16px 0; padding-top:20px; }
 .ct-pay { flex:1; display:flex; align-items:center; justify-content:center; gap:8px; padding:18px; border-radius:20px; border:none; font-size:15px; font-weight:800; cursor:pointer; transition:all 0.2s; -webkit-tap-highlight-color:transparent; }
 .ct-pay:active { transform:scale(0.97); }
 .ct-pay:disabled { opacity:0.5; cursor:not-allowed; }
 .ct-pay-stars { background:linear-gradient(135deg,#f59e0b,#d97706); color:#fff; box-shadow:0 8px 32px rgba(245,158,11,0.4); }
 .ct-pay-crypto { background:rgba(59,130,246,0.15); color:#60a5fa; border:1.5px solid rgba(59,130,246,0.3) !important; }
-.ct-success { min-height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px 24px; gap:16px; animation:ctReveal 0.5s cubic-bezier(0.34,1.56,0.64,1); }
-.ct-success-icon { width:80px; height:80px; border-radius:50%; background:rgba(34,197,94,0.15); border:2px solid rgba(34,197,94,0.3); display:flex; align-items:center; justify-content:center; font-size:36px; }
+.ct-success { min-height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px 24px; gap:16px; animation:ctReveal 0.5s cubic-bezier(0.34,1.56,0.64,1); position:relative; z-index:1; }
+.ct-success-icon { width:80px; height:80px; border-radius:50%; background:rgba(0,230,118,0.12); border:2px solid rgba(0,230,118,0.3); display:flex; align-items:center; justify-content:center; font-size:36px; }
 .ct-success-title { font-size:26px; font-weight:800; letter-spacing:-0.5px; color:#e2e8f0; margin:0; }
 .ct-success-sub { font-size:15px; color:rgba(255,255,255,0.4); margin:0; }
 .ct-success-freeze { font-size:13px; color:#a78bfa; background:rgba(139,92,246,0.1); border:1px solid rgba(139,92,246,0.25); border-radius:12px; padding:10px 18px; font-weight:600; }
 .ct-success-back { margin-top:8px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:14px; color:rgba(255,255,255,0.6); font-size:15px; font-weight:600; padding:14px 28px; cursor:pointer; }
 `;
+
+function CatalogStars({ n = 90 }: { n?: number }) {
+  const pts = useMemo(() => Array.from({ length: n }, (_, i) => ({
+    id: i, x: (i * 97 + 13) % 100, y: (i * 61 + 7) % 100,
+    r: 0.3 + (i % 7) * 0.2, op: 0.1 + (i % 6) * 0.1, dur: 2 + (i % 5), del: i % 4,
+  })), [n]);
+  return (
+    <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 0 }}>
+      {pts.map(s => (
+        <circle key={s.id} cx={`${s.x}%`} cy={`${s.y}%`} r={s.r} fill="white"
+          style={{ opacity: s.op, animation: `ctStarTwinkle ${s.dur}s ${s.del}s ease-in-out infinite`, ["--op" as string]: s.op } as React.CSSProperties}
+        />
+      ))}
+    </svg>
+  );
+}
+
+function CatalogStrip({ color, style = {} }: { color: string; style?: React.CSSProperties }) {
+  return <div className="ct-amb-strip" style={{
+    position: "absolute", height: "1.5px", width: "100%", pointerEvents: "none",
+    background: `linear-gradient(90deg,transparent 0%,${color}00 5%,${color}cc 30%,${color} 50%,${color}cc 70%,${color}00 95%,transparent 100%)`,
+    ...style,
+  }} />;
+}
 
 export function CatalogTab(_props?: { initialStationId?: number; onCalcOpenChange?: (open: boolean) => void }) {
   const user = useUserStore((s) => s.user);
@@ -212,6 +242,20 @@ export function CatalogTab(_props?: { initialStationId?: number; onCalcOpenChang
   return (
     <div className="ct-root">
       <style>{CSS}</style>
+      {/* Cobalt starfield background */}
+      <CatalogStars />
+      {/* SVG grid lines */}
+      <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 0 }}>
+        <line x1="33%" y1="0" x2="33%" y2="100%" stroke="rgba(99,102,241,0.09)" strokeWidth="1" />
+        <line x1="66%" y1="0" x2="66%" y2="100%" stroke="rgba(99,102,241,0.09)" strokeWidth="1" />
+        <line x1="0" y1="33%" x2="100%" y2="33%" stroke="rgba(99,102,241,0.09)" strokeWidth="1" />
+        <line x1="0" y1="66%" x2="100%" y2="66%" stroke="rgba(99,102,241,0.09)" strokeWidth="1" />
+      </svg>
+      {/* Ambient glow blooms */}
+      <div style={{ position: "absolute", top: -60, left: "50%", transform: "translateX(-50%)", width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle,rgba(168,85,247,0.18) 0%,transparent 70%)", pointerEvents: "none", zIndex: 0 }} />
+      <div style={{ position: "absolute", bottom: -80, right: -40, width: 260, height: 260, borderRadius: "50%", background: "radial-gradient(circle,rgba(219,39,119,0.14) 0%,transparent 70%)", pointerEvents: "none", zIndex: 0 }} />
+      {/* Top ambient strip */}
+      <CatalogStrip color="#a855f7" style={{ top: 0, zIndex: 2 }} />
 
       {/* ── Success ─────────────────────────────────────────────── */}
       {step === "success" && (
@@ -425,8 +469,8 @@ export function CatalogTab(_props?: { initialStationId?: number; onCalcOpenChang
                     className="ct-proceed"
                     whileTap={{ scale: 0.97 }}
                     style={{
-                      background: `linear-gradient(135deg,${sel.network.color},${sel.network.color}bb)`,
-                      boxShadow: `0 8px 32px ${sel.network.glow}45`,
+                      background: "linear-gradient(135deg,#a855f7,#db2777)",
+                      boxShadow: "0 0 24px #a855f744",
                     }}
                     onClick={() => { impact("medium"); setStep("confirm"); }}
                   >
