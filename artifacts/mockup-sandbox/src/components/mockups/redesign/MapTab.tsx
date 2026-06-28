@@ -203,16 +203,6 @@ export function MapTab() {
         borderBottom:"1px solid rgba(99,102,241,0.25)",
         padding:"12px 16px 10px",
       }}>
-        {/* Title with long-shadow */}
-        <div style={{
-          fontSize:11, fontWeight:900, letterSpacing:"0.28em",
-          textTransform:"uppercase", color:"#E8622A",
-          textShadow: longShadow("rgba(232,98,42,0.18)", 10),
-          marginBottom:8,
-        }}>
-          ● МАТРИЦА СНАБЖЕНИЯ
-        </div>
-
         {/* Search row */}
         <div style={{ display:"flex", gap:8, alignItems:"center" }}>
           <div style={{

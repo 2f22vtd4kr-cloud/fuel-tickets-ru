@@ -107,13 +107,6 @@ export function LoadingScreen() {
         ))}
       </div>
 
-      {/* Bottom-left small caption */}
-      <div
-        className="absolute bottom-8 left-5 z-20 font-mono text-[10px] tracking-[0.2em] uppercase"
-        style={{ color: "rgba(255,255,255,0.25)" }}
-      >
-        Матрица Снабжения
-      </div>
 
       <style>{`
         @keyframes colRise {
