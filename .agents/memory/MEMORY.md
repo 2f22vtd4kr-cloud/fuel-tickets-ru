@@ -7,7 +7,7 @@
 - [Port conflict on backend restart](port-conflict.md) — run `fuser -k 8000/tcp` before restarting TMA Backend if it fails to bind port 8000.
 - [FastAPI route ordering](fastapi-route-ordering.md) — literal routes (e.g. /api/empire/leaderboard, /api/prices/regional) must be declared BEFORE parameterized routes (/api/empire/{user_id}, /api/prices/{region_name}).
 - [useToast API](usetoa-api.md) — useToast().add(message: string, type?: "success"|"error"|"info"|"warning") — NOT add({ type, message }). Message is first arg, type is second.
-- [AI provider pattern](ai-provider-pattern.md) — AI_PROVIDER env var: "rule-based"(default)/"grok"/"openai"/"none"; Grok uses XAI_API_KEY + base_url https://api.x.ai/v1; ai_chat must be async def to use httpx.AsyncClient.
+- [AI provider pattern](ai-provider-pattern.md) — Gemini 2.0 Flash → Groq llama-3.3-70b → rule-based chain; Gemini free tier hits quota (429) often, Groq handles it silently; FuelStatus has no price_per_liter.
 - [Excel station seeder](excel-station-seeder.md) — 1222 real stations in seed_excel_stations.py; threshold 600 guards re-seed; delete tma.db + restart backend to force fresh seed; must escape all quotes from Excel addresses.
 - [Game notification timer bug](game-notif-timer.md) — GamesPage useEffect cleanup cancels previous timers on new notifications; fix with Map<id,timer> ref so each notification has its own independent timeout.
 - [PostgreSQL in production](postgres-production.md) — DATABASE_URL secret is set → app uses PostgreSQL, not SQLite. tma.db stays 0 bytes. Raw SQL must use Python datetime not SQLite date('now'). Model columns added via ALTER TABLE in _run_migrations() at startup.

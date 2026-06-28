@@ -134,6 +134,7 @@ externalPort = 8099
 
 [userenv.shared]
 PAYMENT_METHOD = "auto"
+AI_PROVIDER = "gemini"
 
 [userenv.production]
 TMA_PORT = "8000"

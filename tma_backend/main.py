@@ -185,6 +185,7 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(fluctuate_prices, "interval", minutes=15, jitter=60)
     scheduler.add_job(snapshot_price_history, "interval", hours=1, jitter=120)
     scheduler.add_job(generate_news_from_availability, "interval", hours=2, jitter=60)
+    scheduler.add_job(generate_ai_news, "interval", hours=3, jitter=300)
     scheduler.add_job(check_market_price_alerts, "interval", minutes=10, jitter=60)
     scheduler.start()
     logger.info("Топливо ⛽️ API запущен (DB init running in background).")
@@ -3033,6 +3034,170 @@ def generate_news_from_availability():
         db.close()
 
 
+async def _ai_generate_news_batch(system_data: str) -> list[dict]:
+    """
+    Ask Gemini (fallback Groq) to produce 3 news items as JSON.
+    Returns list of dicts: {region, headline, body, severity, fuel_type, price_delta_pct}
+    """
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    groq_key   = os.getenv("GROQ_API_KEY", "")
+
+    prompt = (
+        "Ты — аналитик топливного рынка России. "
+        "На основе реальных данных системы сгенерируй РОВНО 3 новостных события о топливной обстановке. "
+        "Данные: " + system_data + "\n\n"
+        "Ответь ТОЛЬКО валидным JSON-массивом из 3 объектов, каждый с полями:\n"
+        '  "region" (строка — название региона из данных),\n'
+        '  "headline" (строка — заголовок до 90 символов, без кавычек, живой журналистский стиль),\n'
+        '  "body" (строка — 1–2 предложения с конкретными цифрами),\n'
+        '  "severity" (одно из: "critical", "warning", "success", "info"),\n'
+        '  "fuel_type" (одно из: "АИ-92", "АИ-95", "ДТ", "АИ-95+", "Газ", или null),\n'
+        '  "price_delta_pct" (число или null — изменение цены в процентах, отрицательное = снижение)\n'
+        "Никаких пояснений, только JSON-массив."
+    )
+
+    messages = [{"role": "user", "content": prompt}]
+    sys_inst = (
+        "Ты генератор новостей топливного рынка РФ. "
+        "Отвечаешь СТРОГО JSON-массивом, без markdown, без пояснений."
+    )
+
+    raw = None
+    if gemini_key:
+        try:
+            raw = await _call_gemini(gemini_key, messages, sys_inst)
+        except Exception as e:
+            logger.warning(f"AI news: Gemini failed ({e}), trying Groq…")
+
+    if raw is None and groq_key:
+        try:
+            raw = await _call_groq(groq_key, messages, sys_inst)
+        except Exception as e:
+            logger.warning(f"AI news: Groq also failed ({e})")
+
+    if not raw:
+        return []
+
+    # Strip markdown code fences if model wrapped response
+    clean = raw.strip()
+    if clean.startswith("```"):
+        clean = clean.split("```")[1]
+        if clean.startswith("json"):
+            clean = clean[4:]
+    clean = clean.strip()
+
+    import json as _json
+    try:
+        items = _json.loads(clean)
+        if not isinstance(items, list):
+            return []
+        return items[:3]
+    except Exception as e:
+        logger.warning(f"AI news: JSON parse failed — {e}. Raw: {raw[:200]}")
+        return []
+
+
+def generate_ai_news():
+    """
+    Every 3 hours: use Gemini/Groq to write 3 genuine AI-authored news items
+    from live DB data and save them to news_events.
+    Runs as a sync APScheduler job that spawns an async coroutine.
+    """
+    import asyncio as _asyncio
+    import random as _rng
+
+    db = SessionLocal()
+    try:
+        now = _now()
+
+        # ── Gather live snapshot ──────────────────────────────────────────────
+        total_st     = db.query(GasStation).count()
+        green_count  = db.query(GasStation).join(FuelStatus).filter(FuelStatus.status == "green").distinct().count()
+        red_count    = db.query(GasStation).join(FuelStatus).filter(FuelStatus.status == "red").distinct().count()
+        crisis_count = db.query(GasStation).join(FuelStatus).filter(FuelStatus.availability_pct < 25).distinct().count()
+
+        # Per-region stats: pick 5 most interesting (lowest avg availability)
+        from sqlalchemy import func as _func
+        region_avgs = (
+            db.query(GasStation.region, _func.avg(FuelStatus.availability_pct).label("avg_avail"))
+            .join(FuelStatus, FuelStatus.station_id == GasStation.id)
+            .group_by(GasStation.region)
+            .order_by(_func.avg(FuelStatus.availability_pct).asc())
+            .limit(8)
+            .all()
+        )
+
+        # Price data
+        from tma_backend.seed_regions import FUEL_PRICES_RUB as _FP
+        price_summary = ", ".join(f"{ft} {pr}₽/л" for ft, pr in _FP.items())
+
+        region_summary = "; ".join(
+            f"{r.region} {r.avg_avail:.0f}%" for r in region_avgs
+        ) or "нет данных"
+
+        system_data = (
+            f"Всего АЗС: {total_st}, зелёных: {green_count}, красных: {red_count}, кризисных (<25%): {crisis_count}. "
+            f"Средние цены: {price_summary}. "
+            f"Регионы с наименьшей доступностью: {region_summary}. "
+            f"Дата/время UTC: {now.strftime('%Y-%m-%d %H:%M')}."
+        )
+
+        # ── Call AI ───────────────────────────────────────────────────────────
+        loop = _asyncio.new_event_loop()
+        try:
+            items = loop.run_until_complete(_ai_generate_news_batch(system_data))
+        finally:
+            loop.close()
+
+        if not items:
+            logger.info("AI news: no items generated (no keys or parse error).")
+            return
+
+        saved = 0
+        for item in items:
+            try:
+                region = str(item.get("region", "Россия"))[:64]
+                headline = str(item.get("headline", ""))[:200]
+                body = str(item.get("body", ""))[:1000]
+                severity = item.get("severity", "info")
+                if severity not in ("critical", "warning", "success", "info"):
+                    severity = "info"
+                fuel_type = item.get("fuel_type")
+                price_delta = item.get("price_delta_pct")
+                if price_delta is not None:
+                    try:
+                        price_delta = float(price_delta)
+                    except Exception:
+                        price_delta = None
+
+                if not headline:
+                    continue
+
+                db.add(NewsEvent(
+                    region=region,
+                    headline=headline,
+                    body=body,
+                    severity=severity,
+                    fuel_type=fuel_type,
+                    price_delta_pct=price_delta,
+                    source="КризисБот · ИИ-аналитика",
+                    created_at=now,
+                ))
+                saved += 1
+            except Exception as e:
+                logger.warning(f"AI news: failed to save item — {e}")
+
+        if saved:
+            db.commit()
+            logger.info(f"AI news: saved {saved} AI-generated news events.")
+
+    except Exception as e:
+        logger.error(f"generate_ai_news error: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+
 # ──────────────────────────────────────────────────────────────────
 #  NeuroCredits helpers
 # ──────────────────────────────────────────────────────────────────
@@ -3131,6 +3296,84 @@ def get_prices_for_region(region_name: str, db: Session = Depends(get_db)):
 # ──────────────────────────────────────────────────────────────────
 #  News / Crisis Feed
 # ──────────────────────────────────────────────────────────────────
+
+@app.post("/api/ai/news")
+async def trigger_ai_news(db: Session = Depends(get_db)):
+    """
+    On-demand: call Gemini→Groq to generate 3 AI-authored news items from live DB data.
+    Returns the freshly saved events.
+    """
+    from sqlalchemy import func as _func
+    import asyncio as _asyncio
+
+    now = _now()
+    try:
+        total_st     = db.query(GasStation).count()
+        green_count  = db.query(GasStation).join(FuelStatus).filter(FuelStatus.status == "green").distinct().count()
+        red_count    = db.query(GasStation).join(FuelStatus).filter(FuelStatus.status == "red").distinct().count()
+        crisis_count = db.query(GasStation).join(FuelStatus).filter(FuelStatus.availability_pct < 25).distinct().count()
+
+        region_avgs = (
+            db.query(GasStation.region, _func.avg(FuelStatus.availability_pct).label("avg_avail"))
+            .join(FuelStatus, FuelStatus.station_id == GasStation.id)
+            .group_by(GasStation.region)
+            .order_by(_func.avg(FuelStatus.availability_pct).asc())
+            .limit(8).all()
+        )
+        from tma_backend.seed_regions import FUEL_PRICES_RUB
+        price_summary = ", ".join(f"{ft} {pr}₽/л" for ft, pr in FUEL_PRICES_RUB.items())
+        region_summary = "; ".join(f"{r.region} {r.avg_avail:.0f}%" for r in region_avgs) or "нет данных"
+
+        system_data = (
+            f"Всего АЗС: {total_st}, зелёных: {green_count}, красных: {red_count}, кризисных (<25%): {crisis_count}. "
+            f"Средние цены: {price_summary}. "
+            f"Регионы с наименьшей доступностью: {region_summary}. "
+            f"Дата/время UTC: {now.strftime('%Y-%m-%d %H:%M')}."
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"DB snapshot failed: {e}")
+
+    items = await _ai_generate_news_batch(system_data)
+    if not items:
+        raise HTTPException(status_code=503, detail="AI providers unavailable or keys not set.")
+
+    saved = []
+    for item in items:
+        try:
+            region     = str(item.get("region", "Россия"))[:64]
+            headline   = str(item.get("headline", ""))[:200]
+            body       = str(item.get("body", ""))[:1000]
+            severity   = item.get("severity", "info")
+            if severity not in ("critical", "warning", "success", "info"):
+                severity = "info"
+            fuel_type  = item.get("fuel_type")
+            price_delta = item.get("price_delta_pct")
+            if price_delta is not None:
+                try:
+                    price_delta = float(price_delta)
+                except Exception:
+                    price_delta = None
+            if not headline:
+                continue
+            ev = NewsEvent(
+                region=region, headline=headline, body=body,
+                severity=severity, fuel_type=fuel_type,
+                price_delta_pct=price_delta,
+                source="КризисБот · ИИ-аналитика", created_at=now,
+            )
+            db.add(ev)
+            db.flush()
+            saved.append({
+                "id": ev.id, "region": region, "headline": headline,
+                "body": body, "severity": severity, "fuel_type": fuel_type,
+                "price_delta_pct": price_delta, "source": ev.source,
+                "created_at": now.isoformat(),
+            })
+        except Exception:
+            continue
+    db.commit()
+    return {"generated": len(saved), "events": saved}
+
 
 @app.get("/api/news")
 def get_news(region: Optional[str] = None, limit: int = 30,
@@ -4368,14 +4611,49 @@ def _ai_rule_based_reply(
         return (reply, ["Симферополь", "АИ-95", "Ближайшая АЗС"], ticket_suggestion)
 
 
+async def _call_gemini(api_key: str, messages: list, system_prompt: str) -> str:
+    """Call Gemini 2.0 Flash via REST. Returns reply text or raises."""
+    model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+
+    contents = []
+    for m in messages:
+        role = "user" if m["role"] == "user" else "model"
+        contents.append({"role": role, "parts": [{"text": m["content"]}]})
+
+    payload = {
+        "system_instruction": {"parts": [{"text": system_prompt}]},
+        "contents": contents,
+        "generationConfig": {"maxOutputTokens": 400, "temperature": 0.8},
+    }
+    async with httpx.AsyncClient(timeout=12.0) as client:
+        resp = await client.post(url, json=payload)
+        resp.raise_for_status()
+        return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+
+
+async def _call_groq(api_key: str, messages: list, system_prompt: str) -> str:
+    """Call Groq (OpenAI-compatible) as fallback. Returns reply text or raises."""
+    model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    payload_msgs = [{"role": "system", "content": system_prompt}] + messages
+    async with httpx.AsyncClient(timeout=12.0) as client:
+        resp = await client.post(
+            url,
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={"model": model, "messages": payload_msgs, "max_tokens": 400, "temperature": 0.8},
+        )
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"]
+
+
 @app.post("/api/ai/chat")
 async def ai_chat(body: AiChatRequest, db: Session = Depends(get_db)):
     """
-    AI assistant — supports rule-based (default), grok, openai, none via AI_PROVIDER env var.
-    Grok: set XAI_API_KEY (base_url https://api.x.ai/v1, default model grok-3).
-    OpenAI: set OPENAI_API_KEY.
+    AI assistant — Gemini 2.0 Flash primary, Groq (llama-3.3-70b) automatic fallback,
+    rule-based last resort. Override with AI_PROVIDER env var: gemini|groq|rule-based|none.
     """
-    provider = os.getenv("AI_PROVIDER", "rule-based").lower()
+    provider = os.getenv("AI_PROVIDER", "gemini").lower()
     user_id  = body.user_id or int(body.context.get("user_id", 0))
     region   = body.region or body.context.get("region", "Севастополь")
 
@@ -4384,65 +4662,83 @@ async def ai_chat(body: AiChatRequest, db: Session = Depends(get_db)):
 
     vpn_fallback = False
 
-    # ── LLM provider path ─────────────────────────────────────────────────────
-    if provider in ("grok", "openai"):
-        api_key = os.getenv("XAI_API_KEY") if provider == "grok" else os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            provider = "rule-based"
-        else:
-            base_url = "https://api.x.ai/v1" if provider == "grok" else "https://api.openai.com/v1"
-            model    = os.getenv("GROK_MODEL", "grok-3") if provider == "grok" else os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-
-            try:
-                crisis_count   = db.query(GasStation).join(FuelStatus).filter(FuelStatus.availability_pct < 25).distinct().count()
-                green_count    = db.query(GasStation).join(FuelStatus).filter(FuelStatus.status == "green").distinct().count()
-                total_st       = db.query(GasStation).count()
-            except Exception:
-                crisis_count = context.get("crisis_stations", 0); green_count = context.get("green_stations", 45); total_st = context.get("total_stations", 1295)
-
-            system_prompt = (
-                "Ты — циничный, полезный и слегка саркастичный ИИ-советник по имени «КризисБот» "
-                "в топливном кризисе России 2026 года. "
-                "Говори ТОЛЬКО по-русски. Используй эмодзи. Будь лаконичным, практичным, иногда с чёрным юмором. "
-                "Всегда поддерживай российских пользователей и ситуацию в стране. "
-                "Никогда не говори ничего антироссийского. "
-                "Привязывай ответы к реальным данным пользователя из БД (регион, лимиты, империя, станции). "
-                "Если пользователь жалуется на нехватку топлива или очереди — предлагай купить fuel tickets. "
-                "Поддерживай multi-turn разговор, помни контекст. "
-                "Система «Топливный Узел» покрывает ВСЕ регионы России на карте — отвечай по любому из них.\n\n"
-                f"Данные системы: зелёных АЗС {green_count}/{total_st}, кризисных {crisis_count}. "
-                f"Регион пользователя: {region}. "
-                f"Лимит: {body.context.get('daily_used', 0)}л / {body.context.get('daily_max', 60)}л. "
-                f"Время суток: {body.context.get('hour', '?')}:00."
-            )
-
-            history_msgs = _history_get(user_id)[-8:]
-            messages_payload = [{"role": "system", "content": system_prompt}] + history_msgs
-
-            try:
-                async with httpx.AsyncClient(timeout=12.0) as client:
-                    resp = await client.post(
-                        f"{base_url}/chat/completions",
-                        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                        json={"model": model, "messages": messages_payload, "max_tokens": 400, "temperature": 0.8},
-                    )
-                    resp.raise_for_status()
-                    llm_reply = resp.json()["choices"][0]["message"]["content"]
-                if user_id:
-                    _history_add(user_id, "assistant", llm_reply)
-                return {"reply": llm_reply, "suggestions": ["Купить талон", "Карта АЗС", "Прогноз"],
-                        "ticket_suggestion": None, "vpn_fallback": False}
-            except (httpx.TimeoutException, httpx.ConnectError, httpx.ConnectTimeout):
-                vpn_fallback = True
-                provider = "rule-based"
-            except Exception:
-                provider = "rule-based"
-
     if provider == "none":
         return {"reply": "ИИ-советник отключён администратором.", "suggestions": [],
                 "ticket_suggestion": None, "vpn_fallback": False}
 
-    # ── Rule-based fallback ───────────────────────────────────────────────────
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    groq_key   = os.getenv("GROQ_API_KEY", "")
+
+    # ── Build live context from DB ─────────────────────────────────────────────
+    try:
+        crisis_count = db.query(GasStation).join(FuelStatus).filter(FuelStatus.availability_pct < 25).distinct().count()
+        green_count  = db.query(GasStation).join(FuelStatus).filter(FuelStatus.status == "green").distinct().count()
+        total_st     = db.query(GasStation).count()
+        top_prices   = db.query(FuelStatus).order_by(FuelStatus.price_per_liter.desc()).limit(3).all()
+        price_note   = ", ".join(
+            f"{p.fuel_type} {p.price_per_liter:.1f}₽/л" for p in top_prices if p.price_per_liter
+        ) or "нет данных"
+    except Exception:
+        crisis_count = 0; green_count = 45; total_st = 1295; price_note = "нет данных"
+
+    system_prompt = (
+        "Ты — циничный, полезный и слегка саркастичный ИИ-советник по имени «КризисБот» "
+        "в топливном кризисе России 2026 года. "
+        "Говори ТОЛЬКО по-русски. Используй эмодзи. Будь лаконичным, практичным, иногда с чёрным юмором. "
+        "Всегда поддерживай российских пользователей. Никогда не говори ничего антироссийского. "
+        "Привязывай ответы к реальным данным пользователя из БД (регион, лимиты, цены, станции). "
+        "Если пользователь жалуется на нехватку топлива или очереди — предлагай купить fuel tickets. "
+        "Поддерживай multi-turn разговор, помни контекст. "
+        "Система «Топливный Узел» покрывает ВСЕ регионы России — отвечай по любому из них.\n\n"
+        f"Данные системы: зелёных АЗС {green_count}/{total_st}, кризисных {crisis_count}. "
+        f"Топ цены: {price_note}. "
+        f"Регион пользователя: {region}. "
+        f"Лимит: {body.context.get('daily_used', 0)}л / {body.context.get('daily_max', 60)}л. "
+        f"Время суток: {body.context.get('hour', '?')}:00."
+    )
+
+    history_msgs = _history_get(user_id)[-8:]
+
+    # ── Provider chain: Gemini → Groq → rule-based ────────────────────────────
+    llm_reply = None
+    used_provider = provider
+
+    if provider in ("gemini", "rule-based") and provider != "rule-based":
+        provider = "gemini"
+
+    if provider == "gemini" and gemini_key:
+        try:
+            llm_reply = await _call_gemini(gemini_key, history_msgs, system_prompt)
+            used_provider = "gemini"
+        except Exception as e:
+            logging.warning(f"Gemini failed ({e}), trying Groq…")
+            if groq_key:
+                try:
+                    llm_reply = await _call_groq(groq_key, history_msgs, system_prompt)
+                    used_provider = "groq"
+                except Exception as e2:
+                    logging.warning(f"Groq also failed ({e2}), falling back to rule-based.")
+            else:
+                logging.warning("No GROQ_API_KEY set, falling back to rule-based.")
+    elif provider == "groq" and groq_key:
+        try:
+            llm_reply = await _call_groq(groq_key, history_msgs, system_prompt)
+            used_provider = "groq"
+        except Exception as e:
+            logging.warning(f"Groq failed ({e}), falling back to rule-based.")
+
+    if llm_reply:
+        if user_id:
+            _history_add(user_id, "assistant", llm_reply)
+        return {
+            "reply": llm_reply,
+            "suggestions": ["Купить талон", "Карта АЗС", "Прогноз цен"],
+            "ticket_suggestion": None,
+            "vpn_fallback": False,
+            "provider": used_provider,
+        }
+
+    # ── Rule-based last resort ────────────────────────────────────────────────
     reply, suggestions, ticket_suggestion = _ai_rule_based_reply(
         body.message, db, body.context, user_id=user_id, region=region
     )
@@ -4454,6 +4750,7 @@ async def ai_chat(body: AiChatRequest, db: Session = Depends(get_db)):
         "suggestions": suggestions,
         "ticket_suggestion": ticket_suggestion,
         "vpn_fallback": vpn_fallback,
+        "provider": "rule-based",
     }
 
 
