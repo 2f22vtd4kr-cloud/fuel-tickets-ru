@@ -145,7 +145,7 @@ export function VaultTab() {
                   onClick={() => setExpandedId(isExpanded ? 0 : v.id)}
                   className="relative glass-panel-heavy rounded-3xl p-5 border border-white/10 transition-all duration-300 overflow-hidden"
                   style={{ 
-                    boxShadow: isExpanded ? \`0 0 30px \${netColor}20\` : 'none'
+                    boxShadow: isExpanded ? `0 0 30px ${netColor}20` : 'none'
                   }}
                 >
                   {/* Left color border accent */}

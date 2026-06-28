@@ -22,15 +22,19 @@ All in `artifacts/mockup-sandbox/src/components/mockups/redesign/`:
 | `AiNewsTab.tsx` | `ds-ai` | `/redesign/AiNewsTab` |
 
 Shared CSS/keyframes: `_group.css` in the same folder.
-Mockup sandbox runs on **port 8081**.
-Canvas artifact ID: `XegfDyZt7HqfW2Bb8Ghoy`
+Mockup sandbox runs on **port 8099** (workflow name: "Mockup Sandbox"). Canvas artifact ID is stale — use `focusCanvasShapes` instead of `presentArtifact`.
 
 ## Canvas Restoration (run at start of every new session)
 
 If the canvas is empty (shapes not persisted), run this in code_execution to re-embed all 7 screens:
 
 ```javascript
-const DEV = `https://${process.env.REPLIT_DEV_DOMAIN || 'YOUR_DEV_DOMAIN'}/__mockup/preview`;
+// Step 1: Restart the Mockup Sandbox workflow first
+await restartWorkflow({ workflowName: "Mockup Sandbox" });
+
+// Step 2: Get the domain
+// Run: echo $REPLIT_DOMAINS  (e.g. abc123.worf.replit.dev)
+const DEV = `https://<YOUR_DOMAIN>:8099/__mockup/preview`;
 const W = 390, H = 844, GAP = 50;
 
 const frames = [
@@ -48,25 +52,31 @@ const folderMap = {
   "ds-vault": "VaultTab", "ds-vpn": "VPNTab", "ds-games": "GamesTab", "ds-ai": "AiNewsTab",
 };
 
-const actions = frames.map(f => ({
-  type: "create", shapeId: f.id,
-  shape: {
-    type: "iframe",
-    x: f.col * (W + GAP), y: f.row * (H + GAP), w: W, h: H,
+// Step 3: Place building placeholders
+await applyCanvasActions({ actions: [{
+  type: "create-auto",
+  shapeIds: frames.map(f => f.id),
+  names: frames.map(f => f.name),
+  shape: { type: "iframe", w: W, h: H, state: "building" }
+}]});
+
+// Step 4: Set live
+await applyCanvasActions({ actions: frames.map(f => ({
+  type: "update", shapeId: f.id,
+  updates: {
+    shapeType: "iframe", state: "live",
     url: `${DEV}/redesign/${folderMap[f.id]}`,
     componentPath: `artifacts/mockup-sandbox/src/components/mockups/redesign/${folderMap[f.id]}.tsx`,
-    componentName: f.name, state: "live",
+    componentName: f.name
   }
-}));
+}))});
 
-await applyCanvasActions({ actions });
 await focusCanvasShapes({ shapeIds: frames.map(f => f.id), animateMs: 600 });
-await presentArtifact({ artifactId: "XegfDyZt7HqfW2Bb8Ghoy", shapeIds: frames.map(f => f.id) });
 ```
 
-**Why:** Canvas shapes are ephemeral — they don't survive a Replit session restart. The component .tsx files DO survive in the repo. This script re-creates the iframes pointing to the existing files.
+**Why:** Canvas shapes are ephemeral — they don't survive a Replit session restart. The component .tsx files DO survive in the repo. This script re-creates the iframes pointing to the existing files. Port changed from 8081 → 8099 (8081 not in Replit's allowed workflow port list). `presentArtifact` artifact ID is stale; use `focusCanvasShapes` instead.
 
-**How to apply:** At the start of any new session where the user wants to review/iterate on the redesign mockups, check `getCanvasState()` first. If shapes are missing, run this restoration script. Also restart the mockup sandbox workflow beforehand: `restartWorkflow({ name: "artifacts/mockup-sandbox: Component Preview Server" })`.
+**How to apply:** At the start of any new session, check `getCanvasState()` first. If shapes are missing, restart the "Mockup Sandbox" workflow, then run the restoration script above.
 
 ## Design System (for new screens or iterations)
 - Background: `#0A0A0F`; card surface `rgba(255,255,255,0.04–0.07)` + `backdrop-filter: blur(20–40px)`
