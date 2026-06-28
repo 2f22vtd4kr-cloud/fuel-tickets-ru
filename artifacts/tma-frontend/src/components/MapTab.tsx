@@ -36,6 +36,9 @@ const AMBIENT_CSS = `
   0%,100% { opacity: var(--op); }
   50%     { opacity: calc(var(--op) * 0.25); }
 }
+.leaflet-tile-pane {
+  filter: sepia(100%) hue-rotate(200deg) saturate(7) brightness(0.82);
+}
 `;
 
 function MapStarField() {
