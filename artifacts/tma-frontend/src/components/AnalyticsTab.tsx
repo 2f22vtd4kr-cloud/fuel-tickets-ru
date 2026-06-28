@@ -1147,7 +1147,7 @@ export function AnalyticsTab({ onNavigate }: Props) {
       <div style={{ position: "relative", zIndex: 1 }}>
 
       {/* Header — sticky cobalt glass */}
-      <div style={{ padding: "3rem 1rem 0.6rem", position: "sticky", top: 0, zIndex: 10, background: "rgba(4,5,68,0.88)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(120,140,255,0.1)" }}>
+      <div style={{ padding: "0.75rem 1rem 0.6rem", position: "sticky", top: 0, zIndex: 10, background: "rgba(4,5,68,0.88)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(120,140,255,0.1)" }}>
         <AmbientStrip color="#a855f7" style={{ bottom: 0, left: 0, right: 0 }} />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
