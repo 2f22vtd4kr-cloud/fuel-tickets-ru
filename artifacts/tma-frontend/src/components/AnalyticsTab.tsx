@@ -151,7 +151,14 @@ function PriceMatrix({ regions }: { regions: Record<string, RegionalSupply> }) {
             >
               <div style={{ padding: "0.5rem 0.7rem", overflow: "hidden" }}>
                 <div style={{ color: isCritical ? "#fca5a5" : "rgba(255,255,255,0.82)", fontSize: "0.67rem", fontWeight: isCritical ? 700 : 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {region.split(" ").slice(-1)[0].slice(0, 14)}
+                  {(() => {
+                    const s = region
+                      .replace(/\s+область$/i, " обл.")
+                      .replace(/\s+республика\b/i, " Респ.")
+                      .replace(/\s+автономный округ\b/i, " АО")
+                      .replace(/\s+автономная область\b/i, " АО");
+                    return s.length > 18 ? s.slice(0, 17) + "…" : s;
+                  })()}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", marginTop: "2px" }}>
                   <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: isCritical ? "#FF1744" : isLow ? "#FFD600" : "#00E676", flexShrink: 0 }} />
@@ -1377,7 +1384,7 @@ export function AnalyticsTab({ onNavigate }: Props) {
             { label: "Татарстан", key: "Татарстан", emoji: "🛢" },
           ];
           return (
-            <div style={{ display: "flex", gap: "0.35rem", marginBottom: "0.5rem", overflowX: "auto" }}>
+            <div style={{ display: "flex", gap: "0.35rem", marginBottom: "0.5rem", overflowX: "auto", margin: "0 -1rem 0.5rem", padding: "0 1rem", scrollbarWidth: "none" }}>
               {CITIES.map(({ label, key, emoji }) => {
                 const exactMatch = Object.keys(regions).find(r => r.includes(key));
                 const active = key === "" ? selectedRegion === "" : selectedRegion.includes(key);
