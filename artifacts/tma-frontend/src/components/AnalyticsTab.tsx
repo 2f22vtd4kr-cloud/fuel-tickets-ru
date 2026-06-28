@@ -1106,7 +1106,20 @@ export function AnalyticsTab({ onNavigate }: Props) {
   const filtered = selectedRegion ? sorted.filter(([r]) => r === selectedRegion) : sorted;
   const overallColor = (data?.availability_index ?? 0) >= 60 ? "#00E676" : (data?.availability_index ?? 0) >= 25 ? "#FFD600" : "#FF1744";
   const criticalCount = Object.values(regions).filter(r => r.avg_pct < 25).length;
-  const sc = data?.station_counts ?? { total: 0, green: 0, yellow: 0, red: 0 };
+
+  // Station-level counts (one number per station, not per fuel type)
+  const stationSc = (() => {
+    let green = 0, yellow = 0, red = 0;
+    for (const s of stations) {
+      const avg = s.fuel_statuses.length
+        ? s.fuel_statuses.reduce((a, f) => a + f.availability_pct, 0) / s.fuel_statuses.length
+        : 0;
+      if (avg >= 60) green++;
+      else if (avg >= 25) yellow++;
+      else red++;
+    }
+    return { green, yellow, red };
+  })();
 
   if (loading) return (
     <div style={{ padding: "1rem", display: "flex", flexDirection: "column", gap: "1rem", background: "linear-gradient(160deg,#0C0EA8 0%,#090B82 40%,#060760 75%,#040450 100%)", minHeight: "100vh" }}>
@@ -1240,9 +1253,9 @@ export function AnalyticsTab({ onNavigate }: Props) {
             <p style={{ color: "#E8622A", fontSize: "0.6rem", margin: "0 0 0.55rem", textTransform: "uppercase", letterSpacing: "0.2em" }}>Статус АЗС</p>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
               {([
-                { count: sc.green,  color: "#00E676", label: "норма" },
-                { count: sc.yellow, color: "#FFD600", label: "мало" },
-                { count: sc.red,    color: "#FF1744", label: "нет" },
+                { count: stationSc.green,  color: "#00E676", label: "норма" },
+                { count: stationSc.yellow, color: "#FFD600", label: "мало" },
+                { count: stationSc.red,    color: "#FF1744", label: "нет" },
               ]).map(({ count, color, label }, idx) => (
                 <motion.div key={label} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.12 + idx * 0.06, duration: 0.25 }} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                   <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: color, boxShadow: `0 0 5px ${color}`, flexShrink: 0 }} />
@@ -1700,7 +1713,6 @@ function NewsFeed() {
 
       {/* Network reliability summary */}
       <NetworkDistributionChart />
-      <NetworkReliabilityWidget />
       {/* Top networks by availability */}
       <TopNetworksWidget />
       {/* Top cheapest stations right now */}
@@ -1885,93 +1897,7 @@ function RegionalPricesTable() {
   );
 }
 
-function NetworkReliabilityWidget() {
-  const { stations } = useStationStore();
-  if (!stations.length) return null;
 
-  const total = stations.length;
-  const withFuel = stations.filter((s) => s.fuel_statuses.some((f) => f.availability_pct > 0)).length;
-  const avgQueue = stations.length ? Math.round(stations.reduce((s, st) => s + st.queue_cars, 0) / stations.length) : 0;
-  const reliabilityPct = Math.round((withFuel / total) * 100);
-  const reliColor = reliabilityPct >= 70 ? "#00E676" : reliabilityPct >= 40 ? "#FFD600" : "#FF1744";
-
-  // Zone breakdown
-  const zones = ["critical", "standard", "eastern"] as const;
-  const zoneInfo: Record<string, { label: string; color: string; emoji: string }> = {
-    critical: { label: "Кризисная", color: "#FF1744", emoji: "🔴" },
-    standard: { label: "Стандарт",  color: "#E8622A", emoji: "🟣" },
-    eastern:  { label: "Восток",    color: "#f59e0b", emoji: "🟡" },
-  };
-  const zoneStats = zones.map((z) => {
-    const zStations = stations.filter((s) => s.zone_type === z);
-    const zAvg = zStations.length
-      ? Math.round(zStations.reduce((acc, s) => {
-          const sAvg = s.fuel_statuses.length
-            ? s.fuel_statuses.reduce((a, f) => a + f.availability_pct, 0) / s.fuel_statuses.length : 0;
-          return acc + sAvg;
-        }, 0) / zStations.length)
-      : 0;
-    return { z, count: zStations.length, avg: zAvg, ...zoneInfo[z] };
-  });
-
-  return (
-    <div style={{ padding: "0 1rem 1.5rem" }}>
-      <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "rgba(255,255,255,0.45)", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.5rem" }}>
-        НАДЁЖНОСТЬ СЕТИ · ИТОГО
-      </div>
-      <div style={{
-        background: "rgba(255,255,255,0.05)",
-        border: "1px solid #1e1e2a", borderRadius: "14px",
-        padding: "0.75rem", display: "flex", gap: "0.5rem",
-        position: "relative", overflow: "hidden", marginBottom: "0.5rem",
-      }}>
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: `linear-gradient(90deg,transparent,${reliColor}44,transparent)` }} />
-        {[
-          { label: "Всего АЗС", value: total, color: "#E8622A", suffix: "" },
-          { label: "С топливом", value: withFuel, color: reliColor, suffix: "" },
-          { label: "Надёжность", value: reliabilityPct, color: reliColor, suffix: "%" },
-          { label: "Ср. очередь", value: avgQueue, color: "rgba(255,255,255,0.65)", suffix: "авт" },
-        ].map(({ label, value, color, suffix }) => (
-          <div key={label} style={{ flex: 1, textAlign: "center" }}>
-            <div style={{ fontFamily: "'JetBrains Mono',monospace", color, fontSize: "1.1rem", fontWeight: 800, lineHeight: 1 }}>
-              {value}{suffix}
-            </div>
-            <div style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.52rem", marginTop: "3px" }}>{label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Zone breakdown */}
-      <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "rgba(255,255,255,0.45)", fontSize: "0.4rem", letterSpacing: "0.14em", marginBottom: "0.4rem" }}>
-        ЗОНЫ · СРЕДНЯЯ ДОСТУПНОСТЬ
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
-        {zoneStats.map(({ z, label, color, emoji, count, avg }, zi) => (
-          <motion.div
-            key={z}
-            initial={{ opacity: 0, x: -6 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: zi * 0.08, duration: 0.25 }}
-            style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
-          >
-            <span style={{ fontSize: "0.65rem", flexShrink: 0 }}>{emoji}</span>
-            <span style={{ color: "rgba(255,255,255,0.72)", fontSize: "0.65rem", width: "72px", flexShrink: 0 }}>{label}</span>
-            <div style={{ flex: 1, height: "6px", background: "#0b0b0f", borderRadius: "3px", overflow: "hidden" }}>
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${avg}%` }}
-                transition={{ delay: zi * 0.08 + 0.15, duration: 0.7, ease: "easeOut" }}
-                style={{ height: "100%", background: avg >= 60 ? "#00E676" : avg >= 25 ? "#FFD600" : "#FF1744", borderRadius: "3px" }}
-              />
-            </div>
-            <span style={{ fontFamily: "'JetBrains Mono',monospace", color, fontSize: "0.65rem", fontWeight: 700, width: "30px", textAlign: "right", flexShrink: 0 }}>{avg}%</span>
-            <span style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.55rem", flexShrink: 0 }}>{count}АЗС</span>
-          </motion.div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 // ── Service-word blocklist (mirrors backend _SERVICE_NETWORK_WORDS) ───────────
 const SERVICE_NETWORK_WORDS = new Set([
