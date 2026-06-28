@@ -449,7 +449,7 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
           position: "relative",
           display: "flex",
           alignItems: "center",
-          background: "rgba(20,20,32,0.88)",
+          background: "rgba(12,14,120,0.85)",
           backdropFilter: "blur(20px)",
           border: "1px solid rgba(255,255,255,0.06)",
           borderRadius: "16px",
@@ -539,8 +539,8 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
                 transition={{ duration: 0.15 }}
                 style={{
                   position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0,
-                  background: "rgba(8,7,16,0.98)", backdropFilter: "blur(24px)",
-                  border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px",
+                  background: "rgba(12,14,120,0.95)", backdropFilter: "blur(24px)",
+                  border: "1px solid rgba(168,85,247,0.2)", borderRadius: "14px",
                   padding: "0.5rem",
                   boxShadow: "0 12px 32px #00000099",
                   zIndex: 9999,
@@ -595,7 +595,7 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
                   cursor: "pointer",
                   backdropFilter: "blur(12px)",
                   transition: "all 0.2s",
-                  background: isActive ? "rgba(167,139,250,0.18)" : "rgba(20,20,32,0.75)",
+                  background: isActive ? "rgba(167,139,250,0.22)" : "rgba(12,14,100,0.65)",
                   color: isActive ? "#a78bfa" : "rgba(255,255,255,0.7)",
                   border: `1px solid ${isActive ? "#a78bfa55" : "rgba(255,255,255,0.06)"}`,
                   boxShadow: isActive ? "0 0 14px rgba(167,139,250,0.22)" : "none",
@@ -622,7 +622,7 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
               left: "0.75rem",
               right: "0.75rem",
               zIndex: 1000,
-              background: "rgba(10,10,20,0.98)",
+              background: "rgba(12,14,120,0.95)",
               border: "1px solid rgba(168,85,247,0.18)",
               borderRadius: "22px",
               padding: "1rem",
@@ -645,7 +645,7 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
 
             {/* Quick stats strip */}
             <div style={{
-              background: "rgba(20,20,28,0.8)",
+              background: "rgba(12,14,100,0.7)",
               border: "1px solid #1e1e2a",
               borderRadius: "10px",
               display: "flex",
@@ -728,7 +728,7 @@ export function MapTab({ visible, initialStationId, navVisible = true, onNavTogg
                 onClick={() => { findNearestGreenFromCenter(); setShowFilters(false); }}
                 title="Ближайшая с топливом от центра карты"
                 style={{
-                  background: "rgba(20,20,28,0.9)",
+                  background: "rgba(12,14,100,0.7)",
                   border: "1px solid #22222f",
                   borderRadius: "8px",
                   color: "#4ade80",

@@ -122,9 +122,9 @@ function PriceMatrix({ regions }: { regions: Record<string, RegionalSupply> }) {
         <span style={{ color: "#374151", fontSize: "0.58rem", fontFamily: "'JetBrains Mono',monospace" }}>₽/литр</span>
       </div>
 
-      <div style={{ background: "linear-gradient(160deg,#080810,#0a0a14)", border: "1px solid #1e1e2a", borderRadius: "14px", overflow: "hidden", boxShadow: "0 4px 24px #00000040" }}>
+      <div style={{ background: "rgba(255,255,255,0.05)", border: "1px solid #1e1e2a", borderRadius: "14px", overflow: "hidden", boxShadow: "0 4px 24px #00000040" }}>
         {/* Header row */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr repeat(3, 68px)", background: "#0f0f1a", borderBottom: "1px solid #1a1a28" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr repeat(3, 68px)", background: "rgba(0,0,0,0.3)", borderBottom: "1px solid rgba(168,85,247,0.1)" }}>
           <div style={{ padding: "0.45rem 0.7rem", color: "#374151", fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'JetBrains Mono',monospace" }}>
             регион
           </div>
@@ -448,7 +448,7 @@ function MarketAnalysis({ regions, data }: { regions: Record<string, RegionalSup
   return (
     <div style={{ padding: "0 1rem 1rem" }}>
       <div style={{
-        background: "linear-gradient(160deg,#0a0a14,#0d0a1a)",
+        background: "rgba(255,255,255,0.05)",
         border: "1px solid #a855f722",
         borderRadius: "16px",
         padding: "0.9rem",
@@ -676,7 +676,7 @@ function SupplyForecast({ regions }: { regions: Record<string, RegionalSupply> }
   return (
     <div style={{ padding: "0 1rem 0.75rem" }}>
       <div style={{
-        background: "linear-gradient(135deg,#0a0a14,#0d0d18)",
+        background: "rgba(255,255,255,0.05)",
         border: "1px solid #1e1e2a",
         borderRadius: "14px",
         padding: "0.75rem",
@@ -994,7 +994,7 @@ function AIPricePredictions() {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.07, duration: 0.3 }}
-                  style={{ background: `linear-gradient(160deg,#0f0f1c,#14141c)`, border: `1px solid ${color}28`, borderRadius: "10px", padding: "0.55rem 0.5rem", position: "relative", overflow: "hidden", boxShadow: `0 0 12px ${color}08` }}
+                  style={{ background: `rgba(255,255,255,0.05)`, border: `1px solid ${color}28`, borderRadius: "10px", padding: "0.55rem 0.5rem", position: "relative", overflow: "hidden", boxShadow: `0 0 12px ${color}08` }}
                 >
                   <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, ${color}55, ${color})` }} />
                   <p style={{ margin: "0 0 0.1rem", color, fontSize: "0.52rem", fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>{fuel}</p>
@@ -1229,7 +1229,7 @@ export function AnalyticsTab({ onNavigate }: Props) {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.35 }}
-            style={{ background: `linear-gradient(135deg,#14141c,${overallColor}10)`, border: `1px solid ${overallColor}33`, borderRadius: "14px", padding: "0.9rem 1rem", position: "relative", overflow: "hidden", boxShadow: `0 0 24px ${overallColor}10` }}
+            style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${overallColor}33`, borderRadius: "14px", padding: "0.9rem 1rem", position: "relative", overflow: "hidden", boxShadow: `0 0 24px ${overallColor}10` }}
           >
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, ${overallColor}66, ${overallColor})` }} />
             {/* Radial glow orb */}
@@ -1246,7 +1246,7 @@ export function AnalyticsTab({ onNavigate }: Props) {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.35, delay: 0.07 }}
-            style={{ background: "linear-gradient(135deg,#14141c,#0f0a18)", border: "1px solid #22222f", borderRadius: "14px", padding: "0.9rem 1rem", position: "relative", overflow: "hidden" }}
+            style={{ background: "rgba(255,255,255,0.05)", border: "1px solid #22222f", borderRadius: "14px", padding: "0.9rem 1rem", position: "relative", overflow: "hidden" }}
           >
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: "linear-gradient(90deg,#22c55e33,#eab30833,#ef444433)" }} />
             <p style={{ color: "rgba(255,255,255,0.5)", fontSize: "0.6rem", margin: "0 0 0.55rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>Статус АЗС</p>
@@ -1297,7 +1297,7 @@ export function AnalyticsTab({ onNavigate }: Props) {
                   key={label}
                   whileTap={{ scale: 0.95 }}
                   style={{
-                    flex: 1, background: `linear-gradient(160deg,#0a0a14,${dotColor}08)`,
+                    flex: 1, background: "rgba(255,255,255,0.04)",
                     border: `1px solid ${dotColor}33`,
                     borderRadius: "12px", padding: "0.6rem 0.35rem 0.55rem", textAlign: "center",
                     position: "relative", overflow: "hidden",
@@ -1346,7 +1346,7 @@ export function AnalyticsTab({ onNavigate }: Props) {
                 key={label}
                 whileTap={{ scale: 0.96 }}
                 style={{
-                  background: `linear-gradient(160deg, #0a0a14, ${color}0c)`,
+                  background: "rgba(255,255,255,0.04)",
                   border: `1px solid ${color}30`,
                   borderRadius: "14px",
                   padding: "0.7rem 0.8rem",
@@ -1497,14 +1497,14 @@ export function AnalyticsTab({ onNavigate }: Props) {
         </div>
 
         {trendData.length < 2 ? (
-          <div style={{ background: "#14141c", border: "1px solid #22222f", borderRadius: "14px", padding: "2rem 1rem", textAlign: "center" }}>
+          <div style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(168,85,247,0.15)", borderRadius: "14px", padding: "2rem 1rem", textAlign: "center" }}>
             <p style={{ color: "#4b5563", fontSize: "0.8rem", margin: 0 }}>
               ⏳ Данные накапливаются…<br />
               <span style={{ fontSize: "0.68rem" }}>График появится после первых замеров</span>
             </p>
           </div>
         ) : (
-          <div style={{ background: "#14141c", border: "1px solid #22222f", borderRadius: "14px", padding: "1rem 1rem 0.5rem" }}>
+          <div style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(168,85,247,0.15)", borderRadius: "14px", padding: "1rem 1rem 0.5rem" }}>
             <ResponsiveContainer width="100%" height={160}>
               <AreaChart data={trendData} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
                 <defs>
@@ -1526,7 +1526,7 @@ export function AnalyticsTab({ onNavigate }: Props) {
                 />
                 <YAxis domain={[0, 100]} tick={{ fill: "#4b5563", fontSize: 9 }} stroke="#22222f" />
                 <Tooltip
-                  contentStyle={{ background: "#14141c", border: "1px solid #22222f", borderRadius: "8px", fontSize: "0.75rem" }}
+                  contentStyle={{ background: "rgba(12,14,100,0.95)", border: "1px solid rgba(168,85,247,0.2)", borderRadius: "8px", fontSize: "0.75rem" }}
                   labelStyle={{ color: "#9ca3af" }}
                   formatter={(v: number) => [`${v.toFixed(1)}%`, "Доступность"]}
                   labelFormatter={(t: string) => {
@@ -1975,7 +1975,7 @@ function NetworkReliabilityWidget() {
         НАДЁЖНОСТЬ СЕТИ · ИТОГО
       </div>
       <div style={{
-        background: "linear-gradient(135deg,#0a0a14,#0d0d18)",
+        background: "rgba(255,255,255,0.05)",
         border: "1px solid #1e1e2a", borderRadius: "14px",
         padding: "0.75rem", display: "flex", gap: "0.5rem",
         position: "relative", overflow: "hidden", marginBottom: "0.5rem",
@@ -2216,7 +2216,7 @@ function FuelSavingsWidget() {
       <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#374151", fontSize: "0.43rem", letterSpacing: "0.14em", marginBottom: "0.45rem" }}>
         Разброс цен · Экономия
       </div>
-      <div style={{ background: "linear-gradient(135deg,#0a0a14,#0d0a18)", border: "1px solid #22c55e18", borderRadius: "14px", padding: "0.75rem", position: "relative", overflow: "hidden" }}>
+      <div style={{ background: "rgba(255,255,255,0.05)", border: "1px solid #22c55e18", borderRadius: "14px", padding: "0.75rem", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#22c55e44,transparent)" }} />
         <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#00E676", fontSize: "0.6rem", fontWeight: 700, marginBottom: "0.5rem" }}>
           💰 Потенциальная экономия при выборе АЗС
@@ -2305,7 +2305,7 @@ function NetworkPriceTableWidget() {
 
   return (
     <div style={{ padding: "0 1rem 1.5rem" }}>
-      <div style={{ background: "linear-gradient(135deg,#0a0a14,#0d0818)", border: "1px solid #a855f718", borderRadius: "14px", padding: "0.75rem", position: "relative", overflow: "hidden" }}>
+      <div style={{ background: "rgba(255,255,255,0.05)", border: "1px solid #a855f718", borderRadius: "14px", padding: "0.75rem", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#a855f744,transparent)" }} />
         <div style={{ display: "flex", gap: "0.3rem", marginBottom: "0.6rem" }}>
           {FUELS.map(f => (
@@ -2392,7 +2392,7 @@ function RegionLeaderboardWidget() {
 
   return (
     <div style={{ padding: "0 1rem 1.5rem" }}>
-      <div style={{ background: "linear-gradient(135deg,#0a0a14,#0d0818)", border: "1px solid #a855f718", borderRadius: "14px", padding: "0.75rem", position: "relative", overflow: "hidden" }}>
+      <div style={{ background: "rgba(255,255,255,0.05)", border: "1px solid #a855f718", borderRadius: "14px", padding: "0.75rem", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: "linear-gradient(90deg,transparent,#22c55e44,transparent)" }} />
 
         {/* Top 5 */}

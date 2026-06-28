@@ -10,8 +10,8 @@ description: Canvas mockup screens for the premium app redesign — file paths, 
 | Shape ID | File | Status |
 |----------|------|--------|
 | `ds-loading` | `LoadingScreen.tsx` | ✅ Graduated → `artifacts/tma-frontend/src/components/IntroSplash.tsx` |
-| `ds-map` | `MapTab.tsx` | ✅ **Graduated** → `artifacts/tma-frontend/src/components/MapTab.tsx` (cobalt starfield) |
-| `ds-analytics` | `AnalyticsTab.tsx` | ✅ **Graduated** → `artifacts/tma-frontend/src/components/AnalyticsTab.tsx` (cobalt starfield) |
+| `ds-map` | `MapTab.tsx` | ⚠️ **Partial** — floating UI (search bar, filter panel, chips) is cobalt-glass; Leaflet map tiles are CartoDB external rasters (cannot be recolored) |
+| `ds-analytics` | `AnalyticsTab.tsx` | ✅ **Graduated** — root background + starfield cobalt; widget card fills changed from opaque `#14141c` → `rgba(255,255,255,0.05)` cobalt glass |
 | `ds-catalog` | `CatalogTab.tsx` | ✅ **Graduated** → `artifacts/tma-frontend/src/components/CatalogTab.tsx` (cobalt starfield re-applied; ~490 lines, network-voucher wizard flow with Stars/crypto payment) |
 | `ds-vault` | `VaultTab.tsx` | 🔵 Dormant — next candidate |
 | `ds-vpn` | `VPNTab.tsx` | 🔵 Dormant |
