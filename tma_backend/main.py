@@ -219,6 +219,8 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(snapshot_price_history, "interval", hours=1, jitter=120)
     scheduler.add_job(generate_news_from_availability, "interval", hours=2, jitter=60)
     scheduler.add_job(generate_ai_news, "interval", hours=3, jitter=300)
+    scheduler.add_job(fetch_web_fuel_news, "interval", hours=4, jitter=300,
+                      next_run_time=datetime.utcnow() + timedelta(minutes=2))  # run 2 min after startup
     scheduler.add_job(check_market_price_alerts, "interval", minutes=10, jitter=60)
     scheduler.add_job(refresh_network_ai_rankings, "cron", hour=3, minute=15)
     scheduler.start()
@@ -3328,6 +3330,139 @@ def generate_ai_news():
 
     except Exception as e:
         logger.error(f"generate_ai_news error: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+
+# ──────────────────────────────────────────────────────────────────
+#  Real-world fuel news via Gemini Google Search grounding
+# ──────────────────────────────────────────────────────────────────
+
+async def _call_gemini_with_search(api_key: str, prompt: str) -> str:
+    """Call Gemini with Google Search grounding enabled. Returns reply text."""
+    model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    payload = {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "tools": [{"google_search": {}}],
+        "generationConfig": {"maxOutputTokens": 800, "temperature": 0.3},
+    }
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        resp = await client.post(url, json=payload)
+        resp.raise_for_status()
+        data = resp.json()
+        return data["candidates"][0]["content"]["parts"][0]["text"]
+
+
+async def _ai_fetch_real_fuel_news() -> list[dict]:
+    """
+    Use Gemini Google Search grounding to pull real current news about
+    fuel situation in Russia/Crimea. Returns list of parsed news dicts.
+    """
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    if not gemini_key:
+        return []
+
+    from datetime import datetime as _dt
+    today = _dt.utcnow().strftime("%d %B %Y")
+
+    prompt = (
+        f"Сегодня {today}. Найди в интернете актуальные новости о ситуации с топливом "
+        "в России и Крыму/Севастополе за последние 48 часов. "
+        "Составь РОВНО 3 новостных события на основе реальных источников. "
+        "Ответь ТОЛЬКО валидным JSON-массивом из 3 объектов. Каждый объект:\n"
+        '  "region": регион России (например "Крым", "Севастополь", "Краснодарский край"),\n'
+        '  "headline": заголовок до 100 символов (без кавычек),\n'
+        '  "body": 1-2 предложения с конкретными фактами и цифрами,\n'
+        '  "severity": одно из "critical"/"warning"/"success"/"info",\n'
+        '  "fuel_type": тип топлива или null,\n'
+        '  "price_delta_pct": изменение цены в % (число) или null.\n'
+        "Если реальных новостей нет — опиши общую ситуацию с топливом в регионе. "
+        "Только JSON, никакого другого текста."
+    )
+
+    try:
+        raw = await _call_gemini_with_search(gemini_key, prompt)
+        # Strip markdown code fences if present
+        raw = raw.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        raw = raw.strip()
+        items = json.loads(raw)
+        if isinstance(items, list):
+            return items
+    except Exception as e:
+        logger.warning(f"Real fuel news fetch error: {e}")
+    return []
+
+
+def fetch_web_fuel_news():
+    """
+    Every 4 hours: use Gemini Google Search grounding to fetch real-world
+    fuel news for Russia/Crimea and save to news_events.
+    """
+    import asyncio as _asyncio
+
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    if not gemini_key:
+        logger.info("fetch_web_fuel_news: no GEMINI_API_KEY, skipping.")
+        return
+
+    db = SessionLocal()
+    try:
+        now = _now()
+
+        loop = _asyncio.new_event_loop()
+        try:
+            items = loop.run_until_complete(_ai_fetch_real_fuel_news())
+        finally:
+            loop.close()
+
+        if not items:
+            logger.info("fetch_web_fuel_news: no items returned.")
+            return
+
+        saved = 0
+        for item in items:
+            try:
+                region   = str(item.get("region", "Россия"))[:64]
+                headline = str(item.get("headline", ""))[:200]
+                body     = str(item.get("body", ""))[:1000]
+                severity = item.get("severity", "info")
+                if severity not in ("critical", "warning", "success", "info"):
+                    severity = "info"
+                fuel_type = item.get("fuel_type")
+                price_delta = item.get("price_delta_pct")
+                if price_delta is not None:
+                    try:
+                        price_delta = float(price_delta)
+                    except Exception:
+                        price_delta = None
+                if not headline:
+                    continue
+                db.add(NewsEvent(
+                    region=region,
+                    headline=headline,
+                    body=body,
+                    severity=severity,
+                    fuel_type=fuel_type,
+                    price_delta_pct=price_delta,
+                    source="Матрица · Поиск в сети",
+                    created_at=now,
+                ))
+                saved += 1
+            except Exception as e:
+                logger.warning(f"fetch_web_fuel_news: failed to save item — {e}")
+
+        if saved:
+            db.commit()
+            logger.info(f"fetch_web_fuel_news: saved {saved} real news items.")
+
+    except Exception as e:
+        logger.error(f"fetch_web_fuel_news error: {e}")
         db.rollback()
     finally:
         db.close()
