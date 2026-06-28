@@ -92,7 +92,7 @@ const SPLASH_KEY = "tma-splash-seen-v2";
 const ONBOARDING_KEY = "tma-onboarding-v1";
 const AI_BANNER_KEY = "tma-ai-banner-dismissed-v1";
 const NEWS_LAST_VISIT_KEY = "tma-news-last-visit";
-const TICKER_H = 40;
+const TICKER_H = 0;
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>(DEFAULT_TAB);
