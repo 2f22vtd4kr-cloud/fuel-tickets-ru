@@ -5,35 +5,38 @@ interface Props {
   onDone: () => void;
 }
 
+const COLUMNS = [
+  { text: "ПОХ*Й",         bg: null,        textColor: "#ffffff", tintColor: "#A855F7", tintOpacity: 0.18, delay: 0 },
+  { text: "ИНФЛЯЦИЯ —",    bg: "#A855F7",   textColor: "#ffffff", tintColor: null,      tintOpacity: 0,    delay: 0.08 },
+  { text: "БЕРИ ТАЛОНЫ",   bg: null,        textColor: "#ffffff", tintColor: "#22D3EE", tintOpacity: 0.14, delay: 0.16 },
+  { text: "И ЗАМОРАЖИВАЙ", bg: "#22D3EE",   textColor: "#0A0A0F", tintColor: null,      tintOpacity: 0,    delay: 0.24 },
+  { text: "ЦЕНЫ",          bg: null,        textColor: "#ffffff", tintColor: "#A855F7", tintOpacity: 0.22, delay: 0.32 },
+];
+
+const COL_RISE_CSS = `
+@keyframes colRise {
+  from { clip-path: inset(0 0 100% 0); opacity: 0; }
+  to   { clip-path: inset(0 0 0%   0); opacity: 1; }
+}
+`;
+
 export function IntroSplash({ onDone }: Props) {
-  const [phase, setPhase] = useState<"loading" | "exit">("loading");
-  const [progress, setProgress] = useState(0);
-  const progressRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [phase, setPhase] = useState<"in" | "exit">("in");
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const startTime = Date.now();
-    const duration = 2800;
-    progressRef.current = setInterval(() => {
-      const pct = Math.min(100, ((Date.now() - startTime) / duration) * 100);
-      setProgress(pct);
-      if (pct >= 100) {
-        clearInterval(progressRef.current!);
-        setTimeout(() => {
-          setPhase("exit");
-          setTimeout(onDone, 450);
-        }, 300);
-      }
-    }, 20);
-
-    return () => {
-      if (progressRef.current) clearInterval(progressRef.current);
-    };
+    // Auto-dismiss after columns finish animating (longest delay 0.32s + 0.7s anim = ~1.1s) + small pause
+    timerRef.current = setTimeout(() => {
+      setPhase("exit");
+      setTimeout(onDone, 420);
+    }, 2600);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSkip = () => {
-    if (progressRef.current) clearInterval(progressRef.current);
+    if (timerRef.current) clearTimeout(timerRef.current);
     setPhase("exit");
-    setTimeout(onDone, 450);
+    setTimeout(onDone, 420);
   };
 
   return (
@@ -43,154 +46,99 @@ export function IntroSplash({ onDone }: Props) {
           key="splash"
           initial={{ opacity: 1 }}
           exit={{ opacity: 0, scale: 1.03 }}
-          transition={{ duration: 0.45, ease: "easeInOut" }}
+          transition={{ duration: 0.42, ease: "easeInOut" }}
           style={{
             position: "fixed",
             inset: 0,
             zIndex: 99999,
-            background: "#0d0b18",
-            display: "flex",
-            flexDirection: "column",
+            background: "#0A0A0F",
             overflow: "hidden",
+            display: "flex",
+            flexDirection: "row",
           }}
         >
-          {/* Radial purple glow at center */}
-          <div style={{
-            position: "absolute",
-            top: "30%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            width: 420,
-            height: 420,
-            background: "radial-gradient(circle, rgba(120,60,200,0.35) 0%, transparent 70%)",
-            pointerEvents: "none",
-          }} />
+          <style>{COL_RISE_CSS}</style>
 
-          {/* Ambient dot grid */}
-          <div aria-hidden style={{
-            position: "absolute",
-            inset: 0,
-            pointerEvents: "none",
-            backgroundImage: "radial-gradient(circle, rgba(168,85,247,0.12) 1px, transparent 1px)",
-            backgroundSize: "28px 28px",
-            maskImage: "radial-gradient(ellipse 90% 80% at 50% 40%, black 30%, transparent 100%)",
-            WebkitMaskImage: "radial-gradient(ellipse 90% 80% at 50% 40%, black 30%, transparent 100%)",
-          }} />
-
-          {/* Title — top */}
-          <motion.div
-            initial={{ opacity: 0, y: -18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.1, ease: "easeOut" }}
-            style={{
-              position: "relative",
-              zIndex: 2,
-              paddingTop: "env(safe-area-inset-top, 52px)",
-              paddingLeft: "1.5rem",
-              paddingRight: "1.5rem",
-              paddingBottom: "1rem",
-            }}
-          >
-            <h1 style={{
-              fontSize: "clamp(1.75rem, 7vw, 2.25rem)",
-              fontWeight: 900,
-              color: "#ffffff",
-              lineHeight: 1.18,
-              margin: 0,
-              letterSpacing: "-0.01em",
-            }}>
-              Добро пожаловать<br />в Топливо
-            </h1>
-          </motion.div>
-
-          {/* Hero image — fills remaining space, covers watermark with bottom overlay */}
-          <motion.div
-            initial={{ opacity: 0, scale: 1.04 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.7, delay: 0.2, ease: "easeOut" }}
-            style={{
-              position: "relative",
-              flex: 1,
-              overflow: "hidden",
-              zIndex: 1,
-            }}
-          >
-            <img
-              src="/splash-hero.png"
-              alt=""
+          {/* Vertical type columns */}
+          {COLUMNS.map((col, i) => (
+            <div
+              key={i}
               style={{
-                width: "100%",
+                position: "relative",
+                flex: 1,
                 height: "100%",
-                objectFit: "cover",
-                objectPosition: "center top",
-              }}
-              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-            />
-
-            {/* Bottom gradient — covers watermark + hosts loading bar */}
-            <div style={{
-              position: "absolute",
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: "38%",
-              background: "linear-gradient(to top, #0d0b18 0%, #0d0b18 40%, rgba(13,11,24,0.85) 70%, transparent 100%)",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "flex-end",
-              padding: "0 2rem 2.5rem",
-              paddingBottom: "calc(2.5rem + env(safe-area-inset-bottom, 0px))",
-            }}>
-              {/* Loading bar */}
-              <div style={{ marginBottom: "0.55rem" }}>
-                <div style={{
-                  height: "3px",
-                  background: "rgba(255,255,255,0.1)",
-                  borderRadius: "2px",
-                  overflow: "hidden",
-                }}>
-                  <motion.div
-                    style={{
-                      height: "100%",
-                      width: `${progress}%`,
-                      background: "linear-gradient(90deg, #7c3aed, #a855f7, #db2777)",
-                      boxShadow: "0 0 10px rgba(168,85,247,0.7)",
-                      borderRadius: "2px",
-                      transition: "width 0.02s linear",
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Loading label */}
-              <div style={{
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "space-between",
+                justifyContent: "center",
+                overflow: "hidden",
+                animation: `colRise 0.7s cubic-bezier(0.16,1,0.3,1) both`,
+                animationDelay: `${col.delay}s`,
+              }}
+            >
+              {/* Solid colour fill */}
+              {col.bg && (
+                <div style={{ position: "absolute", inset: 0, background: col.bg }} />
+              )}
+
+              {/* Subtle tint on dark columns */}
+              {!col.bg && col.tintColor && (
+                <div style={{
+                  position: "absolute",
+                  inset: 0,
+                  background: col.tintColor,
+                  opacity: col.tintOpacity,
+                }} />
+              )}
+
+              {/* Vertical text — reads bottom → top */}
+              <div style={{
+                position: "relative",
+                writingMode: "vertical-lr",
+                transform: "rotate(180deg)",
+                fontSize: "clamp(48px, 14vw, 68px)",
+                fontWeight: 900,
+                textTransform: "uppercase",
+                color: col.textColor,
+                letterSpacing: "-0.03em",
+                lineHeight: 1,
+                userSelect: "none",
+                textShadow: col.bg === "#22D3EE"
+                  ? "none"
+                  : "0 0 40px rgba(168,85,247,0.3)",
               }}>
-                <span style={{
-                  fontSize: "0.78rem",
-                  color: "rgba(255,255,255,0.55)",
-                  fontWeight: 500,
-                  letterSpacing: "0.01em",
-                }}>
-                  Загрузка...
-                </span>
-                <span style={{
-                  fontSize: "0.78rem",
-                  color: "rgba(255,255,255,0.35)",
-                }}>
-                  {Math.round(progress)}%
-                </span>
+                {col.text}
               </div>
+
+              {/* Column separator */}
+              <div style={{
+                position: "absolute",
+                top: 0, bottom: 0, right: 0,
+                width: 1,
+                background: "rgba(255,255,255,0.06)",
+              }} />
             </div>
-          </motion.div>
+          ))}
+
+          {/* Bottom caption */}
+          <div style={{
+            position: "absolute",
+            bottom: "calc(env(safe-area-inset-bottom, 0px) + 28px)",
+            left: 20,
+            zIndex: 10,
+            fontFamily: "monospace",
+            fontSize: 10,
+            letterSpacing: "0.2em",
+            textTransform: "uppercase",
+            color: "rgba(255,255,255,0.22)",
+          }}>
+            Матрица Снабжения
+          </div>
 
           {/* Skip button */}
           <motion.button
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 1.2 }}
+            transition={{ delay: 1.0 }}
             onClick={handleSkip}
             style={{
               position: "absolute",
@@ -199,7 +147,7 @@ export function IntroSplash({ onDone }: Props) {
               zIndex: 10,
               background: "rgba(255,255,255,0.08)",
               border: "1px solid rgba(255,255,255,0.12)",
-              borderRadius: "20px",
+              borderRadius: 20,
               color: "rgba(255,255,255,0.6)",
               fontSize: "0.72rem",
               fontWeight: 500,
