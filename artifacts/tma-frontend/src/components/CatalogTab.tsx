@@ -73,9 +73,9 @@ const CSS = `
 .ct-net { width:100%; display:flex; align-items:center; gap:14px; padding:14px 16px; border-radius:20px; border:1.5px solid; background:rgba(255,255,255,0.03); cursor:pointer; text-align:left; transition:border-radius 0.2s, border-color 0.25s, background 0.25s, box-shadow 0.25s; position:relative; overflow:hidden; -webkit-tap-highlight-color:transparent; }
 .ct-net.expanded { border-bottom-left-radius:0; border-bottom-right-radius:0; border-bottom-color:transparent !important; }
 .ct-net:active { transform:scale(0.98); }
-.ct-net-logo { width:38px; height:38px; border-radius:10px; overflow:hidden; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
-.ct-net-logo img { width:34px; height:34px; object-fit:contain; }
-.ct-net-logo-fallback { width:38px; height:38px; border-radius:10px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:900; color:#fff; letter-spacing:-0.5px; }
+.ct-net-logo { width:54px; height:54px; border-radius:13px; overflow:hidden; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+.ct-net-logo img { width:100%; height:100%; object-fit:contain; }
+.ct-net-logo-fallback { width:54px; height:54px; border-radius:13px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:900; color:#fff; letter-spacing:-0.5px; }
 .ct-net-names { display:flex; flex-direction:column; gap:2px; flex:1; min-width:0; }
 .ct-net-name { font-size:16px; font-weight:700; color:#e2e8f0; letter-spacing:-0.2px; }
 .ct-net-badge { font-size:10px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; opacity:0.85; }
