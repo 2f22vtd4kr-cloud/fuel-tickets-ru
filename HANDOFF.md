@@ -131,6 +131,51 @@ Feature is fully built and live. The bot's 409 Conflict errors in logs are trans
 
 ---
 
+## Session: 2026-06-28 — Premium Redesign Canvas Mockups (All 7 Screens)
+
+### What we were building
+Full premium redesign of all app screens on canvas for user approval before graduating to production. Design direction: deep dark #0A0A0F, "night drive in Mercedes" atmosphere, Apple minimalism, glassmorphism/Liquid Glass, dynamic per-network color accents, progressive disclosure.
+
+### What was done this session
+7 canvas mockup screens built in `artifacts/mockup-sandbox/src/components/mockups/redesign/` via parallel DESIGN subagents:
+
+| File | Canvas Shape ID | Screen |
+|------|-----------------|--------|
+| `LoadingScreen.tsx` | `ds-loading` | Vertical stacked typography splash — "ПОХУЙ / ИНФЛЯЦИЯ / — / БЕРИ ТАЛОНЫ / И ЗАМОРАЖИВАЙ / ЦЕНЫ" with alternating cyan/purple highlight blocks behind each word. Stars particle bg. Animated progress bar at bottom. |
+| `MapTab.tsx` | `ds-map` | Dark simulated map with glowing station markers (green/yellow/red). LIVE ticker strip. Search + filter chips. Glassmorphic bottom-sheet station modal (Lukoil #12 open state) — map blurs behind modal, fuel availability bars, crowd-report buttons, "Купить талон" CTA. |
+| `CatalogTab.tsx` | `ds-catalog` | "Талоны на топливо" header + anti-inflation lock badge. Сетевые/Станционные tab switcher. 2-column network card grid (Lukoil/Rosneft/Gazprom/Bashneft with per-network color glows). Expanded Lukoil card with fuel chips, volume selector, mini market chart widget, purchase CTA. |
+| `VaultTab.tsx` | `ds-vault` | XP/level badge, violet→cyan progress bar, summary stats row. 3 active vouchers (network-colored borders). Top voucher expanded with inline SVG QR code + "Предъявить на АЗС". Purchase history rows. |
+| `VPNTab.tsx` | `ds-vpn` | Full-screen modal. Animated pulsing shield icon (green when active). Connection info + session timer. 3 feature chips. Pricing tiers (7/30/90 days in Telegram Stars). "Отключить VPN" ghost button. |
+| `GamesTab.tsx` | `ds-games` | Sub-tabs: Империя/Мини-игры/Опыт. Resource bar (oil/fuel/coins/stars). 5×5 isometric CSS grid with buildings + ambient purple glow. Mini-game preview cards (flip/tap). Daily rewards scroll strip. |
+| `AiNewsTab.tsx` | `ds-ai` | Sub-tabs: ИИ-Советник/Сводка. Bot profile header (CrisisBot, онлайн). Chat bubbles: bot welcome, user question, bot reply with action card, typing indicator. Quick-action chips. Frosted glass input bar. |
+
+Shared CSS/animations in: `_group.css` (same folder — imported by components that need keyframes).
+
+### Design system tokens applied to all screens
+- Background: `#0A0A0F`; card surface: `rgba(255,255,255,0.04–0.07)` glassmorphism
+- Accent: `#A855F7` violet, `#22D3EE` cyan
+- Network glows: Lukoil `#EF4444`, Rosneft `#3B82F6`, Gazprom `#22D3EE`, Bashneft `#8B5CF6`, Tatneft `#22C55E`, NNK `#F59E0B`
+- Font: Inter; mobile portrait 390×844; bottom nav 72px glassmorphic
+
+### Where we stopped
+All 7 canvas screens presented for user approval. Not yet graduated to production app.
+
+### Next steps (once user approves screens)
+1. Graduate each approved screen using `mockup-graduate` skill
+2. Key preservation rules for graduation:
+   - MapTab: keep Leaflet + react-leaflet, station clusters, real API data, crowd-report `POST /api/stations/{id}/report`
+   - CatalogTab: keep `POST /api/catalog/purchase` + 38% MockPaymentProvider block mechanic + `LiveMarketWidget`
+   - VaultTab: keep `qrcode` lib for QR generation, purchase history from `/api/vouchers/{user_id}`
+   - AiNewsTab: keep `AI_PROVIDER` env var pattern + `CrisisBot` + news tab
+   - LoadingScreen: mount on app init, unmount after initial API data loads (stations + user)
+   - VPNTab, GamesTab: already exist as `VpnTab.tsx` / `GamesTab.tsx` in frontend — graduate replaces them
+
+### Fixes done this session
+- Fixed Tailwind CSS missing from TMA Frontend (installed `tailwindcss` + `@tailwindcss/vite`, added plugin to `vite.config.ts`, added `@import "tailwindcss"` to `index.css`)
+- TMA Frontend moved from port 3001 → 5000 (Replit-exposed port)
+
+---
+
 ## Handoff Convention
 
 Every session must append a new `## Session: YYYY-MM-DD — Title` block above this line before ending. Include:
