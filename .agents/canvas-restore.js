@@ -13,8 +13,17 @@
  */
 
 // ── Config ───────────────────────────────────────────────────────────────────
-const DOMAIN = process.env.REPLIT_DOMAINS?.split(",")[0] ?? "";
-if (!DOMAIN) throw new Error("REPLIT_DOMAINS not set — is this running in the Replit sandbox?");
+// NOTE: process.env is unavailable in code_execution sandbox.
+// Before running this script, get the domain via bash:
+//   bash: echo $REPLIT_DOMAINS  → copy the first domain
+// Then set it below:
+const DOMAIN = (await import('os')).hostname().includes('replit')
+  ? (() => { throw new Error("Set DOMAIN manually: run `echo $REPLIT_DOMAINS` in bash first, paste the first value here.") })()
+  : "";
+
+// ─── PASTE DOMAIN HERE after running: bash `echo $REPLIT_DOMAINS` ────────────
+// const DOMAIN = "xxxx.picard.replit.dev";  // ← uncomment and fill in
+if (!DOMAIN) throw new Error("Set DOMAIN: paste output of `echo $REPLIT_DOMAINS` (first value) as the DOMAIN constant above.");
 
 const BASE = `https://${DOMAIN}:8099/__mockup/preview/redesign`;
 const W = 390, H = 844;
