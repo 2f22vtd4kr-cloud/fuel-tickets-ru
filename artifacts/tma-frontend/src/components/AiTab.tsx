@@ -240,10 +240,10 @@ function ChatBubble({
       initial={{ opacity: 0, y: 10, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: "spring", damping: 22, stiffness: 280 }}
-      className={`flex gap-2 max-w-[85%] ${isBot ? "" : "self-end justify-end"}`}
+      className={`flex gap-2 min-w-0 max-w-[85%] ${isBot ? "" : "self-end justify-end"}`}
     >
       {isBot && <BotAvatar />}
-      <div className={`flex flex-col gap-1 ${isBot ? "" : "items-end"}`}>
+      <div className={`flex flex-col gap-1 min-w-0 flex-1 ${isBot ? "" : "items-end"}`}>
         <div
           className={`p-3.5 rounded-2xl text-[15px] leading-relaxed shadow-sm ${
             isBot ? "rounded-bl-sm" : "rounded-br-sm"
