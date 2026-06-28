@@ -176,6 +176,77 @@ All 7 canvas screens presented for user approval. Not yet graduated to productio
 
 ---
 
+## Session: 2026-06-28 — Map Tab Cobalt Starfield Redesign
+
+### What we were building
+Continued the premium redesign series. Focus: (1) migrate project back to Replit with all workflows running, (2) redesign the Map Tab mockup with a bold cobalt/starfield aesthetic inspired by a "Building the Future" poster reference — deep royal blue, orange accents, interactive station markers, glassmorphic modal, slide-up filter panel.
+
+### What was done this session
+
+#### 1. Replit migration restored — all 4 workflows running
+- **TMA Backend** → `python -m tma_backend.main` on port 8000 ✓
+- **TMA Frontend** → `pnpm --filter @workspace/tma-frontend run dev` on port **5000** (moved from 3001)
+- **Telegram Bot** → `python bot.py` ✓
+- **Mockup Sandbox** → `cd artifacts/mockup-sandbox && PORT=8099 BASE_PATH=/__mockup pnpm dev` on port 8099 ✓
+
+#### 2. LoadingScreen graduated to production
+`artifacts/tma-frontend/src/components/IntroSplash.tsx` — the vertical stacked-typography loading screen (ПОХ*Й / ИНФЛЯЦИЯ— / БЕРИ ТАЛОНЫ / И ЗАМОРАЖИВАЙ / ЦЕНЫ / colRise animation) was graduated from the mockup sandbox into the live app.
+
+#### 3. Map Tab full redesign — Cobalt Starfield
+`artifacts/mockup-sandbox/src/components/mockups/redesign/MapTab.tsx` — completely rewritten. Old: dark/black glassmorphic. New:
+
+**Visual direction:**
+- Background: deep cobalt gradient (`#0B0C4A → #060730`)
+- 80 procedural star particles (SVG, `useMemo` for stable positions per render)
+- Indigo road-grid SVG lines + faint district labels (СЕВЕРНАЯ / ЦЕНТР / КОРАБЕЛЬНАЯ / ГАГАРИНСКИЙ)
+- Primary action colour: orange/coral **#E8622A** (was violet #A855F7) — CTAs, active filters, nav indicator, filter panel apply button
+- Long-shadow typographic effect on station name + modal headers
+
+**Interactivity (fully functional within the mockup, no backend):**
+- `useState` for: `selectedId` (station modal), `filtersOpen` (filter panel), `activeFuel`, `activeSort`, `activeNet`
+- **9 station markers** — each clickable; selected marker grows (18px core vs 11px), gains a glow ring, shows name label above; unselected markers have independent `markerPulse` animation
+- **Filter fuel chips** (Все/АИ-92/АИ-95/ДТ/Газ) — filters visible markers in real-time
+- **Station detail modal** — slides up (`slideUp` keyframe .35s cubic-bezier) from bottom; shows: name with long-shadow, address, network badge + rating + availability badge, per-fuel price bars with glow fills, crowd-report buttons (✅/⚠️/❌), orange "Купить талон ⛽" CTA; tap ✕ to close
+- **Filter panel** — tap filter icon in search bar → frosted overlay + slide-up panel with Sort (4 options) + Network (7 options) + Apply button
+- **Legend pill** — floats bottom-right, moves up when modal is open (`bottom` transition)
+
+**Removed:** "Матрица Снабжения" text removed from both MapTab.tsx (header) and LoadingScreen.tsx (bottom caption) per user request.
+
+### Canvas state at session end
+| Shape ID | Component | Status |
+|----------|-----------|--------|
+| `ds-loading` | `LoadingScreen.tsx` | Graduated to production — mockup kept for reference |
+| `ds-map` | `MapTab.tsx` | **Ready for graduation next session** |
+| `ds-catalog` | `CatalogTab.tsx` | Dormant — from prev session, unchanged |
+| `ds-vault` | `VaultTab.tsx` | Dormant — from prev session, unchanged |
+| `ds-vpn` | `VPNTab.tsx` | Dormant — from prev session, unchanged |
+| `ds-games` | `GamesTab.tsx` | Dormant — from prev session, unchanged |
+| `ds-ai` | `AiNewsTab.tsx` | Dormant — from prev session, unchanged |
+
+### Restoring canvas next session (ONE step)
+```
+// At session start: read + paste .agents/canvas-restore.js into code_execution
+// It uses REPLIT_DOMAINS env var automatically — no manual domain substitution needed.
+// Make sure "Mockup Sandbox" workflow is running first.
+```
+
+### Next steps
+1. Graduate `MapTab.tsx` cobalt starfield design into production `artifacts/tma-frontend/src/components/MapTab.tsx`
+   - Keep Leaflet + react-leaflet for real map tiles
+   - Apply cobalt background to the map tile layer (custom TileLayer style or CSS filter)
+   - Port the glassmorphic modal (station info sheet) — wire to real API data + crowd-report `POST /api/stations/{id}/report`
+   - Port the slide-up filter panel — wire to existing region/fuel/status filter state in `useMapStore`
+   - Replace purple accent with orange `#E8622A` on CTAs
+2. Iterate on remaining dormant screens (Catalog, Vault, etc.) or go straight to graduation
+
+### Gotchas discovered this session
+- TMA Frontend must run on port **5000** (Replit-exposed); 3001 was blocked in preview pane
+- `presentArtifact` is permanently stale — always use `focusCanvasShapes({ shapeIds })` to focus existing canvas shapes
+- Canvas shapes are ephemeral (lost on session end); `.agents/canvas-restore.js` re-creates all 7 in one `code_execution` call
+- Mockup Sandbox port must be **8099** (8081 not in Replit's allowed workflow port list)
+
+---
+
 ## Handoff Convention
 
 Every session must append a new `## Session: YYYY-MM-DD — Title` block above this line before ending. Include:
