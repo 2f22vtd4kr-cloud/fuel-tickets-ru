@@ -25,7 +25,6 @@ import { AiTab } from "@/components/AiTab";
 import { GamesTab } from "@/components/GamesTab";
 import { VaultTab } from "@/components/VaultTab";
 import { VpnModal } from "@/components/VpnModal";
-import { MarketTicker } from "@/components/MarketTicker";
 import { IntroSplash } from "@/components/IntroSplash";
 import { AdminPanel } from "@/components/AdminPanel";
 import { OnboardingTour } from "@/components/OnboardingTour";
@@ -526,16 +525,6 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Market ticker — fixed strip */}
-      <div
-        style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 9800 }}
-        onMouseDown={handleTickerPressStart}
-        onMouseUp={handleTickerPressEnd}
-        onTouchStart={handleTickerPressStart}
-        onTouchEnd={handleTickerPressEnd}
-      >
-        <MarketTicker stationCount={stations.length} />
-      </div>
 
       {/* Phone-width clamp — ensures proper mobile rendering in canvas/iframe previews */}
       <style>{`body{max-width:430px;margin:0 auto;overflow-x:hidden}`}</style>
