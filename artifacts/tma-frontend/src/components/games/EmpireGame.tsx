@@ -74,9 +74,10 @@ function DailyRewardsRow({ loginDay, lastRewardDate, onClaim }: {
         </span>
         {canClaim && (
           <button onClick={onClaim} style={{
-            background: "linear-gradient(135deg,#7c3aed,#5b21b6)", border: "none",
+            background: "#E8622A", border: "none",
             borderRadius: 8, color: "#fff", fontSize: 10, fontWeight: 700,
             padding: "3px 10px", cursor: "pointer",
+            boxShadow: "0 0 10px rgba(232,98,42,0.35)",
           }}>
             Забрать
           </button>
@@ -89,15 +90,15 @@ function DailyRewardsRow({ loginDay, lastRewardDate, onClaim }: {
           const isPast = loginDay > dayNum;
           return (
             <div key={r.day} style={{
-              flexShrink: 0, background: isCurrent ? "rgba(124,58,237,0.2)" : "rgba(255,255,255,0.04)",
-              border: `1px solid ${isCurrent ? "rgba(124,58,237,0.5)" : "rgba(255,255,255,0.07)"}`,
+              flexShrink: 0, background: isCurrent ? "rgba(232,98,42,0.18)" : "rgba(255,255,255,0.04)",
+              border: `1px solid ${isCurrent ? "rgba(232,98,42,0.5)" : "rgba(255,255,255,0.07)"}`,
               borderRadius: 10, padding: "6px 8px", textAlign: "center",
               minWidth: 48, opacity: isPast ? 0.4 : 1,
-              boxShadow: isCurrent ? "0 0 12px rgba(124,58,237,0.3)" : "none",
+              boxShadow: isCurrent ? "0 0 12px rgba(232,98,42,0.25)" : "none",
             }}>
               {isPast && <div style={{ fontSize: 14 }}>✅</div>}
               {!isPast && <div style={{ fontSize: 13 }}>💰</div>}
-              <div style={{ fontSize: 9, fontWeight: 700, color: isCurrent ? "#c4b5fd" : "rgba(255,255,255,0.5)" }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: isCurrent ? "#E8622A" : "rgba(255,255,255,0.5)" }}>
                 {fmtNum(r.coins)}
               </div>
               <div style={{ fontSize: 8, color: "rgba(255,255,255,0.35)" }}>{r.label}</div>
@@ -192,7 +193,7 @@ function BuildingDetailPanel({ building, onClose, onUpgrade, onDemolish }: {
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>
             {def.name}
-            <span style={{ marginLeft: 8, fontSize: 11, background: "rgba(124,58,237,0.2)", border: "1px solid rgba(124,58,237,0.3)", borderRadius: 6, padding: "1px 6px", color: "#c4b5fd" }}>
+            <span style={{ marginLeft: 8, fontSize: 11, background: "rgba(232,98,42,0.18)", border: "1px solid rgba(232,98,42,0.35)", borderRadius: 6, padding: "1px 6px", color: "#E8622A" }}>
               Ур.{building.level}
             </span>
           </div>
@@ -219,9 +220,9 @@ function BuildingDetailPanel({ building, onClose, onUpgrade, onDemolish }: {
       <div style={{ padding: "0 14px", display: "flex", flexDirection: "column", gap: 8 }}>
         {building.level < def.maxLevel && (
           <button onClick={onUpgrade} style={{
-            width: "100%", height: 46, background: "linear-gradient(135deg,#7c3aed,#5b21b6)",
+            width: "100%", height: 46, background: "#E8622A",
             border: "none", borderRadius: 13, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer",
-            boxShadow: "0 4px 20px rgba(124,58,237,0.4)",
+            boxShadow: "0 4px 20px rgba(232,98,42,0.38)",
           }}>
             ⬆️ Улучшить до Ур.{building.level + 1} — {fmtNum(cost)} 💰
           </button>
@@ -302,7 +303,7 @@ function OfflineEarningsModal({ gains, onDismiss }: {
     >
       <motion.div
         initial={{ scale: 0.85, y: 20 }} animate={{ scale: 1, y: 0 }}
-        style={{ background: "rgba(10,12,24,0.98)", border: "1px solid rgba(124,58,237,0.3)", borderRadius: 20, padding: 24, width: "100%", maxWidth: 320, textAlign: "center" }}
+        style={{ background: "rgba(14,18,140,0.97)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 20, padding: 24, width: "100%", maxWidth: 320, textAlign: "center" }}
       >
         <div style={{ fontSize: 36, marginBottom: 8 }}>😴</div>
         <div style={{ fontSize: 16, fontWeight: 700, color: "#fff", marginBottom: 4 }}>Пока вы отсутствовали...</div>
@@ -315,7 +316,7 @@ function OfflineEarningsModal({ gains, onDismiss }: {
             </div>
           ))}
         </div>
-        <button onClick={onDismiss} style={{ width: "100%", height: 44, background: "linear-gradient(135deg,#7c3aed,#5b21b6)", border: "none", borderRadius: 12, color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+        <button onClick={onDismiss} style={{ width: "100%", height: 44, background: "#E8622A", border: "none", borderRadius: 12, color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", boxShadow: "0 0 20px rgba(232,98,42,0.35)" }}>
           Забрать!
         </button>
       </motion.div>
@@ -369,17 +370,17 @@ function LeaderboardPanel({ onClose, currentUserId }: { onClose: () => void; cur
                 return (
                   <div key={e.user_id} style={{
                     display: "flex", alignItems: "center", gap: 10,
-                    background: isMe ? "rgba(124,58,237,0.15)" : "rgba(255,255,255,0.04)",
-                    border: `1px solid ${isMe ? "rgba(124,58,237,0.4)" : "rgba(255,255,255,0.07)"}`,
+                    background: isMe ? "rgba(232,98,42,0.12)" : "rgba(255,255,255,0.04)",
+                    border: `1px solid ${isMe ? "rgba(232,98,42,0.4)" : "rgba(255,255,255,0.07)"}`,
                     borderRadius: 12, padding: "8px 12px",
                   }}>
                     <span style={{ fontSize: 18, minWidth: 24, textAlign: "center" }}>
                       {e.rank <= 3 ? medals[e.rank - 1] : `#${e.rank}`}
                     </span>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: isMe ? "#c4b5fd" : "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: isMe ? "#E8622A" : "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {e.username ? `@${e.username}` : `Игрок ${e.user_id}`}
-                        {isMe && <span style={{ marginLeft: 6, fontSize: 10, color: "#a78bfa" }}>ВЫ</span>}
+                        {isMe && <span style={{ marginLeft: 6, fontSize: 10, color: "#E8622A" }}>ВЫ</span>}
                       </div>
                       <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>
                         Ур.{e.empire_level} · {e.prestige_count > 0 ? `⭐×${e.prestige_count} · ` : ""}💰{fmtNum(e.coins)}
@@ -645,7 +646,7 @@ export function GamesPage() {
       >
         <canvas ref={canvasRef} style={{ display: "block", touchAction: "none" }} />
         {pendingBuildId && (
-          <div style={{ position: "absolute", top: 8, left: "50%", transform: "translateX(-50%)", background: "rgba(124,58,237,0.9)", borderRadius: 10, padding: "6px 14px", color: "#fff", fontSize: 11, fontWeight: 700, pointerEvents: "none", zIndex: 100 }}>
+          <div style={{ position: "absolute", top: 8, left: "50%", transform: "translateX(-50%)", background: "rgba(232,98,42,0.92)", borderRadius: 10, padding: "6px 14px", color: "#fff", fontSize: 11, fontWeight: 700, pointerEvents: "none", zIndex: 100 }}>
             👆 Нажмите на пустую клетку для постройки
           </div>
         )}
