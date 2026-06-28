@@ -18,3 +18,9 @@ id = "G0mt8UhgWIkthQyJGTiZM"
 uri = "file://screenshots/app_banner.jpg"
 type = "image"
 title = "Топливо ⛽️ — Banner"
+
+[[outputs]]
+id = "qXaHfcdokIcRJ6ERZSOj6"
+uri = "file://screenshots/app_banner_v2.jpg"
+type = "image"
+title = "Топливо — Баннер (обновлённый)"
