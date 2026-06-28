@@ -16,3 +16,6 @@
 - [Premium redesign mockups](redesign-mockups.md) — 7 canvas screens; LoadingScreen graduated, MapTab cobalt-starfield ready for graduation; restore canvas with `.agents/canvas-restore.js` (one code_execution paste, uses REPLIT_DOMAINS auto).
 - [No underscore UI labels](no-underscore-labels.md) — never render СЛОВО_СЛОВО gray micro-labels or "требуется реакция" / "кризис_дефицита" text anywhere in mockups or production UI.
 - [Cobalt design system](cobalt-design-system.md) — full handoff: palette, banned colors, tile filter trick, starfield placement, BottomNav analytics restore, what's done, what's next.
+- [Bottom-sheet scroll vs drag](bottom-sheet-scroll.md) — framer-motion drag sheets: never set overflow:hidden on the scrollable container (overrides overflowY:auto); use touchAction:"pan-y" not "none" so native scroll works alongside drag-to-dismiss.
+- [Telegram header color](tg-header-color.md) — App.tsx must call tg.setHeaderColor("#1318B0") and tg.setBackgroundColor("#1318B0") on init; old value #050507 (black) causes visible gap between Telegram chrome and app background.
+- [CatalogTab network logos](catalog-network-logos.md) — logos are inline SVGs in NETWORK_SVGS map in CatalogTab.tsx; no external image fetching; NetworkLogo component falls back to initials badge for unknown networks.
