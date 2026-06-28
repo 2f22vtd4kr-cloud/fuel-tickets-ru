@@ -151,7 +151,7 @@ export function VaultTab() {
                   {/* Left color border accent */}
                   <div 
                     className="absolute left-0 top-0 bottom-0 w-1.5 opacity-80" 
-                    style={{ backgroundColor: netColor, boxShadow: \`0 0 10px \${netColor}\` }}
+                    style={{ backgroundColor: netColor, boxShadow: `0 0 10px ${netColor}` }}
                   />
                   
                   {/* Header Row */}
