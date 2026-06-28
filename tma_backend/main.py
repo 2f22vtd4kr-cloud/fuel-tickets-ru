@@ -1777,6 +1777,79 @@ def create_network_cryptobot_invoice(body: NetworkVoucherIn, db: Session = Depen
     }
 
 
+@app.post("/api/cryptobot-webhook")
+async def cryptobot_webhook(request: Request, db: Session = Depends(get_db)):
+    """
+    CryptoBot sends invoice_paid events here.
+    Configure in CryptoBot: Settings → Webhooks → URL = https://<your-domain>/api/cryptobot-webhook
+    Verifies the Crypto-Pay-API-Token header, then flips the matching purchase from
+    "pending" → "active" and extends its expiry to 90 days.
+    """
+    token = request.headers.get("Crypto-Pay-API-Token", "")
+    expected = os.getenv("CRYPTO_BOT_TOKEN", "")
+    if not expected or token != expected:
+        logger.warning("cryptobot_webhook: invalid token header")
+        raise HTTPException(401, detail="Unauthorized")
+
+    try:
+        body_bytes = await request.body()
+        data = json.loads(body_bytes)
+    except Exception:
+        raise HTTPException(400, detail="Invalid JSON")
+
+    update_type = data.get("update_type")
+    if update_type != "invoice_paid":
+        # Acknowledge other event types silently
+        return {"ok": True}
+
+    invoice = data.get("payload", {})
+    invoice_id = invoice.get("invoice_id")
+    # qr_hash was stored as the CryptoBot payload field when the invoice was created
+    qr_hash_payload = invoice.get("payload", "")
+
+    logger.info("cryptobot_webhook: invoice_paid invoice_id=%s qr_hash=%s", invoice_id, qr_hash_payload)
+
+    # Try matching by transaction_id ("CB-{invoice_id}") OR qr_hash payload
+    purchase = None
+    if invoice_id:
+        tx_id = f"CB-{invoice_id}"
+        purchase = (
+            db.query(PurchaseHistory)
+            .filter(PurchaseHistory.transaction_id == tx_id)
+            .first()
+        )
+    if purchase is None and qr_hash_payload:
+        purchase = (
+            db.query(PurchaseHistory)
+            .filter(PurchaseHistory.qr_hash == qr_hash_payload)
+            .first()
+        )
+
+    if purchase is None:
+        logger.warning("cryptobot_webhook: no pending purchase found for invoice_id=%s", invoice_id)
+        return {"ok": True}  # Return 200 so CryptoBot doesn't retry indefinitely
+
+    if purchase.status != "pending":
+        logger.info("cryptobot_webhook: purchase %d already %s — skipping", purchase.id, purchase.status)
+        return {"ok": True}
+
+    purchase.status = "active"
+    purchase.expires_at = _now() + timedelta(days=90)
+    # Award XP for a real payment
+    user = db.query(User).filter(User.telegram_id == purchase.user_id).first()
+    if user:
+        old_level = user.xp
+        user.xp += 20
+        user.level = _xp_to_level(user.xp)
+        _notify_levelup(user, old_level)
+    db.commit()
+    logger.info(
+        "cryptobot_webhook: purchase %d activated (user=%d, %s %dL)",
+        purchase.id, purchase.user_id, purchase.fuel_type, purchase.volume,
+    )
+    return {"ok": True}
+
+
 @app.post("/api/catalog/network-voucher")
 def purchase_network_voucher(body: NetworkVoucherIn, db: Session = Depends(get_db)):
     """Purchase a mock network-wide voucher (valid at any station of the given network)."""

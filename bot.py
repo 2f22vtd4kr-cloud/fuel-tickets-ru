@@ -3,7 +3,7 @@ import logging
 import httpx
 from dotenv import load_dotenv
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram.ext import Application, CommandHandler, MessageHandler, PreCheckoutQueryHandler, ContextTypes, filters
 
 load_dotenv()
 
@@ -120,6 +120,16 @@ async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
 
 
+async def pre_checkout_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Telegram requires answering pre_checkout_query within 10 seconds.
+    Always approve — actual validation happens in successful_payment.
+    """
+    query = update.pre_checkout_query
+    await query.answer(ok=True)
+    logger.info("pre_checkout_query answered ok=True: id=%s payload=%s", query.id, query.invoice_payload)
+
+
 async def post_init(app: Application) -> None:
     await app.bot.delete_my_commands()
     logger.info("Bot command list cleared.")
@@ -143,6 +153,7 @@ def main() -> None:
         .build()
     )
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(PreCheckoutQueryHandler(pre_checkout_query))
     app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment))
     logger.info("Бот запущен.")
     app.run_polling()
