@@ -624,11 +624,6 @@ export function MapTab() {
               <div style={{ width:40, height:4, borderRadius:2, background:"rgba(255,255,255,0.2)" }} />
             </div>
 
-            <div style={{
-              fontSize:11, fontWeight:900, letterSpacing:"0.2em",
-              textTransform:"uppercase", color:"#E8622A", marginBottom:18,
-            }}>ФИЛЬТРЫ · МАТРИЦА</div>
-
             <div style={{ marginBottom:18 }}>
               <div style={{ fontSize:10, fontWeight:700, letterSpacing:"0.16em",
                 textTransform:"uppercase", color:"rgba(150,165,255,0.45)", marginBottom:9 }}>Сортировка</div>

@@ -248,7 +248,6 @@ export function AnalyticsTab() {
           <Strip color={VIOLET} style={{ bottom:0, left:0, right:0 }} />
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
             <div>
-              <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"0.42rem", letterSpacing:"0.18em", color:"#4b5563", marginBottom:2 }}>МАТРИЦА_СНАБЖЕНИЯ · АНАЛИТИКА</div>
               <h1 style={{ margin:0, fontSize:"1.25rem", fontWeight:900, background:`linear-gradient(90deg, #fff 0%, ${VIOLET} 60%, ${MAGENTA} 100%)`, WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
                 Аналитика
               </h1>
@@ -271,9 +270,8 @@ export function AnalyticsTab() {
               <div style={{ position:"absolute", inset:0, pointerEvents:"none", opacity:0.025, background:"repeating-linear-gradient(0deg,transparent,transparent 3px,#ef4444 3px,#ef4444 4px)" }} />
               <div style={{ width:10, height:10, borderRadius:"50%", flexShrink:0, background:AVAIL.red, boxShadow:`0 0 14px ${AVAIL.red}`, animation:"scanPulse 1s infinite" }} />
               <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ color:AVAIL.red, fontWeight:800, fontSize:"0.7rem", letterSpacing:"0.1em", fontFamily:"'JetBrains Mono',monospace" }}>КРИЗИС_ДЕФИЦИТА</div>
-                <div style={{ color:"#9ca3af", fontSize:"0.65rem", marginTop:2 }}>
-                  {crisisCount} {crisisCount < 5 ? "региона" : "регионов"} ниже 25% · требуется реакция
+                <div style={{ color:AVAIL.red, fontWeight:800, fontSize:"0.75rem" }}>
+                  {crisisCount} {crisisCount < 5 ? "региона" : "регионов"} ниже 25%
                 </div>
               </div>
               <button style={{ background:`${AVAIL.red}22`, border:`1px solid ${AVAIL.red}44`, borderRadius:8, color:AVAIL.red, fontSize:"0.65rem", fontWeight:700, padding:"0.3rem 0.55rem", cursor:"pointer", flexShrink:0 }}>
@@ -313,7 +311,6 @@ export function AnalyticsTab() {
         <div style={{ padding:"0.75rem 1rem 0" }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"0.5rem" }}>
             <div>
-              <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"0.42rem", color:"#374151", letterSpacing:"0.12em", marginBottom:2 }}>ДИНАМИКА_НАЛИЧИЯ</div>
               <div style={{ color:"#9ca3af", fontSize:"0.72rem", textTransform:"uppercase", letterSpacing:"0.06em" }}>Тренд наличия</div>
             </div>
             <div style={{ display:"flex", gap:4 }}>
@@ -369,7 +366,6 @@ export function AnalyticsTab() {
         <div style={{ padding:"0.75rem 1rem 0" }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"0.5rem" }}>
             <div>
-              <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"0.42rem", color:"#374151", letterSpacing:"0.12em", marginBottom:2 }}>МАТРИЦА_ЦЕН · КРИТИЧНЫЕ_ЗОНЫ</div>
               <div style={{ color:"#9ca3af", fontSize:"0.72rem", textTransform:"uppercase", letterSpacing:"0.06em" }}>Матрица цен</div>
             </div>
             <span style={{ background:`${AVAIL.red}15`, border:`1px solid ${AVAIL.red}30`, borderRadius:4, color:AVAIL.red, fontSize:"0.52rem", fontWeight:700, padding:"0.08rem 0.32rem", fontFamily:"'JetBrains Mono',monospace" }}>ТОП-6 крит.</span>
@@ -409,7 +405,6 @@ export function AnalyticsTab() {
         <div style={{ padding:"0.75rem 1rem 0" }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"0.5rem" }}>
             <div>
-              <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:"0.42rem", color:"#374151", letterSpacing:"0.12em", marginBottom:2 }}>РЕГИОНАЛЬНОЕ_НАЛИЧИЕ</div>
               <div style={{ color:"#9ca3af", fontSize:"0.72rem", textTransform:"uppercase", letterSpacing:"0.06em" }}>По регионам</div>
             </div>
             <div style={{ display:"flex", gap:4 }}>
