@@ -68,7 +68,8 @@ A premium Telegram bot + Telegram Mini App (TMA) fuel availability dashboard for
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- **No underscore labels in UI**: Never render `СЛОВО_СЛОВО` gray micro-labels (e.g. `МАТРИЦА_СНАБЖЕНИЯ`, `ДИНАМИКА_НАЛИЧИЯ`) above section headings — not in mockups, not in production. Section titles stand alone.
+- **No "требуется реакция" or "КРИЗИС_ДЕФИЦИТА"**: Crisis banners show only a count + percentage, no underscore-cased category names.
 
 ## Gotchas
 
