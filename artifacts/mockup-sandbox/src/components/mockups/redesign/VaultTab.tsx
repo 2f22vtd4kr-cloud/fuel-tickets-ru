@@ -186,7 +186,7 @@ export function VaultTab() {
 
                   {/* Expanded Content (QR) */}
                   <div 
-                    className={\`overflow-hidden transition-all duration-500 ease-in-out \${isExpanded ? 'max-h-[400px] opacity-100 mt-6 pt-6 border-t border-white/10' : 'max-h-0 opacity-0 mt-0'}\`}
+                    className={`overflow-hidden transition-all duration-500 ease-in-out \${isExpanded ? 'max-h-[400px] opacity-100 mt-6 pt-6 border-t border-white/10' : 'max-h-0 opacity-0 mt-0'}`}
                   >
                     <div className="flex flex-col items-center">
                       <div className="text-sm font-medium text-white/60 mb-4">Предъявить на АЗС</div>
@@ -269,10 +269,10 @@ export function VaultTab() {
 function NavItem({ icon, label, active = false }: { icon: React.ReactNode, label: string, active?: boolean }) {
   return (
     <div className="flex flex-col items-center gap-1.5 cursor-pointer w-[60px]">
-      <div className={\`transition-colors duration-300 \${active ? 'text-[#A855F7] drop-shadow-[0_0_8px_rgba(168,85,247,0.8)]' : 'text-white/40'}\`}>
+      <div className={`transition-colors duration-300 \${active ? 'text-[#A855F7] drop-shadow-[0_0_8px_rgba(168,85,247,0.8)]' : 'text-white/40'}`}>
         {React.cloneElement(icon as React.ReactElement, { className: 'w-6 h-6' })}
       </div>
-      <span className={\`text-[10px] font-medium transition-colors duration-300 \${active ? 'text-white' : 'text-white/40'}\`}>
+      <span className={`text-[10px] font-medium transition-colors duration-300 \${active ? 'text-white' : 'text-white/40'}`}>
         {label}
       </span>
     </div>
