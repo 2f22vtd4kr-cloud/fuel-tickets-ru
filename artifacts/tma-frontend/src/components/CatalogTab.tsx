@@ -226,6 +226,9 @@ export function CatalogTab(_props?: { initialStationId?: number; onCalcOpenChang
   const adminPass = _props?.adminPass ?? "";
   const user = useUserStore((s) => s.user);
   const refresh = useUserStore((s) => s.refresh);
+  const refreshUser = useCallback(() => {
+    setTimeout(() => { refresh(); }, 1500);
+  }, [refresh]);
   const { add: toast } = useToast();
   const fetchVault = useVaultStore((s) => s.fetch);
 
@@ -274,6 +277,7 @@ export function CatalogTab(_props?: { initialStationId?: number; onCalcOpenChang
               notify("success");
               toast(`⭐ Оплата ${inv.stars_amount} Stars принята! Талон в Кармане.`, "success");
               fetchVault(user.id);
+              refreshUser();
               setStep("success");
             } else if (status === "cancelled") {
               notify("error");
@@ -286,6 +290,7 @@ export function CatalogTab(_props?: { initialStationId?: number; onCalcOpenChang
         } else if (inv.invoice_link) {
           window.open(inv.invoice_link, "_blank");
           toast(`⭐ Счёт на ${inv.stars_amount} Stars открыт.`, "success");
+          refreshUser();
           setStep("success");
         } else {
           toast(`⭐ ${inv.stars_amount} Stars — откройте через Telegram.`, "success");
@@ -317,6 +322,7 @@ export function CatalogTab(_props?: { initialStationId?: number; onCalcOpenChang
       notify("success");
       toast("✅ Талон выдан бесплатно", "success");
       fetchVault(user.id);
+      refreshUser();
       setStep("success");
     } catch (e: unknown) {
       notify("error");

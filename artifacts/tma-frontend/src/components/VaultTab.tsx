@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useVaultStore } from "@/stores/useVaultStore";
 import { useUserStore } from "@/stores/useUserStore";
 import { useFavoritesStore } from "@/stores/useFavoritesStore";
 import { useStationStore } from "@/stores/useStationStore";
 import { fetchReferral, fetchAchievements, fetchUserSubscriptions, unsubscribeFromStation, fetchCreditsBalance, fetchUserNotes, deleteStationNote } from "@/api/client";
+import { useToast } from "@/components/Toast";
 import type { Achievement } from "@/api/client";
 import type { Purchase, ReferralInfo, Subscription, CreditTx, TabId } from "@/types";
 import { FUEL_LABELS, XP_TIER_THRESHOLDS } from "@/types";
@@ -54,7 +55,7 @@ function QRModal({ hash, onClose, expiresAt, networkName, fuelType, volume, pric
   // Hide all floating UI elements while QR modal is open
   useEffect(() => {
     window.dispatchEvent(new CustomEvent("tma-qr-modal-open"));
-    return () => window.dispatchEvent(new CustomEvent("tma-qr-modal-close"));
+    return () => { window.dispatchEvent(new CustomEvent("tma-qr-modal-close")); };
   }, []);
   const expiry = expiryInfo(expiresAt);
   const netColor = networkName ? (VAULT_NET_COLORS[networkName] ?? "#E8622A") : "#E8622A";
@@ -440,6 +441,8 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
   const [referral, setReferral] = useState<ReferralInfo | null>(null);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [showAllAch, setShowAllAch] = useState(false);
+  const { add: toast } = useToast();
+  const prevUnlockedCodesRef = useRef<Set<string> | null>(null);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [showAllSubs, setShowAllSubs] = useState(false);
   const [creditHistory, setCreditHistory] = useState<CreditTx[]>([]);
@@ -458,16 +461,35 @@ export function VaultTab({ initialPurchaseId, onNavigate }: VaultTabProps) {
     return () => { if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current); };
   }, [highlightedId]);
 
+  const refreshAchievements = useCallback((userId: number, silent = false) => {
+    fetchAchievements(userId).then((d) => {
+      const newAchs = d.achievements;
+      const newUnlocked = new Set(newAchs.filter(a => a.unlocked).map(a => a.code));
+      if (!silent && prevUnlockedCodesRef.current !== null) {
+        newUnlocked.forEach(code => {
+          if (!prevUnlockedCodesRef.current!.has(code)) {
+            const ach = newAchs.find(a => a.code === code);
+            if (ach) {
+              toast(`${ach.icon} Достижение разблокировано: ${ach.label} (+${ach.xp_bonus} XP)`, "success");
+            }
+          }
+        });
+      }
+      prevUnlockedCodesRef.current = newUnlocked;
+      setAchievements(newAchs);
+    }).catch(() => {});
+  }, [toast]);
+
   useEffect(() => {
     if (user) {
       fetch(user.id);
       fetchReferral(user.id).then(setReferral).catch(() => {});
-      fetchAchievements(user.id).then((d) => setAchievements(d.achievements)).catch(() => {});
+      refreshAchievements(user.id, prevUnlockedCodesRef.current === null);
       fetchUserSubscriptions(user.id).then((d) => setSubscriptions(d.subscriptions)).catch(() => {});
       fetchCreditsBalance(user.id).then((d) => setCreditHistory(d.history)).catch(() => {});
       fetchUserNotes(user.id).then((d) => setStationNotes(d.notes)).catch(() => {});
     }
-  }, [user, fetch]);
+  }, [user, fetch, refreshAchievements]);
 
   const { favoriteRegions, removeFavorite: removeFav, favoriteStations, toggleStationFavorite } = useFavoritesStore();
   const active = purchases.filter((p) => p.status === "active");
