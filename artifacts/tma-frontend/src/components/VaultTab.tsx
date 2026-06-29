@@ -74,27 +74,53 @@ function QRModal({ hash, onClose, expiresAt, networkName, fuelType, volume, pric
     }).catch(() => {});
   };
 
-  const handleSavePng = async () => {
-    if (!dataUrl) return;
-    setSaving(true);
-    try {
-      const link = document.createElement("a");
-      link.href = dataUrl;
-      link.download = `talон_${hash.slice(0, 8)}.png`;
-      link.click();
-    } finally { setSaving(false); }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tgApp = (window as any).Telegram?.WebApp;
+
+  const _triggerDownload = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
   };
 
-  const handleSavePdf = () => {
-    if (!dataUrl) return;
+  const handleSavePng = async () => {
+    if (!dataUrl || saving) return;
+    setSaving(true);
+    try {
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const filename = `talon_${hash.slice(0, 8)}.png`;
+      const file = new File([blob], filename, { type: "image/png" });
+      // Web Share API — works in iOS TMA
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: "Топливный талон" });
+      } else {
+        _triggerDownload(blob, filename);
+      }
+    } catch {
+      // Last resort: open raw data URL in new tab
+      if (tgApp?.openLink) tgApp.openLink(dataUrl);
+      else window.open(dataUrl, "_blank");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSavePdf = async () => {
+    if (!dataUrl || saving) return;
     setSaving(true);
     try {
       const doc = new jsPDF({ format: "a6", unit: "mm", orientation: "portrait" });
       doc.setFillColor(8, 9, 15);
       doc.rect(0, 0, 105, 148, "F");
-      doc.setTextColor(168, 85, 247);
+      doc.setTextColor(232, 98, 42);
       doc.setFontSize(10);
-      doc.text("ТОПЛИВО ⛽️ — ЦИФРОВОЙ ТАЛОН", 10, 14);
+      doc.text("TOPLIВО — ЦИФРОВОЙ ТАЛОН", 10, 14);
       doc.setTextColor(220, 220, 240);
       doc.setFontSize(8);
       doc.text(`Код: ${hash}`, 10, 22);
@@ -103,14 +129,36 @@ function QRModal({ hash, onClose, expiresAt, networkName, fuelType, volume, pric
       doc.setTextColor(100, 100, 130);
       doc.setFontSize(6);
       doc.text("Предъявите QR-код оператору АЗС", 10, 108);
-      doc.save(`талон_${hash.slice(0, 8)}.pdf`);
-    } finally { setSaving(false); }
+      const filename = `talon_${hash.slice(0, 8)}.pdf`;
+      const pdfBlob = doc.output("blob");
+      const file = new File([pdfBlob], filename, { type: "application/pdf" });
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: "Топливный талон" });
+      } else {
+        _triggerDownload(pdfBlob, filename);
+      }
+    } catch {
+      // fallback: try doc.save which works on desktop
+      try {
+        const doc2 = new jsPDF({ format: "a6", unit: "mm", orientation: "portrait" });
+        doc2.save(`talon_${hash.slice(0, 8)}.pdf`);
+      } catch { /* ignore */ }
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleShareTg = () => {
     const text = `⛽ Мой топливный талон\n\nКод: ${hash}\nДата: ${now.toLocaleDateString("ru")}\n\n⛽ Топливный Узел — Матрица Снабжения`;
-    const tgUrl = `https://t.me/share/url?text=${encodeURIComponent(text)}`;
-    window.open(tgUrl, "_blank");
+    const tgUrl = `https://t.me/share/url?url=${encodeURIComponent("https://t.me/ToplivoBot")}&text=${encodeURIComponent(text)}`;
+    // Use TMA SDK — window.open is blocked in iOS Telegram WebApp
+    if (tgApp?.openTelegramLink) {
+      tgApp.openTelegramLink(tgUrl);
+    } else if (tgApp?.openLink) {
+      tgApp.openLink(tgUrl);
+    } else {
+      window.open(tgUrl, "_blank");
+    }
   };
 
   return (
