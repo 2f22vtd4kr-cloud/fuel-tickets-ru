@@ -112,6 +112,7 @@ export default function App() {
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [adminPass, setAdminPass] = useState("");
   const [showWallet, setShowWallet] = useState(false);
+  const [qrModalOpen, setQrModalOpen] = useState(false);
   const [showAiBanner, setShowAiBanner] = useState(false);
   const [calcOpen, setCalcOpen] = useState(false);
   const [newsBadgeCount, setNewsBadgeCount] = useState(0);
@@ -253,6 +254,18 @@ export default function App() {
     const openWallet = () => setShowWallet(true);
     window.addEventListener("tma-open-wallet", openWallet);
     return () => window.removeEventListener("tma-open-wallet", openWallet);
+  }, []);
+
+  // ── QR voucher modal — hide all floating UI while open ──────────
+  useEffect(() => {
+    const onOpen  = () => setQrModalOpen(true);
+    const onClose = () => setQrModalOpen(false);
+    window.addEventListener("tma-qr-modal-open",  onOpen);
+    window.addEventListener("tma-qr-modal-close", onClose);
+    return () => {
+      window.removeEventListener("tma-qr-modal-open",  onOpen);
+      window.removeEventListener("tma-qr-modal-close", onClose);
+    };
   }, []);
 
   // ── Catalog success mode — hide all UI except Карман ────────────
@@ -471,7 +484,7 @@ export default function App() {
           border: "none",
           animation: vpnActive ? "vpnGlow 2s ease-in-out infinite" : "none",
           cursor: "pointer",
-          display: catalogSuccess ? "none" : "flex", alignItems: "center", justifyContent: "center",
+          display: catalogSuccess || qrModalOpen ? "none" : "flex", alignItems: "center", justifyContent: "center",
           boxShadow: "0 2px 12px rgba(0,0,0,0.35)",
           transition: "background 0.4s",
         }}
@@ -487,7 +500,7 @@ export default function App() {
           position: "fixed",
           bottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)",
           left: calcOpen ? "33%" : "50%",
-          display: catalogSuccess ? "none" : "flex",
+          display: catalogSuccess || qrModalOpen ? "none" : "flex",
           alignItems: "center", justifyContent: "center", gap: "4px",
           transform: "translateX(-50%)",
           transition: "left 0.25s cubic-bezier(0.25,0.46,0.45,0.94)",
@@ -506,7 +519,7 @@ export default function App() {
       </button>
 
       {/* Wallet floating button */}
-      <div style={{ position: "fixed", bottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)", right: "12px", zIndex: 9500 }}>
+      <div style={{ position: "fixed", bottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)", right: "12px", zIndex: 9500, display: qrModalOpen ? "none" : undefined }}>
         {(() => {
           const activeCount = purchases.filter((p) => p.status === "active").length;
           return (
@@ -652,7 +665,7 @@ export default function App() {
       <BottomNav
         active={activeTab}
         onChange={handleTabChange}
-        visible={navVisible && !catalogSuccess}
+        visible={navVisible && !catalogSuccess && !qrModalOpen}
         badges={{
           ...(crisisCount > 0 || activeNetworkVoucherCount > 0
             ? { catalog: (crisisCount > 0 ? crisisCount : 0) + activeNetworkVoucherCount }

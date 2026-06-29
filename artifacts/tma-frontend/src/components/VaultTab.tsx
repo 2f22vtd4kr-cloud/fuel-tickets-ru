@@ -50,6 +50,12 @@ function QRModal({ hash, onClose, expiresAt, networkName, fuelType, volume, pric
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
   const now = new Date();
+
+  // Hide all floating UI elements while QR modal is open
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("tma-qr-modal-open"));
+    return () => window.dispatchEvent(new CustomEvent("tma-qr-modal-close"));
+  }, []);
   const expiry = expiryInfo(expiresAt);
   const netColor = networkName ? (VAULT_NET_COLORS[networkName] ?? "#E8622A") : "#E8622A";
 
