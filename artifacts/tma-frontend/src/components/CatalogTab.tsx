@@ -48,7 +48,7 @@ const CSS = `
 @keyframes ctAmbientFlow { 0%{background-position:0% 50%} 100%{background-position:200% 50%} }
 @keyframes ctAmbientPulse { 0%,100%{opacity:.55} 50%{opacity:1} }
 .ct-amb-strip { background-size:200% 100%; animation:ctAmbientFlow 3s linear infinite, ctAmbientPulse 2.6s ease-in-out infinite; }
-.ct-root { min-height:100%; background:${COBALT_BG}; color:#e2e8f0; font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif; display:flex; flex-direction:column; overflow:hidden; position:relative; }
+.ct-root { min-height:100%; background:${COBALT_BG}; color:#e2e8f0; font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif; display:flex; flex-direction:column; overflow-x:hidden; position:relative; }
 .ct-hero { position:relative; margin:20px 16px 0; padding:18px 20px; border-radius:24px; background:rgba(255,255,255,0.04); border:1px solid rgba(232,98,42,0.3); overflow:hidden; flex-shrink:0; backdrop-filter:blur(12px); z-index:1; }
 .ct-hero-glow { position:absolute; top:-40px; right:-40px; width:140px; height:140px; border-radius:50%; background:radial-gradient(circle,rgba(232,98,42,0.25) 0%,transparent 70%); pointer-events:none; }
 .ct-hero-row { display:flex; align-items:center; gap:14px; position:relative; }
@@ -98,7 +98,8 @@ const CSS = `
 .ct-vol-p { font-size:11px; font-weight:600; font-variant-numeric:tabular-nums; }
 .ct-proceed { width:100%; padding:18px; border-radius:20px; border:none; color:#fff; font-size:17px; font-weight:800; letter-spacing:-0.3px; cursor:pointer; transition:all 0.2s; -webkit-tap-highlight-color:transparent; }
 .ct-proceed:active { transform:scale(0.97); opacity:0.9; }
-.ct-confirm { min-height:100%; display:flex; flex-direction:column; padding:0 0 32px; animation:ctReveal 0.35s cubic-bezier(0.34,1.56,0.64,1); position:relative; z-index:1; }
+.ct-confirm { min-height:100%; display:flex; flex-direction:column; padding:0 0 100px; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; animation:ctReveal 0.35s cubic-bezier(0.34,1.56,0.64,1); position:relative; z-index:1; }
+.ct-confirm::-webkit-scrollbar { display:none; }
 @keyframes ctReveal { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
 .ct-confirm-bar { height:4px; width:100%; opacity:0.7; }
 .ct-confirm-hdr { display:flex; align-items:center; gap:12px; padding:20px 20px 16px; }
